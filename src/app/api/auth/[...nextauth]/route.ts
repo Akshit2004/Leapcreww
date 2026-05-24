@@ -42,7 +42,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           email: user.email,
           image: user.image,
-          organizations: user.memberships.map((m) => ({
+          organizations: (user.memberships as { organization: { id: string; name: string; slug: string }; role: string }[]).map((m) => ({
             id: m.organization.id,
             name: m.organization.name,
             slug: m.organization.slug,
