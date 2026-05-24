@@ -1,0 +1,155 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id             String       @id @default(uuid())
+  name           String?
+  email          String       @unique
+  hashedPassword String
+  image          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  memberships    Membership[]
+}
+
+model Organization {
+  id           String        @id @default(uuid())
+  name         String
+  slug         String        @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  memberships  Membership[]
+  contacts     Contact[]
+  campaigns    Campaign[]
+  templates    Template[]
+  chatbotNodes ChatbotNode[]
+  integrations Integration[]
+  systemLogs   SystemLog[]
+  messages     Message[]
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  AGENT
+}
+
+model Membership {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           Role         @default(AGENT)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([userId, organizationId])
+}
+
+model Contact {
+  id             String       @id @default(uuid())
+  name           String
+  phone          String
+  email          String
+  source         String
+  tags           String[]     // Postgres scalar list support
+  status         String       // "Active" | "Inactive"
+  lastMessage    String?
+  lastMessageTime String?
+  unreadCount    Int          @default(0)
+  assignedAgent  String       @default("None")
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages       Message[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  sender         String       // "user" | "agent" | "system"
+  text           String       @db.Text
+  timestamp      String
+  status         String?      // "sent" | "delivered" | "read"
+  buttons        String[]     // Postgres scalar list support
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+model Campaign {
+  id             String       @id @default(uuid())
+  name           String
+  targetTag      String
+  templateName   String
+  sent           Int          @default(0)
+  delivered      Int          @default(0)
+  read           Int          @default(0)
+  clicked        Int          @default(0)
+  status         String       // "Completed" | "Active" | "Scheduled" | "Sending"
+  date           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+model Template {
+  id             String       @id @default(uuid())
+  name           String
+  body           String       @db.Text
+  category       String       // "Marketing" | "Utility" | "Authentication"
+  buttons        String[]     // Postgres scalar list support
+  mediaType      String       @default("none") // "none" | "image" | "video" | "document"
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+model ChatbotNode {
+  id             String       // Keep visual IDs: n1, n2, n3...
+  type           String       // "trigger" | "message" | "question" | "delay"
+  title          String
+  content        String       @db.Text
+  options        String[]     // Postgres scalar list
+  delayTime      Int?
+  nextId         String?
+  routes         Json?        // Stores options routing dynamically
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@id([id, organizationId])
+}
+
+model Integration {
+  id             String       // shopify, woocommerce, gsheets etc
+  name           String
+  description    String       @db.Text
+  status         String       // "connected" | "disconnected"
+  icon           String
+  apiKey         String?      @db.Text
+  webhookUrl     String?      @db.Text
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@id([id, organizationId])
+}
+
+model SystemLog {
+  id             String       @id @default(uuid())
+  timestamp      String
+  type           String       // "campaign" | "chat" | "integration" | "crm"
+  message        String       @db.Text
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
