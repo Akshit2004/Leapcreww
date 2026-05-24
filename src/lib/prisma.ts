@@ -6,13 +6,12 @@ const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
 const createPrismaClient = () => {
   const connectionString = process.env.DATABASE_URL;
-  // Supabase remote connections require SSL via pg.Pool
   const pool = new Pool({
     connectionString,
     max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
-    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+    ssl: { rejectUnauthorized: false },
   });
   const adapter = new PrismaPg(pool);
 
