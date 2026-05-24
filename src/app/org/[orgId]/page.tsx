@@ -9,7 +9,7 @@ import { OverviewTab } from "../../../components/OverviewTab";
 import { InboxTab } from "../../../components/InboxTab";
 import { CampaignsTab } from "../../../components/CampaignsTab";
 import { TemplatesTab } from "../../../components/TemplatesTab";
-import { Loader, AlertCircle, Bot } from "lucide-react";
+import { Loader, AlertCircle, Bot, Menu } from "lucide-react";
 
 export default function TenantDashboard() {
   const params = useParams();
@@ -22,6 +22,7 @@ export default function TenantDashboard() {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // 1. Session Redirect Guard
   useEffect(() => {
@@ -122,10 +123,37 @@ export default function TenantDashboard() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-amber-50 font-sans">
       {/* 1. Left Sidebar Navigation */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)} 
+      />
 
       {/* 2. Main Tab View Panels */}
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-amber-50 relative">
+        {/* Mobile Top Navigation Header */}
+        <header className="h-14 px-4 bg-white border-b border-orange-200 flex items-center justify-between shrink-0 lg:hidden select-none">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-1.5 rounded-lg hover:bg-orange-50 text-stone-700 cursor-pointer"
+            >
+              <Menu className="w-5.5 h-5.5" />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center">
+                <Bot className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-bold text-sm tracking-wide text-stone-900">WappFlow</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse-soft" />
+            <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-500/10 uppercase">SaaS Sandbox</span>
+          </div>
+        </header>
+
         {renderActiveTab()}
       </main>
     </div>

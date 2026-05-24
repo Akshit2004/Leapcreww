@@ -15,9 +15,12 @@ import {
   AlertCircle
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
+import { useParams } from "next/navigation";
 
 export const CampaignsTab: React.FC = () => {
   const { campaigns, templates, contacts, sendBroadcast } = useApp();
+  const params = useParams();
+  const orgId = params.orgId as string;
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Form States
@@ -35,12 +38,13 @@ export const CampaignsTab: React.FC = () => {
 
   const handleLaunchCampaign = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!campaignName.trim() || !targetTag || !templateName) return;
+    if (!campaignName.trim() || !targetTag || !templateName || !orgId) return;
 
     sendBroadcast({
       name: campaignName.trim(),
       targetTag,
       templateName,
+      organizationId: orgId,
     });
 
     // Reset and close
@@ -82,7 +86,7 @@ export const CampaignsTab: React.FC = () => {
   const allUniqueTags = Array.from(new Set(contacts.flatMap((c) => c.tags)));
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-8 animate-slide-up">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up">
       {/* Tab Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

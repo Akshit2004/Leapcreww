@@ -104,7 +104,7 @@ interface AppContextType {
   addContact: (contact: Omit<Contact, "id">) => Contact;
   updateContact: (id: string, updates: Partial<Contact>) => void;
   deleteContact: (id: string) => void;
-  sendBroadcast: (campaign: Omit<Campaign, "id" | "sent" | "delivered" | "read" | "clicked" | "status" | "date">) => void;
+  sendBroadcast: (campaign: { name: string; targetTag: string; templateName: string; organizationId: string }) => Promise<void>;
   sendLiveChatMessage: (contactId: string, text: string, sender?: "user" | "agent" | "system", buttons?: string[]) => void;
   updateChatbotNodes: (nodes: ChatbotNode[]) => void;
   toggleIntegration: (id: string, config?: { apiKey?: string; webhookUrl?: string }) => void;
@@ -281,24 +281,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const sendBroadcast = (campaignData: Omit<Campaign, "id" | "sent" | "delivered" | "read" | "clicked" | "status" | "date">) => {
-    const campId = `camp-${Date.now()}`;
-    const targetContacts = contacts.filter((c) => c.tags.includes(campaignData.targetTag));
-    const recipientCount = targetContacts.length;
+  const sendBroadcast = async (campaignData: { name: string; targetTag: string; templateName: string; organizationId: string }) => {
+    try {
+      addSystemLog("campaign", `Launching broadcast '${campaignData.name}' to matching contacts...`);
+      
+      const res = await fetch("/api/whatsapp/campaign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(campaignData),
+      });
 
-    const newCamp: Campaign = {
-      ...campaignData,
-      id: campId,
-      sent: recipientCount,
-      delivered: 0,
-      read: 0,
-      clicked: 0,
-      status: "Sending",
-      date: new Date().toISOString().split("T")[0],
-    };
+      if (!res.ok) {
+        const err = await res.json();
+        addSystemLog("campaign", `Broadcast launch failed: ${err.error}`);
+        return;
+      }
 
-    setCampaigns((prev) => [newCamp, ...prev]);
-    addSystemLog("campaign", `Launched broadcast '${newCamp.name}' targetting ${recipientCount} contacts with tag: ${newCamp.targetTag}`);
+      const data = await res.json();
+      setCampaigns((prev) => [data.campaign, ...prev]);
+      addSystemLog("campaign", `Broadcast launched successfully! Fired to ${data.campaign.sent} contacts.`);
+    } catch (err: any) {
+      addSystemLog("campaign", `Broadcast launch error: ${err.message}`);
+    }
   };
 
   const updateChatbotNodes = (newNodes: ChatbotNode[]) => {

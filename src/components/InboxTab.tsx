@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useParams } from "next/navigation";
 import { 
   Search, 
   Send, 
@@ -16,11 +17,14 @@ import {
   MessageSquareOff,
   ShoppingBag,
   ExternalLink,
-  Laptop
+  Laptop,
+  ArrowLeft
 } from "lucide-react";
 import { useApp, Contact, Message } from "../context/AppContext";
 
 export const InboxTab: React.FC = () => {
+  const params = useParams();
+  const orgId = params.orgId as string;
   const { 
     contacts, 
     chatHistory, 
@@ -36,6 +40,7 @@ export const InboxTab: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [inputText, setInputText] = useState("");
   const [newTagInput, setNewTagInput] = useState("");
+  const [showMobileProfile, setShowMobileProfile] = useState(false);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -62,26 +67,31 @@ export const InboxTab: React.FC = () => {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || !activeContactId) return;
+    if (!inputText.trim() || !activeContactId || !orgId) return;
 
     const text = inputText.trim();
     const contact = contacts.find(c => c.id === activeContactId);
 
-    // Send live chat message locally
+    if (!contact) return;
+
+    // Send live chat message locally for instant snappy UI response
     sendLiveChatMessage(activeContactId, text, "agent");
     setInputText("");
 
-    // If WhatsApp integration is connected, send via real API
-    const whatsappIntegrated = integrations.find(i => i.id === "whatsapp")?.status === "connected";
-    if (whatsappIntegrated && contact) {
-      try {
-        const phone = contact.phone.replace(/[^0-9]/g, "");
-        await fetch("/api/whatsapp/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: phone, text }),
-        }).catch(() => {});
-      } catch {}
+    try {
+      const phone = contact.phone.replace(/[^0-9]/g, "");
+      await fetch("/api/whatsapp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          to: phone, 
+          text,
+          contactId: activeContactId,
+          orgId: orgId
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to sync live chat message with backend:", err);
     }
   };
 
@@ -124,9 +134,11 @@ export const InboxTab: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex h-full overflow-hidden animate-slide-up">
+    <div className="flex-1 flex h-full overflow-hidden animate-slide-up relative">
       {/* 1. Left Contact List Pane */}
-      <div className="w-80 border-r border-orange-100 flex flex-col h-full bg-white shrink-0">
+      <div className={`w-full md:w-80 border-r border-orange-100 flex flex-col h-full bg-white shrink-0 ${
+        activeContactId ? "hidden md:flex" : "flex"
+      }`}>
         {/* Search */}
         <div className="p-4 border-b border-orange-100 shrink-0 space-y-3">
           <h3 className="font-semibold text-base">Active Chats</h3>
@@ -212,33 +224,54 @@ export const InboxTab: React.FC = () => {
       </div>
 
       {/* 2. Middle Chat Stream Window */}
-      <div className="flex-1 flex flex-col h-full bg-orange-50/30 relative">
+      <div className={`flex-1 flex flex-col h-full bg-orange-50/30 relative ${
+        activeContactId ? "flex" : "hidden md:flex"
+      }`}>
         {/* Chat Background Graphic Overlay */}
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#f97316_1.5px,transparent_1.5px)] [background-size:24px_24px]" />
 
         {activeContact ? (
           <>
             {/* Active Contact Header */}
-            <div className="h-16 px-6 bg-white border-b border-orange-100 flex items-center justify-between shrink-0 relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-orange-500/10 flex items-center justify-center font-bold text-orange-600 text-sm">
+            <div className="h-16 px-4 md:px-6 bg-white border-b border-orange-100 flex items-center justify-between shrink-0 relative z-10 select-none">
+              <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                {/* Back button for mobile view */}
+                <button
+                  type="button"
+                  onClick={() => setActiveContactId("")}
+                  className="md:hidden p-1.5 rounded-lg hover:bg-orange-50 text-stone-700 cursor-pointer shrink-0"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+
+                <div className="w-9 h-9 rounded-full bg-orange-500/10 flex items-center justify-center font-bold text-orange-600 text-sm shrink-0">
                   {activeContact.name.split(" ").map(n => n[0]).join("")}
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-stone-900 dark:text-white leading-none">{activeContact.name}</h4>
-                  <span className="text-[10px] text-stone-500 flex items-center gap-1 mt-0.5">
-                    <span>{activeContact.phone}</span>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-stone-900 leading-none truncate">{activeContact.name}</h4>
+                  <span className="text-[10px] text-stone-500 flex items-center gap-1 mt-0.5 truncate">
+                    <span className="truncate">{activeContact.phone}</span>
                     <span>•</span>
-                    <span className="capitalize">{activeContact.source}</span>
+                    <span className="capitalize truncate">{activeContact.source}</span>
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] px-2.5 py-1 rounded-full bg-orange-50 text-stone-600 font-semibold flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:inline-flex text-[10px] px-2.5 py-1 rounded-full bg-orange-50 text-stone-600 font-semibold items-center gap-1.5 shrink-0">
                   <Laptop className="w-3 h-3 text-zinc-500" />
-                  Assigned Agent: <span className="font-bold text-stone-800">{activeContact.assignedAgent}</span>
+                  Agent: <span className="font-bold text-stone-800">{activeContact.assignedAgent}</span>
                 </span>
+                
+                {/* Profile panel toggle button for mobile/tablet screens */}
+                <button
+                  type="button"
+                  onClick={() => setShowMobileProfile(!showMobileProfile)}
+                  className="lg:hidden p-2 rounded-lg hover:bg-orange-50 text-stone-700 cursor-pointer shrink-0 transition-colors"
+                  title="View Customer Profile"
+                >
+                  <User className="w-4.5 h-4.5" />
+                </button>
               </div>
             </div>
 
@@ -353,9 +386,31 @@ export const InboxTab: React.FC = () => {
         )}
       </div>
 
-      {/* 3. Right CRM Profile Panel */}
+      {/* 3. Right CRM Profile Panel Drawer */}
       {activeContact && (
-        <div className="w-72 border-l border-orange-100 bg-white flex flex-col h-full overflow-y-auto custom-scrollbar shrink-0 animate-slide-in-left p-6 space-y-6">
+        <>
+          {/* Backdrop for mobile CRM drawer */}
+          {showMobileProfile && (
+            <div 
+              onClick={() => setShowMobileProfile(false)}
+              className="fixed inset-0 bg-black/40 z-30 lg:hidden transition-opacity duration-300 cursor-pointer"
+            />
+          )}
+
+          <div className={`fixed inset-y-0 right-0 z-40 lg:static w-80 lg:w-72 border-l border-orange-100 bg-white flex flex-col h-full overflow-y-auto custom-scrollbar shrink-0 p-6 space-y-6 transition-transform duration-305 ease-in-out lg:translate-x-0 ${
+            showMobileProfile ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+          }`}>
+            {/* Header close button inside mobile CRM drawer */}
+            <div className="flex items-center justify-between pb-3 border-b border-orange-100 lg:hidden select-none">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Customer Profile</span>
+              <button
+                type="button"
+                onClick={() => setShowMobileProfile(false)}
+                className="p-1 rounded-lg hover:bg-orange-50 text-stone-500 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           <div className="text-center pb-4 border-b border-orange-100 dark:border-zinc-900">
             <div className="w-16 h-16 rounded-full bg-orange-500/10 text-orange-600 flex items-center justify-center text-xl font-bold mx-auto mb-3 border border-orange-500/10">
               {activeContact.name.split(" ").map(n => n[0]).join("")}
@@ -451,13 +506,17 @@ export const InboxTab: React.FC = () => {
           {/* Delete contact */}
           <div className="pt-6 border-t border-orange-100 dark:border-zinc-900">
             <button
-              onClick={() => deleteContact(activeContact.id)}
-              className="w-full text-center py-2 text-xs font-semibold text-red-500 hover:bg-red-500/5 hover:text-red-600 border border-red-500/10 hover:border-red-500/30 rounded-lg transition-colors"
+              onClick={() => {
+                deleteContact(activeContact.id);
+                setShowMobileProfile(false);
+              }}
+              className="w-full text-center py-2 text-xs font-semibold text-red-500 hover:bg-red-500/5 hover:text-red-600 border border-red-500/10 hover:border-red-500/30 rounded-lg transition-colors cursor-pointer"
             >
               Delete Lead Profile
             </button>
           </div>
         </div>
+        </>
       )}
     </div>
   );

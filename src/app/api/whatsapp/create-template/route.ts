@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || phoneNumberId;
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
     const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
 
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const metaRes = await fetch(
-      `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/message_templates`,
+      `https://graph.facebook.com/${apiVersion}/${wabaId}/message_templates`,
       {
         method: "POST",
         headers: {

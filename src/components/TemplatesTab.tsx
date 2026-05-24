@@ -1,20 +1,21 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { 
-  FileCode2, 
-  Plus, 
-  Tag, 
-  Check, 
-  Sparkles, 
-  Image, 
-  Video, 
+import {
+  FileCode2,
+  Plus,
+  Tag,
+  Check,
+  Sparkles,
+  Image,
+  Video,
   FileText,
   MousePointerClick,
   X,
   PlusCircle,
   Trash,
-  Loader
+  Loader,
+  Search
 } from "lucide-react";
 import { useApp, Template } from "../context/AppContext";
 import { useParams } from "next/navigation";
@@ -26,6 +27,7 @@ export const TemplatesTab: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Form States
   const [tmplName, setTmplName] = useState("");
@@ -36,9 +38,14 @@ export const TemplatesTab: React.FC = () => {
   const [buttonsList, setButtonsList] = useState<string[]>([]);
 
   // Filter templates
-  const filteredTemplates = templates.filter(
-    (t) => activeCategory === "all" || t.category === activeCategory
-  );
+  const filteredTemplates = templates.filter((t) => {
+    const matchesCategory = activeCategory === "all" || t.category === activeCategory;
+    const matchesSearch =
+      t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.body.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.category.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   const handleAddButton = () => {
     if (!buttonInput.trim() || buttonsList.length >= 3) return;
@@ -116,7 +123,7 @@ export const TemplatesTab: React.FC = () => {
               addSystemLog("crm", `Template "${t.name}" ${data.metaStatus === "approved" ? "approved" : "rejected"} by Meta`);
             }
           }
-        } catch {}
+        } catch { }
       }
     }, 15000);
 
@@ -167,8 +174,8 @@ export const TemplatesTab: React.FC = () => {
     return parts.map((part, idx) => {
       if (/^\{\{\d\}\}$/.test(part)) {
         return (
-          <span 
-            key={idx} 
+          <span
+            key={idx}
             className="bg-orange-500/10 dark:bg-orange-500/25 text-orange-600 font-mono font-bold px-1 rounded"
           >
             {part}
@@ -180,7 +187,7 @@ export const TemplatesTab: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-8 animate-slide-up">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up">
       {/* Tab Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -196,28 +203,51 @@ export const TemplatesTab: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter Category pills */}
-      <div className="flex items-center gap-1.5 border-b border-orange-100 pb-3">
-        {["all", "Marketing", "Utility", "Authentication"].map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
-            className={`text-xs font-semibold px-4 py-1.5 rounded-lg transition-all ${
-              activeCategory === cat
-                ? "bg-orange-600 text-white"
-                : "text-stone-500 hover:bg-orange-50"
-            }`}
-          >
-            {cat === "all" ? "All Templates" : cat}
-          </button>
-        ))}
+      {/* Filter and Search controls */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-orange-100 pb-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {["all", "Marketing", "Utility", "Authentication"].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => {
+                setActiveCategory(cat);
+              }}
+              className={`text-xs font-semibold px-4 py-1.5 rounded-lg transition-all ${activeCategory === cat
+                  ? "bg-orange-600 text-white"
+                  : "text-stone-500 hover:bg-orange-50"
+                }`}
+            >
+              {cat === "all" ? "All Templates" : cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Search Box */}
+        <div className="relative w-full md:w-72">
+          <input
+            type="text"
+            placeholder="Search templates by name or content..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full text-xs pl-8 pr-8 py-2 rounded-xl border border-orange-100 bg-white/70 backdrop-blur-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition-all shadow-sm"
+          />
+          <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 focus:outline-none"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Templates Grid listing */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTemplates.map((t) => (
-          <div 
-            key={t.id} 
+          <div
+            key={t.id}
             className="glass-panel rounded-2xl flex flex-col justify-between shadow-sm border border-orange-100/80 hover:-translate-y-1 hover:shadow-md transition-all duration-300 overflow-hidden bg-white"
           >
             {/* Template Card Content */}
@@ -250,7 +280,7 @@ export const TemplatesTab: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {t.buttons.map((btn, bIdx) => (
-                    <span 
+                    <span
                       key={bIdx}
                       className="text-[10px] font-bold border border-orange-100 bg-white px-2.5 py-1 text-orange-600 rounded-lg flex items-center gap-1 shadow-sm leading-none"
                     >
@@ -272,14 +302,14 @@ export const TemplatesTab: React.FC = () => {
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="glass-panel w-full max-w-lg rounded-2xl shadow-xl flex flex-col overflow-hidden animate-slide-up bg-white">
-            
+
             {/* Header */}
             <div className="p-6 border-b border-orange-100 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-base text-stone-900 flex items-center gap-2">
                 <FileCode2 className="w-5 h-5 text-orange-500" />
                 Build Message Template
               </h3>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="p-1 rounded-lg hover:bg-orange-50 text-stone-500 transition-colors"
               >
@@ -289,7 +319,7 @@ export const TemplatesTab: React.FC = () => {
 
             {/* Form */}
             <form onSubmit={handleCreateTemplate} className="p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
-              
+
               {/* Template Name */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Template Name</label>
@@ -353,17 +383,17 @@ export const TemplatesTab: React.FC = () => {
               {/* Interactive buttons builder */}
               <div className="space-y-2.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Interactive CTA Buttons (Max 3)</label>
-                
+
                 {/* Active buttons layout */}
                 {buttonsList.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 p-2 bg-orange-50/40 rounded-xl border border-orange-100">
                     {buttonsList.map((btn, idx) => (
-                      <span 
-                        key={idx} 
+                      <span
+                        key={idx}
                         className="text-[10px] font-bold bg-white text-orange-600 border border-orange-100 px-2 py-0.5 rounded flex items-center gap-1.5"
                       >
                         <span>{btn}</span>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => handleRemoveButton(idx)}
                           className="hover:bg-red-500/10 p-0.5 rounded-full text-stone-500 hover:text-red-500"
