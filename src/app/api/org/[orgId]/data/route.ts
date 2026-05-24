@@ -43,7 +43,7 @@ export async function GET(
       },
     });
 
-    const members = memberships.map((m) => ({
+    const members = (memberships as { user: { id: string; name: string | null; email: string }; role: string }[]).map((m) => ({
       id: m.user.id,
       name: m.user.name || m.user.email.split("@")[0],
       email: m.user.email,
