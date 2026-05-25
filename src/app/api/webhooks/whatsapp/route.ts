@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
         if (value.messages) {
           for (const msg of value.messages) {
             const waFrom = msg.from;
-            const text = msg.text?.body || "";
+            const text = msg.text?.body || msg.interactive?.button_reply?.id || "";
             const timestamp = msg.timestamp;
             const profileName = value.contacts?.[0]?.profile?.name || `Customer ${waFrom.slice(-4)}`;
 

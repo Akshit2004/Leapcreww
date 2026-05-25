@@ -74,7 +74,14 @@ export async function sendWhatsAppMessage(
     to: message.to,
   };
 
-  if (message.text) {
+  if (message.buttons) {
+    body.type = "interactive";
+    body.interactive = {
+      type: "button",
+      body: { text: message.text || "" },
+      action: { buttons: message.buttons },
+    };
+  } else if (message.text) {
     body.type = "text";
     body.text = { preview_url: true, body: message.text };
   } else if (message.template) {
@@ -89,13 +96,6 @@ export async function sendWhatsAppMessage(
   } else if (message.document) {
     body.type = "document";
     body.document = message.document;
-  } else if (message.buttons) {
-    body.type = "interactive";
-    body.interactive = {
-      type: "button",
-      body: { text: message.text || "" },
-      action: { buttons: message.buttons },
-    };
   }
 
   try {
