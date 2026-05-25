@@ -58,7 +58,9 @@ export async function GET(request: NextRequest) {
       metaData = await metaRes.json();
 
       if (!metaRes.ok) {
-        return NextResponse.json({ error: metaData.error?.message || "Meta API error" }, { status: 400 });
+        // Meta API error — return current DB status instead of failing
+        console.warn(`[Template Status] Meta API error for ${template.metaId}:`, metaData.error?.message);
+        return NextResponse.json({ metaStatus: dbStatus, metaData: null, metaError: metaData.error?.message });
       }
 
       const metaStatus = metaData.status?.toLowerCase() || "pending";

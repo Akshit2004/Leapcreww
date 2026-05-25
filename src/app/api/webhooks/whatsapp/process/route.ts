@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { formatPhoneNumber } from "@/lib/whatsapp";
 import { handleAutoResponder } from "@/lib/autoresponder";
 
 export async function POST(req: NextRequest) {
@@ -16,13 +15,29 @@ export async function POST(req: NextRequest) {
     }
 
     const org = orgs[0];
+    const normalizedPhone = `+${from.replace(/[^0-9]/g, "")}`;
 
     let contact = await prisma.contact.findFirst({
       where: {
+        phone: normalizedPhone,
         organizationId: org.id,
-        phone: { contains: from.slice(-10) },
       },
     });
+
+    // Backward compatibility: try suffix match
+    if (!contact) {
+      contact = await prisma.contact.findFirst({
+        where: {
+          organizationId: org.id,
+          phone: { contains: from.slice(-10) },
+        },
+      });
+    }
+
+    let activeOrgId = org.id;
+    if (contact) {
+      activeOrgId = contact.organizationId;
+    }
 
     const d = new Date();
     const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -32,7 +47,7 @@ export async function POST(req: NextRequest) {
       contact = await prisma.contact.create({
         data: {
           name: profileName,
-          phone: `+${formatPhoneNumber(from)}`,
+          phone: normalizedPhone,
           email: `${from}@whatsapp.customer`,
           source: "WhatsApp Inbound",
           tags: ["WhatsApp", "Inbound"],
@@ -41,7 +56,7 @@ export async function POST(req: NextRequest) {
           lastMessageTime: timeStr,
           unreadCount: 1,
           assignedAgent: "Bot",
-          organizationId: org.id,
+          organizationId: activeOrgId,
         },
       });
     } else {
@@ -61,7 +76,7 @@ export async function POST(req: NextRequest) {
         text,
         timestamp: timeStr,
         contactId: contact.id,
-        organizationId: org.id,
+        organizationId: activeOrgId,
       },
     });
 
@@ -70,13 +85,12 @@ export async function POST(req: NextRequest) {
         timestamp: timeStr,
         type: "chat",
         message: `Received WhatsApp message from ${contact.name}: "${text.slice(0, 60)}"`,
-        organizationId: org.id,
+        organizationId: activeOrgId,
       },
     });
 
     if (contact.assignedAgent === "Bot") {
-      // Trigger the Groq AI auto-responder and await it
-      await handleAutoResponder(contact.id, org.id);
+      await handleAutoResponder(contact.id, activeOrgId);
     }
 
     return NextResponse.json({ status: "ok", contactId: contact.id }, { status: 200 });

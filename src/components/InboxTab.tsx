@@ -38,7 +38,8 @@ export const InboxTab: React.FC = () => {
     integrations,
     members,
     lockSync,
-    unlockSync
+    unlockSync,
+    refreshWorkspace
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,6 +48,13 @@ export const InboxTab: React.FC = () => {
   const [showMobileProfile, setShowMobileProfile] = useState(false);
   const [showSimulate, setShowSimulate] = useState(false);
   const [simMessage, setSimMessage] = useState("");
+  const [autoRefresh, setAutoRefresh] = useState(false);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => refreshWorkspace(orgId), 5000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, orgId, refreshWorkspace]);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -156,7 +164,20 @@ export const InboxTab: React.FC = () => {
       }`}>
         {/* Search */}
         <div className="p-4 border-b border-orange-100 shrink-0 space-y-3">
-          <h3 className="font-semibold text-base">Active Chats</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-base">Active Chats</h3>
+            <button
+              onClick={() => setAutoRefresh((p) => !p)}
+              className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border transition-all cursor-pointer ${
+                autoRefresh
+                  ? "bg-orange-500 text-white border-orange-500"
+                  : "bg-white text-stone-400 border-orange-100 hover:border-orange-300"
+              }`}
+              title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
+            >
+              {autoRefresh ? "Live" : "Paused"}
+            </button>
+          </div>
           <div className="relative">
             <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhook, validateWebhookSignature, WhatsAppWebhookPayload } from "@/lib/whatsapp";
 import { prisma } from "@/lib/prisma";
 import { handleAutoResponder } from "@/lib/autoresponder";
+import { handleMarketplaceMessage } from "@/lib/marketplace";
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
@@ -66,13 +67,31 @@ export async function POST(req: NextRequest) {
             }
 
             const phoneClean = waFrom.startsWith("+") ? waFrom : `+${waFrom}`;
+            const normalizedPhone = `+${waFrom.replace(/[^0-9]/g, "")}`;
+
+            // Use the org from the webhook metadata match, or fall back to contacting org
+            let activeOrgId = org.id;
 
             let contact = await prisma.contact.findFirst({
               where: {
-                organizationId: org.id,
-                phone: { contains: waFrom.slice(-10) },
+                phone: normalizedPhone,
+                organizationId: activeOrgId,
               },
             });
+
+            // Backward compatibility: try suffix match
+            if (!contact) {
+              contact = await prisma.contact.findFirst({
+                where: {
+                  organizationId: activeOrgId,
+                  phone: { contains: waFrom.slice(-10) },
+                },
+              });
+            }
+
+            if (contact) {
+              activeOrgId = contact.organizationId;
+            }
 
             const d = new Date();
             const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -90,7 +109,7 @@ export async function POST(req: NextRequest) {
               contact = await prisma.contact.create({
                 data: {
                   name: profileName,
-                  phone: phoneClean,
+                  phone: normalizedPhone,
                   email: `${waFrom}@whatsapp.customer`,
                   source: "WhatsApp Inbound",
                   tags: ["WhatsApp", "Inbound"],
@@ -99,7 +118,7 @@ export async function POST(req: NextRequest) {
                   lastMessageTime: timeStr,
                   unreadCount: 1,
                   assignedAgent: "Bot",
-                  organizationId: org.id,
+                  organizationId: activeOrgId,
                 },
               });
             }
@@ -110,7 +129,7 @@ export async function POST(req: NextRequest) {
                 text,
                 timestamp: timeStr,
                 contactId: contact.id,
-                organizationId: org.id,
+                organizationId: activeOrgId,
               },
             });
 
@@ -119,13 +138,20 @@ export async function POST(req: NextRequest) {
                 timestamp: timeStr,
                 type: "chat",
                 message: `WhatsApp from ${contact.name}: "${text.slice(0, 60)}"`,
-                organizationId: org.id,
+                organizationId: activeOrgId,
               },
             });
 
             if (contact.assignedAgent === "Bot") {
-              // Trigger auto-responder and await it so Vercel doesn't freeze the process
-              await handleAutoResponder(contact.id, org.id);
+              const marketplaceHandled = await handleMarketplaceMessage(
+                text,
+                contact.phone,
+                contact.id,
+                activeOrgId
+              );
+              if (!marketplaceHandled) {
+                await handleAutoResponder(contact.id, activeOrgId);
+              }
             }
           }
         }

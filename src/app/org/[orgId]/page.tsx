@@ -10,6 +10,7 @@ import { InboxTab } from "../../../components/InboxTab";
 import { CampaignsTab } from "../../../components/CampaignsTab";
 import { TemplatesTab } from "../../../components/TemplatesTab";
 import { ChatbotTab } from "../../../components/ChatbotTab";
+import { MarketplaceTab } from "../../../components/MarketplaceTab";
 import { Loader, AlertCircle, Bot, Menu } from "lucide-react";
 
 export default function TenantDashboard() {
@@ -64,9 +65,6 @@ export default function TenantDashboard() {
     };
 
     fetchWorkspaceData(true);
-
-    const interval = setInterval(() => fetchWorkspaceData(false), 5000);
-    return () => clearInterval(interval);
   }, [orgId, status, initializeWorkspace]);
 
   const renderActiveTab = () => {
@@ -81,6 +79,8 @@ export default function TenantDashboard() {
         return <TemplatesTab />;
       case "chatbot":
         return <ChatbotTab />;
+      case "marketplace":
+        return <MarketplaceTab />;
       default:
         return <OverviewTab />;
     }

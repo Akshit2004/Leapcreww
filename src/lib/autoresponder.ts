@@ -2,15 +2,12 @@ import { prisma } from "./prisma";
 import { getGroqChatCompletion } from "./groq";
 import { sendWhatsAppMessage } from "./whatsapp";
 
-// Helper: Extract valid JSON from LLM string output
 function extractJsonFromString(str: string): any {
   try {
-    // Strip markdown formatting if present
     const cleanStr = str.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(cleanStr);
   } catch (err) {
     console.error("JSON Extraction failed from response:", str, err);
-    // Find text between braces as fallback
     const match = str.match(/\{[\s\S]*\}/);
     if (match) {
       try {
@@ -23,7 +20,6 @@ function extractJsonFromString(str: string): any {
   }
 }
 
-// Structured CRM & Escalation Agent Analysis
 async function analyzeConversationAgent(recentMessages: any[]): Promise<{
   purchaseIntent: boolean;
   budget: string | null;
@@ -81,207 +77,295 @@ Do not include any explanation, code fences, or markdown wrapping. Return ONLY t
   }
 }
 
-export async function handleAutoResponder(
+// ─── Chatbot Node Tree Traversal ─────────────────────────────────────────────
+
+async function sendReply(
+  text: string,
   contactId: string,
-  orgId: string
+  orgId: string,
+  timeStr: string,
+  contactName: string,
+  contactPhone: string,
+  buttons?: { type: "reply"; reply: { id: string; title: string } }[]
 ) {
+  await prisma.message.create({
+    data: {
+      sender: "agent",
+      text,
+      timestamp: timeStr,
+      contactId,
+      organizationId: orgId,
+      buttons: buttons?.map((b) => b.reply.title) || [],
+    },
+  });
+
+  const truncated = text.length > 35 ? text.substring(0, 32) + "..." : text;
+  await prisma.contact.update({
+    where: { id: contactId },
+    data: { lastMessage: truncated, lastMessageTime: timeStr },
+  });
+
+  await prisma.systemLog.create({
+    data: {
+      timestamp: timeStr,
+      type: "chat",
+      message: `Bot replied to ${contactName}: "${text.slice(0, 50)}"`,
+      organizationId: orgId,
+    },
+  });
+
+  const cleanPhone = contactPhone.replace(/[^0-9]/g, "");
+  const result = await sendWhatsAppMessage({ to: cleanPhone, text, buttons });
+  if (!result.ok) {
+    console.warn("WhatsApp dispatch failed:", result.error);
+  }
+}
+
+async function advanceFlow(
+  fromNodeId: string,
+  nodes: any[],
+  contactId: string,
+  orgId: string,
+  timeStr: string,
+  contactName: string,
+  contactPhone: string
+) {
+  if (!fromNodeId) {
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { currentNodeId: null },
+    });
+    return;
+  }
+
+  const node = nodes.find((n) => n.id === fromNodeId);
+  if (!node) {
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { currentNodeId: null },
+    });
+    return;
+  }
+
+  if (node.type === "message") {
+    await sendReply(node.content, contactId, orgId, timeStr, contactName, contactPhone);
+    if (node.nextId) {
+      const next = nodes.find((n) => n.id === node.nextId);
+      if (next?.type === "question") {
+        const btns = (next.options || []).map((opt: string, idx: number) => ({
+          type: "reply" as const,
+          reply: { id: `opt_${idx}`, title: opt },
+        }));
+        await sendReply(next.content, contactId, orgId, timeStr, contactName, contactPhone, btns);
+        await prisma.contact.update({
+          where: { id: contactId },
+          data: { currentNodeId: next.id },
+        });
+      } else if (next?.type === "delay") {
+        if (next.nextId) {
+          await advanceFlow(next.nextId, nodes, contactId, orgId, timeStr, contactName, contactPhone);
+        }
+      } else {
+        await advanceFlow(node.nextId, nodes, contactId, orgId, timeStr, contactName, contactPhone);
+      }
+    } else {
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: { currentNodeId: null },
+      });
+    }
+  } else if (node.type === "question") {
+    const btns = (node.options || []).map((opt: string, idx: number) => ({
+      type: "reply" as const,
+      reply: { id: `opt_${idx}`, title: opt },
+    }));
+    await sendReply(node.content, contactId, orgId, timeStr, contactName, contactPhone, btns);
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { currentNodeId: node.id },
+    });
+  } else if (node.type === "delay") {
+    if (node.nextId) {
+      await advanceFlow(node.nextId, nodes, contactId, orgId, timeStr, contactName, contactPhone);
+    } else {
+      await prisma.contact.update({
+        where: { id: contactId },
+        data: { currentNodeId: null },
+      });
+    }
+  } else {
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { currentNodeId: null },
+    });
+  }
+}
+
+// ─── Free-form AI fallback (original behavior) ─────────────────────────────
+
+async function freeFormAiReply(
+  contact: any,
+  orgId: string,
+  orgName: string,
+  timeStr: string
+) {
+  const recentMessages = await prisma.message.findMany({
+    where: { contactId: contact.id },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+  });
+  recentMessages.reverse();
+
+  const botContextMessages = [
+    {
+      role: "system",
+      content: `You are an expert AI sales and support assistant for the company: "${orgName}".
+
+Your role:
+- QUALIFY leads: identify their needs, budget, timeline, and purchase intent naturally through conversation
+- ANSWER questions accurately about the company's products/services
+- BOOK appointments or escalate to a human agent when the prospect is ready
+- NEVER make up pricing or features — say "I'll have our team share the details with you"
+
+Response guidelines:
+- Keep responses under 3-4 sentences. WhatsApp is conversational, not email.
+- Use *bold* for emphasis and occasional emojis for warmth (😊 👍 🎉)
+- Ask qualifying questions naturally: "What kind of setup are you looking for?", "Do you have a timeline in mind?"
+- If the customer sounds ready to buy → say "Great! I'll connect you with our team to get this going."
+- If you don't know the answer → "I'm not sure about that. Let me have a specialist reach out to you shortly."
+- NEVER be pushy or salesy — be helpful and consultative.`,
+    },
+    ...recentMessages.map((m) => ({
+      role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
+      content: m.text,
+    })),
+  ];
+
+  const botReplyText = await getGroqChatCompletion(botContextMessages);
+
+  await sendReply(botReplyText, contact.id, orgId, timeStr, contact.name, contact.phone);
+
+  const crmHistory = [
+    ...recentMessages.map((m) => ({
+      role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
+      content: m.text,
+    })),
+    { role: "assistant" as const, content: botReplyText },
+  ];
+
+  console.log(`[Agentic CRM] Triggering background qualification audit for ${contact.name}...`);
+  const analysis = await analyzeConversationAgent(crmHistory);
+  if (analysis) {
+    await applyCrmAnalysis(analysis, contact, orgId, timeStr);
+  }
+}
+
+async function applyCrmAnalysis(analysis: any, contact: any, orgId: string, timeStr: string) {
+  let updatedTags = [...contact.tags];
+  let tagChanged = false;
+
+  if (analysis.purchaseIntent && !updatedTags.includes("Hot Prospect")) {
+    updatedTags.push("Hot Prospect");
+    tagChanged = true;
+  }
+  if (analysis.budget && !updatedTags.includes(analysis.budget)) {
+    updatedTags.push(analysis.budget);
+    tagChanged = true;
+  }
+  if (analysis.interests && Array.isArray(analysis.interests)) {
+    analysis.interests.forEach((item: string) => {
+      if (!updatedTags.includes(item)) {
+        updatedTags.push(item);
+        tagChanged = true;
+      }
+    });
+  }
+
+  if (tagChanged) {
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: { tags: updatedTags },
+    });
+    await prisma.systemLog.create({
+      data: {
+        timestamp: timeStr,
+        type: "crm",
+        message: `Autonomous CRM Agent updated tags for ${contact.name}: ${updatedTags.join(", ")}`,
+        organizationId: orgId,
+      },
+    });
+  }
+
+  if (analysis.frustrated || analysis.needsEscalation) {
+    const memberships = await prisma.membership.findMany({
+      where: { organizationId: orgId },
+      include: { user: true },
+    });
+    const escalationAgent =
+      memberships.length > 0 && memberships[0].user.name
+        ? memberships[0].user.name
+        : "Support Team";
+
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: { assignedAgent: escalationAgent },
+    });
+
+    const reason = analysis.frustrated
+      ? "detected high customer frustration and negative sentiment"
+      : "a complex technical/unresolved support inquiry";
+
+    await prisma.systemLog.create({
+      data: {
+        timestamp: timeStr,
+        type: "crm",
+        message: `[Escalation Alert] Lead ${contact.name} was autonomously re-assigned to agent '${escalationAgent}' due to ${reason}.`,
+        organizationId: orgId,
+      },
+    });
+
+    await prisma.message.create({
+      data: {
+        sender: "system",
+        text: `[Autonomous Escalation: Chat re-assigned to human agent '${escalationAgent}' due to ${reason}]`,
+        timestamp: timeStr,
+        contactId: contact.id,
+        organizationId: orgId,
+      },
+    });
+
+    console.log(`[Agentic CRM] Autonomously escalated contact ${contact.name} to ${escalationAgent}.`);
+  }
+}
+
+// ─── Main Entry Point ───────────────────────────────────────────────────────
+
+export async function handleAutoResponder(contactId: string, orgId: string) {
   try {
-    // 1. Fetch contact & org details
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
       include: { organization: true },
     });
 
-    if (!contact || contact.assignedAgent !== "Bot") {
-      return;
-    }
+    if (!contact || contact.assignedAgent !== "Bot") return;
 
     const orgName = contact.organization.name;
-
-    // 2. Fetch last 10 messages for conversation context
-    const recentMessages = await prisma.message.findMany({
-      where: { contactId },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-    });
-
-    // Reverse messages to chronological order
-    recentMessages.reverse();
-
-    // 3. Format messages for Groq API
-    const botContextMessages = [
-      {
-        role: "system",
-        content: `You are a helpful, professional AI customer assistant for the company: "${orgName}". 
-Your goal is to answer customer queries over WhatsApp, help qualify leads, and provide information politely.
-Keep your responses relatively brief, friendly, and formatted nicely for WhatsApp (you can use bullet points, bold text using *asterisks*, and emojis where appropriate).
-If you do not know the answer, politely tell the customer that a human agent will get back to them shortly.`,
-      },
-      ...recentMessages.map((m) => ({
-        role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
-        content: m.text,
-      })),
-    ];
-
-    // 4. Get response from Groq
-    const botReplyText = await getGroqChatCompletion(botContextMessages);
-
     const d = new Date();
     const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
-    // 5. Save bot reply to PostgreSQL
-    await prisma.message.create({
-      data: {
-        sender: "agent", // Store as agent so it shows in the live chat stream
-        text: botReplyText,
-        timestamp: timeStr,
-        contactId,
-        organizationId: orgId,
-      },
+    // 1. Try chatbot node tree flow
+    const nodes = await prisma.chatbotNode.findMany({
+      where: { organizationId: orgId },
+      orderBy: { id: "asc" },
     });
 
-    // 6. Update contact last message
-    await prisma.contact.update({
-      where: { id: contactId },
-      data: {
-        lastMessage: botReplyText.length > 35 ? botReplyText.substring(0, 32) + "..." : botReplyText,
-        lastMessageTime: timeStr,
-      },
-    });
-
-    // 7. Update System Logs for active response
-    await prisma.systemLog.create({
-      data: {
-        timestamp: timeStr,
-        type: "chat",
-        message: `AI Bot replied to ${contact.name}: "${botReplyText.slice(0, 50)}"`,
-        organizationId: orgId,
-      },
-    });
-
-    // 8. Try sending message via real WhatsApp Meta API if configured
-    const cleanPhone = contact.phone.replace(/[^0-9]/g, "");
-    const result = await sendWhatsAppMessage({ to: cleanPhone, text: botReplyText });
-    if (!result.ok) {
-      console.warn("Auto-responder WhatsApp dispatch skipped/failed:", result.error);
-      await prisma.systemLog.create({
-        data: {
-          timestamp: timeStr,
-          type: "chat",
-          message: `AI Bot WhatsApp dispatch failed: ${result.error}`,
-          organizationId: orgId,
-        },
-      });
+    if (nodes.length > 0) {
+      const handled = await handleNodeFlow(contact, nodes, orgId, timeStr);
+      if (handled) return;
     }
 
-    // ==========================================
-    // 9. AGENTIC CRM ANALYSIS & HUMAN ESCALATION
-    // ==========================================
-    // Re-package messages for the CRM analyzer agent
-    const crmHistory = [
-      ...recentMessages.map((m) => ({
-        role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
-        content: m.text
-      })),
-      {
-        role: "assistant" as const,
-        content: botReplyText
-      }
-    ];
-
-    console.log(`[Agentic CRM] Triggering background qualification audit for ${contact.name}...`);
-    const analysis = await analyzeConversationAgent(crmHistory);
-
-    if (analysis) {
-      console.log(`[Agentic CRM] Audit results for ${contact.name}:`, analysis);
-
-      // A. Self-Directed Tag updates
-      let updatedTags = [...contact.tags];
-      let tagChanged = false;
-
-      if (analysis.purchaseIntent && !updatedTags.includes("Hot Prospect")) {
-        updatedTags.push("Hot Prospect");
-        tagChanged = true;
-      }
-
-      if (analysis.budget && !updatedTags.includes(analysis.budget)) {
-        updatedTags.push(analysis.budget);
-        tagChanged = true;
-      }
-
-      if (analysis.interests && Array.isArray(analysis.interests)) {
-        analysis.interests.forEach((item: string) => {
-          if (!updatedTags.includes(item)) {
-            updatedTags.push(item);
-            tagChanged = true;
-          }
-        });
-      }
-
-      if (tagChanged) {
-        await prisma.contact.update({
-          where: { id: contactId },
-          data: { tags: updatedTags }
-        });
-
-        await prisma.systemLog.create({
-          data: {
-            timestamp: timeStr,
-            type: "crm",
-            message: `Autonomous CRM Agent updated tags for ${contact.name}: ${updatedTags.join(", ")}`,
-            organizationId: orgId
-          }
-        });
-      }
-
-      // B. Autonomous human escalation
-      if (analysis.frustrated || analysis.needsEscalation) {
-        // Fetch first human agent in this workspace to escalate to
-        const memberships = await prisma.membership.findMany({
-          where: { organizationId: orgId },
-          include: { user: true }
-        });
-
-        // Use the first team member's name, or fallback to Admin / Support Team
-        const escalationAgent = memberships.length > 0 && memberships[0].user.name
-          ? memberships[0].user.name
-          : "Support Team";
-
-        // Re-assign agent in DB
-        await prisma.contact.update({
-          where: { id: contactId },
-          data: { assignedAgent: escalationAgent }
-        });
-
-        const reason = analysis.frustrated 
-          ? "detected high customer frustration and negative sentiment" 
-          : "a complex technical/unresolved support inquiry";
-
-        // Log escalation event in System Logs
-        await prisma.systemLog.create({
-          data: {
-            timestamp: timeStr,
-            type: "crm",
-            message: `[Escalation Alert] Lead ${contact.name} was autonomously re-assigned to agent '${escalationAgent}' due to ${reason}.`,
-            organizationId: orgId
-          }
-        });
-
-        // Insert a highly visual system message bubble inside CRM Chat!
-        await prisma.message.create({
-          data: {
-            sender: "system",
-            text: `[Autonomous Escalation: Chat re-assigned to human agent '${escalationAgent}' due to ${reason}]`,
-            timestamp: timeStr,
-            contactId,
-            organizationId: orgId
-          }
-        });
-
-        console.log(`[Agentic CRM] Autonomously escalated contact ${contact.name} to ${escalationAgent}.`);
-      }
-    }
-
+    // 2. Fall back to free-form AI
+    await freeFormAiReply(contact, orgId, orgName, timeStr);
   } catch (error: any) {
     console.error("Error in handleAutoResponder:", error);
     try {
@@ -298,5 +382,132 @@ If you do not know the answer, politely tell the customer that a human agent wil
     } catch (logErr) {
       console.error("Failed to write error log to DB:", logErr);
     }
+  }
+}
+
+async function handleNodeFlow(
+  contact: any,
+  nodes: any[],
+  orgId: string,
+  timeStr: string
+): Promise<boolean> {
+  const lastMsg = await prisma.message.findFirst({
+    where: { contactId: contact.id, sender: "user" },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!lastMsg) return false;
+
+  const incomingText = lastMsg.text.trim().toLowerCase();
+
+  if (!contact.currentNodeId) {
+    // No active flow — check trigger match
+    const trigger = nodes.find((n) => n.id === "n1" && n.type === "trigger");
+    if (!trigger) return false;
+
+    const triggerPhrase = trigger.content.toLowerCase().trim();
+    if (!triggerPhrase || !incomingText.includes(triggerPhrase)) return false;
+
+    // Trigger matched — advance along the flow
+    if (trigger.nextId) {
+      await advanceFlow(trigger.nextId, nodes, contact.id, orgId, timeStr, contact.name, contact.phone);
+      // Run CRM analysis after flow reply
+      await runCrmAnalysis(contact, orgId, timeStr);
+    }
+    return true;
+  }
+
+  // Resume from currentNodeId
+  const currentNode = nodes.find((n) => n.id === contact.currentNodeId);
+  if (!currentNode) {
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: { currentNodeId: null },
+    });
+    return false;
+  }
+
+  if (currentNode.type === "question") {
+    const options = currentNode.options || [];
+    const routes = (currentNode.routes as Record<string, string>) || {};
+
+    let matchedOption: string | null = null;
+    for (const opt of options) {
+      if (incomingText.includes(opt.toLowerCase())) {
+        matchedOption = opt;
+        break;
+      }
+    }
+
+    // Also try exact match if contains didn't work
+    if (!matchedOption) {
+      for (const opt of options) {
+        if (opt.toLowerCase() === incomingText) {
+          matchedOption = opt;
+          break;
+        }
+      }
+    }
+
+    if (matchedOption && routes[matchedOption]) {
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: { currentNodeId: null },
+      });
+      await advanceFlow(routes[matchedOption], nodes, contact.id, orgId, timeStr, contact.name, contact.phone);
+      await runCrmAnalysis(contact, orgId, timeStr);
+      return true;
+    }
+
+    // No option matched — re-ask the question
+    const btns = (currentNode.options || []).map((opt: string, idx: number) => ({
+      type: "reply" as const,
+      reply: { id: `opt_${idx}`, title: opt },
+    }));
+    await sendReply(
+      `I didn't understand that. ${currentNode.content}`,
+      contact.id,
+      orgId,
+      timeStr,
+      contact.name,
+      contact.phone,
+      btns
+    );
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: { currentNodeId: currentNode.id },
+    });
+    return true;
+  }
+
+  // Non-question node with active currentNodeId — execute and advance
+  await prisma.contact.update({
+    where: { id: contact.id },
+    data: { currentNodeId: null },
+  });
+  await advanceFlow(currentNode.id, nodes, contact.id, orgId, timeStr, contact.name, contact.phone);
+  await runCrmAnalysis(contact, orgId, timeStr);
+  return true;
+}
+
+async function runCrmAnalysis(contact: any, orgId: string, timeStr: string) {
+  try {
+    const recentMessages = await prisma.message.findMany({
+      where: { contactId: contact.id },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+    recentMessages.reverse();
+
+    const crmHistory = recentMessages.map((m) => ({
+      role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
+      content: m.text,
+    }));
+
+    const analysis = await analyzeConversationAgent(crmHistory);
+    if (analysis) {
+      await applyCrmAnalysis(analysis, contact, orgId, timeStr);
+    }
+  } catch (err) {
+    console.error("CRM analysis failed:", err);
   }
 }

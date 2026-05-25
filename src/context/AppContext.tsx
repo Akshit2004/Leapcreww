@@ -130,6 +130,7 @@ interface AppContextType {
   deleteTemplate: (id: string) => Promise<void>;
   lockSync: () => void;
   unlockSync: () => void;
+  refreshWorkspace: (orgId: string) => Promise<void>;
   initializeWorkspace: (data: {
     contacts: Contact[];
     campaigns: Campaign[];
@@ -263,6 +264,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setActiveContactId(null);
     }
   }, []);
+
+  const refreshWorkspace = useCallback(async (orgId: string) => {
+    try {
+      const res = await fetch(`/api/org/${orgId}/data`);
+      if (res.ok) {
+        const data = await res.json();
+        initializeWorkspace(data);
+      }
+    } catch { }
+  }, [initializeWorkspace]);
 
   // Actions
   const addContact = (newContact: Omit<Contact, "id">) => {
@@ -515,6 +526,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         deleteTemplate,
         lockSync,
         unlockSync,
+        refreshWorkspace,
         initializeWorkspace,
       }}
     >

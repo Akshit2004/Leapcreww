@@ -24,7 +24,9 @@ import { useApp } from "../context/AppContext";
 import { useParams } from "next/navigation";
 
 export const TemplatesTab: React.FC = () => {
-  const { templates, submitMetaTemplate, deleteTemplate, addSystemLog } = useApp();
+  const { templates, submitMetaTemplate, deleteTemplate, addSystemLog, refreshWorkspace } = useApp();
+  const [isPushingLibrary, setIsPushingLibrary] = useState(false);
+  const [pushResults, setPushResults] = useState<{ successCount: number; failCount: number; details: string } | null>(null);
   const params = useParams();
   const orgId = params.orgId as string;
 
@@ -47,6 +49,8 @@ export const TemplatesTab: React.FC = () => {
   const [complianceScore, setComplianceScore] = useState<number | null>(null);
   const [complianceFeedback, setComplianceFeedback] = useState<string[]>([]);
   const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
+  const [categoryReasoning, setCategoryReasoning] = useState<string | null>(null);
+  const [categoryApplied, setCategoryApplied] = useState(false);
 
   // Client-side quick validation rules
   const [clientWarnings, setClientWarnings] = useState<string[]>([]);
@@ -121,6 +125,8 @@ export const TemplatesTab: React.FC = () => {
         setComplianceScore(data.complianceScore);
         setComplianceFeedback(data.feedback);
         setSuggestedCategory(data.categoryFit);
+        setCategoryReasoning(data.categoryReasoning || null);
+        setCategoryApplied(false);
         addSystemLog("crm", "Template body optimized via WappFlow AI Copilot");
       }
     } catch (err) {
@@ -260,13 +266,15 @@ export const TemplatesTab: React.FC = () => {
           <h2 className="text-2xl font-bold tracking-tight">Meta Approved Templates</h2>
           <p className="text-zinc-500 text-sm mt-1">Manage WhatsApp-compliant template layouts, media variables, and quick action headers.</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer shadow-md shadow-orange-600/10 hover:scale-102 active:scale-98 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Create Template
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer shadow-md shadow-orange-600/10 hover:scale-102 active:scale-98 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Create Template
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search controls */}
@@ -552,6 +560,32 @@ export const TemplatesTab: React.FC = () => {
                         <span>{w}</span>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Category Suggestion Banner */}
+                {suggestedCategory && suggestedCategory !== category && !categoryApplied && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-[10px]">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      AI Suggests: <span className="uppercase">{suggestedCategory}</span>
+                    </div>
+                    {categoryReasoning && (
+                      <p className="text-[9px] text-emerald-600 leading-relaxed">{categoryReasoning}</p>
+                    )}
+                    <div className="text-[9px] text-emerald-600 font-semibold">
+                      Utility templates get approved 2-3x faster than Marketing.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCategory(suggestedCategory);
+                        setCategoryApplied(true);
+                      }}
+                      className="text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                    >
+                      Apply "{suggestedCategory}" Category
+                    </button>
                   </div>
                 )}
 

@@ -25,7 +25,7 @@ import { useParams } from "next/navigation";
 import { CampaignReportDrawer } from "./CampaignReportDrawer";
 
 export const CampaignsTab: React.FC = () => {
-  const { campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign } = useApp();
+  const { campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign, addSystemLog } = useApp();
   const params = useParams();
   const orgId = params.orgId as string;
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,6 +41,8 @@ export const CampaignsTab: React.FC = () => {
   const [campaignName, setCampaignName] = useState("");
   const [targetTag, setTargetTag] = useState("Shopify");
   const [templateName, setTemplateName] = useState("");
+  const [broadcastMode, setBroadcastMode] = useState<"template" | "session">("template");
+  const [sessionText, setSessionText] = useState("");
   
   // Advanced Delivery States
   const [runMode, setRunMode] = useState<"immediate" | "scheduled">("immediate");
@@ -63,17 +65,15 @@ export const CampaignsTab: React.FC = () => {
 
   // Scan and parse variables from active template body
   useEffect(() => {
-    if (!activeTemplate) return;
+    const tpl = templates.find((t) => t.name === templateName);
+    if (!tpl) return;
 
-    // Scan for variables matching {{number}}
     const varRegex = /\{\{(\d+)\}\}/g;
-    const matches = Array.from(activeTemplate.body.matchAll(varRegex)).map((m) => m[0]);
+    const matches = Array.from(tpl.body.matchAll(varRegex)).map((m) => m[0]);
     const uniqueVars = Array.from(new Set(matches));
 
-    // Initialize mapping with defaults
     const initialMapping: Record<string, { type: "contact_field" | "static"; value: string }> = {};
     uniqueVars.forEach((v, index) => {
-      // Default first variable mapping to contact name, others static/empty
       if (index === 0) {
         initialMapping[v] = { type: "contact_field", value: "name" };
       } else {
@@ -81,44 +81,70 @@ export const CampaignsTab: React.FC = () => {
       }
     });
     setVariablesMapping(initialMapping);
-  }, [activeTemplate]);
+  }, [templateName]);
 
   // Calculate target audience size in real-time
   const targetAudienceSize = contacts.filter((c) => c.tags.includes(targetTag)).length;
 
-  const handleLaunchCampaign = (e: React.FormEvent) => {
+  const handleLaunchCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!campaignName.trim() || !targetTag || !templateName || !orgId) return;
+    if (!campaignName.trim() || !targetTag || !orgId) return;
+    if (broadcastMode === "template" && !templateName) return;
+    if (broadcastMode === "session" && !sessionText.trim()) return;
 
-    // Formulate variables array for backend API
-    const variablesPayload = Object.entries(variablesMapping).map(([key, map]) => ({
-      key,
-      type: map.type,
-      value: map.value
-    }));
+    const scheduledAtStr = runMode === "scheduled" && scheduledDate && scheduledTime
+      ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
+      : undefined;
 
-    // Formulate scheduling datetime ISO string
-    let scheduledAtStr: string | undefined;
-    if (runMode === "scheduled" && scheduledDate && scheduledTime) {
-      scheduledAtStr = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
+    if (broadcastMode === "session") {
+      try {
+        addSystemLog("campaign", `Launching session broadcast '${campaignName}'...`);
+        const res = await fetch("/api/whatsapp/session-broadcast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: campaignName.trim(),
+            targetTag,
+            text: sessionText.trim(),
+            organizationId: orgId,
+            delay: sendDelay,
+            scheduledAt: scheduledAtStr
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          addSystemLog("campaign", `Session broadcast failed: ${data.error}`);
+          alert(data.error);
+          return;
+        }
+        addSystemLog("campaign", `Session broadcast launched! ${data.eligibleCount} contacts in 24h window.`);
+      } catch (err: any) {
+        addSystemLog("campaign", `Session broadcast error: ${err.message}`);
+      }
+    } else {
+      const variablesPayload = Object.entries(variablesMapping).map(([key, map]) => ({
+        key,
+        type: map.type,
+        value: map.value
+      }));
+
+      sendBroadcast({
+        name: campaignName.trim(),
+        targetTag,
+        templateName,
+        organizationId: orgId,
+        variables: variablesPayload,
+        delay: sendDelay,
+        scheduledAt: scheduledAtStr
+      });
     }
 
-    sendBroadcast({
-      name: campaignName.trim(),
-      targetTag,
-      templateName,
-      organizationId: orgId,
-      variables: variablesPayload,
-      delay: sendDelay,
-      scheduledAt: scheduledAtStr
-    });
-
-    // Reset and close
     setCampaignName("");
     setRunMode("immediate");
     setScheduledDate("");
     setScheduledTime("");
     setSendDelay(1);
+    setSessionText("");
     setIsModalOpen(false);
   };
 
@@ -373,6 +399,36 @@ export const CampaignsTab: React.FC = () => {
                 />
               </div>
 
+              {/* Broadcast Mode Toggle */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Broadcast Mode</label>
+                <div className="flex gap-2 bg-orange-50 p-1 rounded-xl border border-orange-100">
+                  <button
+                    type="button"
+                    onClick={() => setBroadcastMode("template")}
+                    className={`flex-1 py-2 text-center text-[10px] font-bold rounded-lg cursor-pointer transition-all ${
+                      broadcastMode === "template" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500"
+                    }`}
+                  >
+                    Template Broadcast
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBroadcastMode("session")}
+                    className={`flex-1 py-2 text-center text-[10px] font-bold rounded-lg cursor-pointer transition-all ${
+                      broadcastMode === "session" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500"
+                    }`}
+                  >
+                    Free-Form Session (24h window)
+                  </button>
+                </div>
+                {broadcastMode === "session" && (
+                  <div className="flex items-center gap-1.5 mt-1 text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                    <span>No template needed — sends within 24h customer-initiated window.</span>
+                  </div>
+                )}
+              </div>
+
               {/* Tag Targeting */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex justify-between">
@@ -396,133 +452,149 @@ export const CampaignsTab: React.FC = () => {
                 )}
               </div>
 
-              {/* Approved Templates list */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Pre-approved message template</label>
-                <select
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                  className="w-full bg-orange-50 border border-orange-100 rounded-xl py-2.5 px-4 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500"
-                >
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.name}>{t.name} ({t.category})</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Dynamic Variables Mapping Form */}
-              {activeTemplate && Object.keys(variablesMapping).length > 0 && (
-                <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 space-y-4">
-                  <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
-                    <Settings2 className="w-4 h-4 text-orange-500" />
-                    Template Parameter Mappings
-                  </h5>
-                  
-                  <div className="space-y-3">
-                    {Object.keys(variablesMapping).map((variable) => {
-                      const current = variablesMapping[variable];
-
-                      return (
-                        <div key={variable} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center bg-white p-3 rounded-lg border border-orange-100">
-                          <div className="text-xs font-bold text-stone-600 flex items-center gap-1.5">
-                            <span className="bg-orange-500/10 text-orange-600 font-mono text-[10px] px-1.5 py-0.5 rounded">
-                              {variable}
-                            </span>
-                            Parameter
-                          </div>
-
-                          {/* Mapping Type Selection */}
-                          <div>
-                            <select
-                              value={current.type}
-                              onChange={(e) => {
-                                const nextType = e.target.value as "contact_field" | "static";
-                                setVariablesMapping((prev) => ({
-                                  ...prev,
-                                  [variable]: { 
-                                    type: nextType, 
-                                    value: nextType === "contact_field" ? "name" : "" 
-                                  }
-                                }));
-                              }}
-                              className="w-full bg-orange-50 border border-orange-100 rounded-lg p-1.5 text-[11px] focus:outline-none"
-                            >
-                              <option value="contact_field">CRM Contact Field</option>
-                              <option value="static">Static Custom Text</option>
-                            </select>
-                          </div>
-
-                          {/* Mapping Value Form */}
-                          <div>
-                            {current.type === "contact_field" ? (
-                              <select
-                                value={current.value}
-                                onChange={(e) => {
-                                  setVariablesMapping((prev) => ({
-                                    ...prev,
-                                    [variable]: { type: "contact_field", value: e.target.value }
-                                  }));
-                                }}
-                                className="w-full bg-orange-50 border border-orange-100 rounded-lg p-1.5 text-[11px] focus:outline-none"
-                              >
-                                <option value="name">Contact Name (name)</option>
-                                <option value="email">Contact Email (email)</option>
-                                <option value="phone">Contact Phone (phone)</option>
-                              </select>
-                            ) : (
-                              <input
-                                type="text"
-                                placeholder="Enter custom text..."
-                                required
-                                value={current.value}
-                                onChange={(e) => {
-                                  setVariablesMapping((prev) => ({
-                                    ...prev,
-                                    [variable]: { type: "static", value: e.target.value }
-                                  }));
-                                }}
-                                className="w-full bg-orange-50 border border-orange-100 rounded-lg p-1.5 text-[11px] focus:outline-none"
-                              />
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+              {broadcastMode === "template" ? (
+                <>
+                  {/* Approved Templates list */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Pre-approved message template</label>
+                    <select
+                      value={templateName}
+                      onChange={(e) => setTemplateName(e.target.value)}
+                      className="w-full bg-orange-50 border border-orange-100 rounded-xl py-2.5 px-4 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    >
+                      {templates.map((t) => (
+                        <option key={t.id} value={t.name}>{t.name} ({t.category})</option>
+                      ))}
+                    </select>
                   </div>
-                </div>
-              )}
 
-              {/* Template Body Live Preview with variables compiled */}
-              {activeTemplate && (
-                <div className="bg-orange-50/30 p-4 rounded-xl border border-orange-100 space-y-3">
-                  <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
-                    <Eye className="w-3.5 h-3.5 text-stone-500" />
-                    Interactive Mapped Preview
-                  </h5>
-                  <div className="bg-white border border-orange-100 rounded-xl p-3.5 text-xs text-stone-700 leading-relaxed shadow-sm max-w-[95%]">
-                    {/* Optional Media badge */}
-                    {activeTemplate.mediaType && activeTemplate.mediaType !== "none" && (
-                      <div className="mb-2 px-2.5 py-1 rounded bg-orange-50 text-[10px] text-stone-500 font-bold uppercase inline-flex items-center gap-1.5 select-none leading-none">
-                        <span>{activeTemplate.mediaType} Media Header</span>
+                  {/* Dynamic Variables Mapping Form */}
+                  {activeTemplate && Object.keys(variablesMapping).length > 0 && (
+                    <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 space-y-4">
+                      <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
+                        <Settings2 className="w-4 h-4 text-orange-500" />
+                        Template Parameter Mappings
+                      </h5>
+                      
+                      <div className="space-y-3">
+                        {Object.keys(variablesMapping).map((variable) => {
+                          const current = variablesMapping[variable];
+
+                          return (
+                            <div key={variable} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center bg-white p-3 rounded-lg border border-orange-100">
+                              <div className="text-xs font-bold text-stone-600 flex items-center gap-1.5">
+                                <span className="bg-orange-500/10 text-orange-600 font-mono text-[10px] px-1.5 py-0.5 rounded">
+                                  {variable}
+                                </span>
+                                Parameter
+                              </div>
+
+                              <div>
+                                <select
+                                  value={current.type}
+                                  onChange={(e) => {
+                                    const nextType = e.target.value as "contact_field" | "static";
+                                    setVariablesMapping((prev) => ({
+                                      ...prev,
+                                      [variable]: { 
+                                        type: nextType, 
+                                        value: nextType === "contact_field" ? "name" : "" 
+                                      }
+                                    }));
+                                  }}
+                                  className="w-full bg-orange-50 border border-orange-100 rounded-lg p-1.5 text-[11px] focus:outline-none"
+                                >
+                                  <option value="contact_field">CRM Contact Field</option>
+                                  <option value="static">Static Custom Text</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                {current.type === "contact_field" ? (
+                                  <select
+                                    value={current.value}
+                                    onChange={(e) => {
+                                      setVariablesMapping((prev) => ({
+                                        ...prev,
+                                        [variable]: { type: "contact_field", value: e.target.value }
+                                      }));
+                                    }}
+                                    className="w-full bg-orange-50 border border-orange-100 rounded-lg p-1.5 text-[11px] focus:outline-none"
+                                  >
+                                    <option value="name">Contact Name (name)</option>
+                                    <option value="email">Contact Email (email)</option>
+                                    <option value="phone">Contact Phone (phone)</option>
+                                  </select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    placeholder="Enter custom text..."
+                                    required
+                                    value={current.value}
+                                    onChange={(e) => {
+                                      setVariablesMapping((prev) => ({
+                                        ...prev,
+                                        [variable]: { type: "static", value: e.target.value }
+                                      }));
+                                    }}
+                                    className="w-full bg-orange-50 border border-orange-100 rounded-lg p-1.5 text-[11px] focus:outline-none"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    <p className="whitespace-pre-wrap select-none font-medium">
-                      {compileLivePreview()}
-                    </p>
-
-                    {/* Preview Buttons */}
-                    {activeTemplate.buttons && activeTemplate.buttons.length > 0 && (
-                      <div className="mt-3.5 border-t border-orange-100 pt-2.5 space-y-1 text-center font-bold text-orange-600">
-                        {activeTemplate.buttons.map((btn, idx) => (
-                          <div key={idx} className="py-1 bg-orange-50/50 rounded-md border border-orange-100/40 text-[11px] mb-1">
-                            {btn}
+                  {/* Template Body Live Preview with variables compiled */}
+                  {activeTemplate && (
+                    <div className="bg-orange-50/30 p-4 rounded-xl border border-orange-100 space-y-3">
+                      <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
+                        <Eye className="w-3.5 h-3.5 text-stone-500" />
+                        Interactive Mapped Preview
+                      </h5>
+                      <div className="bg-white border border-orange-100 rounded-xl p-3.5 text-xs text-stone-700 leading-relaxed shadow-sm max-w-[95%]">
+                        {activeTemplate.mediaType && activeTemplate.mediaType !== "none" && (
+                          <div className="mb-2 px-2.5 py-1 rounded bg-orange-50 text-[10px] text-stone-500 font-bold uppercase inline-flex items-center gap-1.5 select-none leading-none">
+                            <span>{activeTemplate.mediaType} Media Header</span>
                           </div>
-                        ))}
+                        )}
+                        <p className="whitespace-pre-wrap select-none font-medium">
+                          {compileLivePreview()}
+                        </p>
+                        {activeTemplate.buttons && activeTemplate.buttons.length > 0 && (
+                          <div className="mt-3.5 border-t border-orange-100 pt-2.5 space-y-1 text-center font-bold text-orange-600">
+                            {activeTemplate.buttons.map((btn, idx) => (
+                              <div key={idx} className="py-1 bg-orange-50/50 rounded-md border border-orange-100/40 text-[11px] mb-1">
+                                {btn}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Session Broadcast Text */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Free-Form Message</label>
+                    <textarea
+                      required
+                      rows={5}
+                      placeholder="Write your message here — no template needed. Only contacts active in the last 24 hours will receive it."
+                      value={sessionText}
+                      onChange={(e) => setSessionText(e.target.value)}
+                      className="w-full bg-orange-50 border border-orange-100 rounded-xl py-2.5 px-4 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500 resize-none"
+                    />
+                    <div className="flex items-start gap-2 bg-blue-50/80 border border-blue-200/40 rounded-xl p-3 text-[10px] text-blue-800 leading-relaxed font-semibold">
+                      <span>📱 Only contacts who messaged in the last 24h will receive this. No Meta template approval needed.</span>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
 
               {/* Scheduling and Delays Advanced Parameters Drawer */}

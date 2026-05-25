@@ -11,7 +11,8 @@ import {
   CircleDot,
   Sparkles,
   LogOut,
-  X
+  X,
+  ShoppingBag
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useApp } from "../context/AppContext";
@@ -47,6 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "campaigns", label: "Campaigns", icon: Megaphone },
     { id: "templates", label: "Templates", icon: FileText },
     { id: "chatbot", label: "Bot Builder", icon: Cpu },
+    { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
   ];
 
   return (

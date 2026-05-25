@@ -151,8 +151,5 @@ export function validateWebhookSignature(signature: string | null, body: string)
 }
 
 export function formatPhoneNumber(phone: string): string {
-  const cleaned = phone.replace(/[^0-9]/g, "");
-  if (cleaned.startsWith("1") && cleaned.length === 11) return cleaned;
-  if (cleaned.length === 10) return `1${cleaned}`;
-  return cleaned;
+  return phone.replace(/[^0-9]/g, "");
 }

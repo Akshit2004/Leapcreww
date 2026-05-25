@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 Analyze the user's template draft copy and optimize it to achieve a 100% Meta approval rate while maximizing customer engagement.
 
 Meta Compliance Guidelines:
-1. Category Match: "Marketing" is for promotional offers, updates, discounts. "Utility" is for receipts, transaction confirmations, order updates, account details. Mismatches will get rejected.
+1. Category Match: "Marketing" is for promotional offers, updates, discounts. "Utility" is for receipts, transaction confirmations, order updates, account details, shipping notifications, appointment reminders. "Authentication" is for OTPs, verification codes, login alerts. Mismatches will get rejected.
 2. Variable formatting: Dynamic placeholders must be structured as "{{1}}", "{{2}}" (sequential indices starting at 1).
 3. Back-to-Back variables: Meta rejects templates with adjacent variables like "{{1}}{{2}}". There MUST be clear surrounding text explaining the variable.
 4. Sentences cannot start or end directly with a variable without leading/trailing words.
@@ -51,14 +51,16 @@ Your task is to re-write the template text to make it Meta-compliant, clean up a
 - optimizedText: The complete rewritten template copy, retaining placeholders like {{1}} and {{2}} in their natural, contextual positions.
 - complianceScore: An estimated approval success probability from 0 to 100 (integer).
 - feedback: An array of strings explaining exactly what you modified, compliance rules checked, and copywriting recommendations.
-- categoryFit: Verify whether the category (e.g. Marketing vs Utility) is appropriate, or recommend the correct classification.
+- categoryFit: Analyze the draft text content and determine the BEST category. Return one of "Marketing", "Utility", or "Authentication" based on the content. Consider that Utility templates get approved 2-3x faster than Marketing.
+- categoryReasoning: A brief explanation of why you chose that category.
 
 You MUST return ONLY a valid raw JSON object matching this schema:
 {
   "optimizedText": string,
   "complianceScore": number,
   "feedback": string[],
-  "categoryFit": string
+  "categoryFit": "Marketing" | "Utility" | "Authentication",
+  "categoryReasoning": string
 }
 Do not include any conversational headers or markdown backticks in your output.`
       },
