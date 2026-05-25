@@ -27,12 +27,16 @@ export async function POST(req: NextRequest) {
     const payload = JSON.parse(bodyText);
     const event = payload.event;
 
-    if (event === "payment.captured" || event === "order.paid") {
-      const razorpayOrderId = payload.payload?.payment?.entity?.order_id ||
+    if (event === "payment.captured" || event === "order.paid" || event === "payment_link.paid") {
+      let razorpayOrderId = payload.payload?.payment?.entity?.order_id ||
                               payload.payload?.order?.entity?.id;
 
+      if (event === "payment_link.paid") {
+        razorpayOrderId = payload.payload?.payment_link?.entity?.id; // This matches the plink_ ID we saved
+      }
+
       if (!razorpayOrderId) {
-        return NextResponse.json({ error: "No order_id in payload" }, { status: 400 });
+        return NextResponse.json({ error: "No order identifier in payload" }, { status: 400 });
       }
 
       const order = await prisma.order.findFirst({
@@ -69,8 +73,11 @@ We'll notify you when it ships. Reply *ORDERS* to check status anytime.`;
       await sendWhatsAppMessage({ to: cleanPhone, text });
     }
 
-    if (event === "payment.failed") {
-      const razorpayOrderId = payload.payload?.payment?.entity?.order_id;
+    if (event === "payment.failed" || event === "payment_link.cancelled") {
+      let razorpayOrderId = payload.payload?.payment?.entity?.order_id;
+      if (event === "payment_link.cancelled") {
+        razorpayOrderId = payload.payload?.payment_link?.entity?.id;
+      }
       if (razorpayOrderId) {
         const order = await prisma.order.findFirst({
           where: { razorpayOrderId },

@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { sendWhatsAppMessage, formatPhoneNumber } from "./whatsapp";
-import { createRazorpayOrder } from "./razorpay";
+import { createRazorpayPaymentLink, getRazorpayInstance } from "./razorpay";
 
 const SHOP_NAME = "WappFlow Store";
 const CURRENCY_SYMBOL = "₹";
@@ -186,7 +186,7 @@ export async function startCheckout(phone: string, contactId: string, orgId: str
   if (!contact) return;
   const total = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const orderId = generateOrderId();
-  const razorpayOrder = await createRazorpayOrder(total, orderId);
+  const razorpayPaymentLink = await createRazorpayPaymentLink(total, orderId, contact.phone, contact.name);
   const order = await prisma.order.create({
     data: {
       orderId,
@@ -194,7 +194,7 @@ export async function startCheckout(phone: string, contactId: string, orgId: str
       total,
       status: "pending",
       paymentStatus: "pending",
-      razorpayOrderId: razorpayOrder.id,
+      razorpayOrderId: razorpayPaymentLink.id,
       phone: contact.phone,
       organizationId: orgId,
       address: { address: "pending" },
@@ -208,7 +208,7 @@ export async function startCheckout(phone: string, contactId: string, orgId: str
       },
     },
   });
-  const paymentLink = `https://rzp.io/i/${razorpayOrder.id}`;
+  const paymentLink = razorpayPaymentLink.short_url;
   let text = `🧾 *Order Summary*
 
 ━━━━━━━━━━━━━━━━━━━\n`;
@@ -347,10 +347,46 @@ export async function handleMarketplaceMessage(
     }
   }
   if (lower === "confirm_order" || lower === "confirm" || lower.includes("paid")) {
-    await sendWhatsAppMessage({
-      to: formatPhoneNumber(phone),
-      text: "✅ Thanks! We'll verify your payment and confirm your order shortly.\n\nReply *ORDERS* to check status anytime.",
+    const latestOrder = await prisma.order.findFirst({
+      where: { contactId, organizationId: orgId },
+      orderBy: { createdAt: "desc" }
     });
+
+    if (!latestOrder) {
+      await sendWhatsAppMessage({
+        to: formatPhoneNumber(phone),
+        text: "You don't have any pending orders. Reply *CATALOG* to browse products.",
+      });
+      return true;
+    }
+
+    if (latestOrder.paymentStatus === "paid") {
+      await sendWhatsAppMessage({
+        to: formatPhoneNumber(phone),
+        text: `✅ Payment verified! Your order *${latestOrder.orderId}* is confirmed.\n\nReply *ORDERS* to check status anytime.`,
+      });
+    } else {
+      let linkStr = "";
+      if (latestOrder.razorpayOrderId && latestOrder.razorpayOrderId.startsWith("plink_")) {
+        try {
+          const rzp = getRazorpayInstance();
+          if (rzp) {
+            const plink = await (rzp.paymentLink as any).fetch(latestOrder.razorpayOrderId);
+            if (plink && plink.short_url) {
+              linkStr = `\n\n💳 *Pay here:* ${plink.short_url}`;
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch payment link for confirmation", err);
+        }
+      }
+
+      await sendWhatsAppMessage({
+        to: formatPhoneNumber(phone),
+        text: `⚠️ Your payment for order *${latestOrder.orderId}* has not been cleared yet.${linkStr}\n\nOnce paid, please reply *CONFIRM* again.`,
+        buttons: linkStr ? [{ type: "reply", reply: { id: "confirm_order", title: "✅ Paid" } }] : undefined
+      });
+    }
     return true;
   }
   return false;

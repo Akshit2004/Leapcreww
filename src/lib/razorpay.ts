@@ -23,6 +23,28 @@ export async function createRazorpayOrder(amountPaise: number, receipt: string) 
   return order;
 }
 
+export async function createRazorpayPaymentLink(amountPaise: number, referenceId: string, phone: string, name: string) {
+  const rzp = getRazorpayInstance();
+  if (!rzp) throw new Error("Razorpay not configured");
+  const paymentLink = await (rzp.paymentLink as any).create({
+    amount: amountPaise,
+    currency: "INR",
+    accept_partial: false,
+    reference_id: referenceId,
+    description: `Order ${referenceId}`,
+    customer: {
+      name: name || "Customer",
+      contact: phone
+    },
+    notify: {
+      sms: false,
+      email: false
+    },
+    reminder_enable: false
+  });
+  return paymentLink as { id: string; short_url: string };
+}
+
 export function verifyRazorpayPayment(
   orderId: string,
   paymentId: string,
