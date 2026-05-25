@@ -222,6 +222,12 @@ export async function GET(
       });
     });
 
+    const orders = await prisma.order.findMany({
+      where: { organizationId: orgId },
+      include: { items: true },
+      orderBy: { createdAt: "desc" },
+    });
+
     // 4. Return unified JSON payloads
     return NextResponse.json({
       contacts,
@@ -232,6 +238,7 @@ export async function GET(
       systemLogs,
       chatHistory,
       members,
+      orders,
     });
   } catch (err: any) {
     console.error("❌ Scoped Data Fetch API failed:", err);
