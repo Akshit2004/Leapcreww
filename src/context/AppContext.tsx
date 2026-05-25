@@ -104,6 +104,7 @@ interface AppContextType {
   addContact: (contact: Omit<Contact, "id">) => Contact;
   updateContact: (id: string, updates: Partial<Contact>) => void;
   deleteContact: (id: string) => void;
+  deleteCampaign: (id: string) => Promise<void>;
   sendBroadcast: (campaign: { name: string; targetTag: string; templateName: string; organizationId: string }) => Promise<void>;
   sendLiveChatMessage: (contactId: string, text: string, sender?: "user" | "agent" | "system", buttons?: string[]) => void;
   updateChatbotNodes: (nodes: ChatbotNode[]) => void;
@@ -351,6 +352,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const deleteCampaign = async (id: string) => {
+    lockSync();
+    setCampaigns((prev) => prev.filter((c) => c.id !== id));
+    try {
+      const res = await fetch(`/api/whatsapp/campaign/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        addSystemLog("campaign", `Failed to delete campaign ID ${id} from sandbox database.`);
+      } else {
+        addSystemLog("campaign", `Permanently deleted campaign ID ${id}`);
+      }
+    } catch (err: any) {
+      addSystemLog("campaign", `Error permanently deleting campaign ID ${id}: ${err.message}`);
+    } finally {
+      unlockSync();
+    }
+  };
+
   const updateChatbotNodes = (newNodes: ChatbotNode[]) => {
     setChatbotNodes(newNodes);
     addSystemLog("crm", "Chatbot Builder nodes layout saved");
@@ -390,6 +410,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addContact,
         updateContact,
         deleteContact,
+        deleteCampaign,
         sendBroadcast,
         sendLiveChatMessage,
         updateChatbotNodes,

@@ -178,7 +178,7 @@ export const InboxTab: React.FC = () => {
           ) : (
             filteredContacts.map((c) => {
               const isSelected = c.id === activeContactId;
-              const hasUnread = (c.unreadCount || 0) > 0;
+              const hasUnread = (c.unreadCount || 0) > 0 && !isSelected;
               return (
                 <button
                   key={c.id}

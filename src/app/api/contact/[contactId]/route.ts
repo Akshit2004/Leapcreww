@@ -39,7 +39,7 @@ export async function PATCH(
     const { contactId } = await params;
     const body = await request.json();
 
-    const allowedFields = ["name", "email", "status", "tags", "assignedAgent"];
+    const allowedFields = ["name", "email", "status", "tags", "assignedAgent", "unreadCount"];
     const updates: Record<string, any> = {};
 
     for (const key of allowedFields) {

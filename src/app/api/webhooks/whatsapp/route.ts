@@ -124,8 +124,8 @@ export async function POST(req: NextRequest) {
             });
 
             if (contact.assignedAgent === "Bot") {
-              // Trigger auto-responder asynchronously so webhook returns quickly
-              handleAutoResponder(contact.id, org.id);
+              // Trigger auto-responder and await it so Vercel doesn't freeze the process
+              await handleAutoResponder(contact.id, org.id);
             }
           }
         }

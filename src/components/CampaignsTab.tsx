@@ -12,13 +12,14 @@ import {
   Eye,
   Settings2,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { useParams } from "next/navigation";
 
 export const CampaignsTab: React.FC = () => {
-  const { campaigns, templates, contacts, sendBroadcast } = useApp();
+  const { campaigns, templates, contacts, sendBroadcast, deleteCampaign } = useApp();
   const params = useParams();
   const orgId = params.orgId as string;
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -130,11 +131,24 @@ export const CampaignsTab: React.FC = () => {
 
                   {/* Header Row */}
                   <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
+                    <div className="space-y-1 flex-1">
                       <h4 className="font-bold text-sm text-stone-900 leading-none">{camp.name}</h4>
-                      <span className="text-[10px] text-stone-500 font-mono block">Template: {camp.templateName}</span>
+                      <span className="text-[10px] text-stone-500 font-mono block mt-1">Template: {camp.templateName}</span>
                     </div>
-                    {getStatusBadge(camp.status)}
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(camp.status)}
+                      <button
+                        onClick={async () => {
+                          if (confirm("Are you sure you want to permanently delete this campaign?")) {
+                            await deleteCampaign(camp.id);
+                          }
+                        }}
+                        className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                        title="Delete Campaign"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Audience Meta */}

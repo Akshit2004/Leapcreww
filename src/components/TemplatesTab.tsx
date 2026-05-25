@@ -1,41 +1,22 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  FileCode2,
-  Plus,
-  Tag,
+  FileText,
+  Search,
   Check,
-  Sparkles,
+  Loader,
   Image,
   Video,
-  FileText,
   MousePointerClick,
-  X,
-  PlusCircle,
-  Trash,
-  Loader,
-  Search
+  X
 } from "lucide-react";
-import { useApp, Template } from "../context/AppContext";
-import { useParams } from "next/navigation";
+import { useApp } from "../context/AppContext";
 
 export const TemplatesTab: React.FC = () => {
-  const { templates, addTemplate, addSystemLog } = useApp();
-  const params = useParams();
-  const orgId = params.orgId as string;
+  const { templates, addSystemLog } = useApp();
   const [activeCategory, setActiveCategory] = useState<string>("all");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Form States
-  const [tmplName, setTmplName] = useState("");
-  const [tmplCategory, setTmplCategory] = useState<Template["category"]>("Utility");
-  const [tmplBody, setTmplBody] = useState("");
-  const [tmplMediaType, setTmplMediaType] = useState<Template["mediaType"]>("none");
-  const [buttonInput, setButtonInput] = useState("");
-  const [buttonsList, setButtonsList] = useState<string[]>([]);
 
   // Filter templates
   const filteredTemplates = templates.filter((t) => {
@@ -46,56 +27,6 @@ export const TemplatesTab: React.FC = () => {
       t.category.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
   });
-
-  const handleAddButton = () => {
-    if (!buttonInput.trim() || buttonsList.length >= 3) return;
-    setButtonsList([...buttonsList, buttonInput.trim()]);
-    setButtonInput("");
-  };
-
-  const handleRemoveButton = (idx: number) => {
-    setButtonsList(buttonsList.filter((_, i) => i !== idx));
-  };
-
-  const handleCreateTemplate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tmplName.trim() || !tmplBody.trim()) return;
-
-    setSubmitting(true);
-
-    try {
-      const res = await fetch("/api/whatsapp/create-template", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: tmplName.trim(),
-          category: tmplCategory,
-          body: tmplBody.trim(),
-          mediaType: tmplMediaType,
-          buttons: buttonsList,
-          organizationId: orgId,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        addSystemLog("crm", `Template creation failed: ${err.error}`);
-        return;
-      }
-
-      const data = await res.json();
-      addTemplate(data.template);
-    } catch (err: any) {
-      addSystemLog("crm", `Template creation error: ${err.message}`);
-    } finally {
-      setSubmitting(false);
-      setTmplName("");
-      setTmplBody("");
-      setTmplMediaType("none");
-      setButtonsList([]);
-      setIsModalOpen(false);
-    }
-  };
 
   const getCategoryBadge = (category: string) => {
     switch (category) {
@@ -194,13 +125,6 @@ export const TemplatesTab: React.FC = () => {
           <h2 className="text-2xl font-bold tracking-tight">Meta Approved Templates</h2>
           <p className="text-zinc-500 text-sm mt-1">Manage WhatsApp-compliant template layouts, media variables, and quick action headers.</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer shadow-md shadow-orange-600/10 hover:scale-102 active:scale-98 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Create Template
-        </button>
       </div>
 
       {/* Filter and Search controls */}
@@ -297,161 +221,6 @@ export const TemplatesTab: React.FC = () => {
           </div>
         ))}
       </div>
-
-      {/* Creation Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-panel w-full max-w-lg rounded-2xl shadow-xl flex flex-col overflow-hidden animate-slide-up bg-white">
-
-            {/* Header */}
-            <div className="p-6 border-b border-orange-100 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-base text-stone-900 flex items-center gap-2">
-                <FileCode2 className="w-5 h-5 text-orange-500" />
-                Build Message Template
-              </h3>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-lg hover:bg-orange-50 text-stone-500 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleCreateTemplate} className="p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
-
-              {/* Template Name */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Template Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. order_completed_alert"
-                  value={tmplName}
-                  onChange={(e) => setTmplName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))}
-                  className="w-full bg-orange-50 border border-orange-100 rounded-xl py-2.5 px-4 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-orange-500"
-                />
-                <span className="text-[9px] text-stone-500 block font-mono">Lowercase letters and underscores only (Meta Compliance).</span>
-              </div>
-
-              {/* Grid 2x2 for categories */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Category select */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Category Type</label>
-                  <select
-                    value={tmplCategory}
-                    onChange={(e) => setTmplCategory(e.target.value as Template["category"])}
-                    className="w-full bg-orange-50 border border-orange-100 rounded-xl p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  >
-                    <option value="Marketing">Marketing</option>
-                    <option value="Utility">Utility</option>
-                    <option value="Authentication">Authentication</option>
-                  </select>
-                </div>
-
-                {/* Media header select */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Header Attachment</label>
-                  <select
-                    value={tmplMediaType}
-                    onChange={(e) => setTmplMediaType(e.target.value as Template["mediaType"])}
-                    className="w-full bg-orange-50 border border-orange-100 rounded-xl p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  >
-                    <option value="none">None (Text-only)</option>
-                    <option value="image">Image</option>
-                    <option value="video">Video</option>
-                    <option value="document">Document PDF</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Message Body */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Message Body Text</label>
-                <textarea
-                  required
-                  rows={4}
-                  placeholder="Hey {{1}}! Thanks for shopping. Your discount is valid til {{2}}."
-                  value={tmplBody}
-                  onChange={(e) => setTmplBody(e.target.value)}
-                  className="w-full bg-orange-50 border border-orange-100 rounded-xl py-2.5 px-4 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500 leading-relaxed"
-                />
-                <span className="text-[9px] text-stone-500 block leading-tight">Use double braces like <code className="font-mono bg-orange-50 px-1 py-0.5 rounded text-orange-500 font-bold select-all">{"{{1}}"}</code>, <code className="font-mono bg-orange-50 px-1 py-0.5 rounded text-orange-500 font-bold select-all">{"{{2}}"}</code> to map custom variables.</span>
-              </div>
-
-              {/* Interactive buttons builder */}
-              <div className="space-y-2.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Interactive CTA Buttons (Max 3)</label>
-
-                {/* Active buttons layout */}
-                {buttonsList.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-orange-50/40 rounded-xl border border-orange-100">
-                    {buttonsList.map((btn, idx) => (
-                      <span
-                        key={idx}
-                        className="text-[10px] font-bold bg-white text-orange-600 border border-orange-100 px-2 py-0.5 rounded flex items-center gap-1.5"
-                      >
-                        <span>{btn}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveButton(idx)}
-                          className="hover:bg-red-500/10 p-0.5 rounded-full text-stone-500 hover:text-red-500"
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Input row */}
-                {buttonsList.length < 3 && (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. Chat with Support 💬"
-                      value={buttonInput}
-                      onChange={(e) => setButtonInput(e.target.value)}
-                      className="flex-1 bg-orange-50 border border-orange-100 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddButton}
-                      className="bg-orange-600 hover:bg-orange-500 text-white rounded-lg px-3 py-1.5 text-xs font-semibold hover:scale-102 transition-all flex items-center gap-1"
-                    >
-                      <PlusCircle className="w-4 h-4 text-orange-500" />
-                      Add
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Submit / Cancel Buttons */}
-              <div className="flex justify-end gap-2.5 pt-4 border-t border-orange-100 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-orange-50 hover:bg-zinc-200 text-stone-600 dark:text-stone-600 font-semibold text-xs rounded-xl cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!tmplName.trim() || !tmplBody.trim() || submitting}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:hover:bg-orange-600 text-white font-semibold text-xs rounded-xl cursor-pointer flex items-center gap-1.5 transition-all shadow-md shadow-orange-600/10"
-                >
-                  {submitting ? (
-                    <><Loader className="w-3.5 h-3.5 animate-spin" /> Submitting to Meta...</>
-                  ) : (
-                    <><Sparkles className="w-3.5 h-3.5" /> Save and Sync Template</>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

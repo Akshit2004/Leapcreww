@@ -75,8 +75,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (contact.assignedAgent === "Bot") {
-      // Trigger the Groq AI auto-responder in the background
-      handleAutoResponder(contact.id, org.id);
+      // Trigger the Groq AI auto-responder and await it
+      await handleAutoResponder(contact.id, org.id);
     }
 
     return NextResponse.json({ status: "ok", contactId: contact.id }, { status: 200 });
