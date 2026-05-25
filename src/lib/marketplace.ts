@@ -81,7 +81,7 @@ export async function sendCategoryProducts(phone: string, category: string, orgI
     if (p.description) text += `   ${p.description.slice(0, 60)}\n`;
     text += "\n";
   });
-  text += `Reply with product *name or number* to add to cart.\nOr type *MENU* to go back.`;
+  text += `Reply with product *name* to add to cart.\nOr type *MENU* to go back.`;
   await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text });
 }
 
@@ -282,6 +282,23 @@ export async function handleMarketplaceMessage(
   orgId: string
 ): Promise<boolean> {
   const lower = text.trim().toLowerCase();
+
+  // Check if user is replying with a product name
+  const products = await prisma.product.findMany({
+    where: { organizationId: orgId, isActive: true },
+    select: { name: true }
+  });
+
+  let matchedProduct = products.find(p => p.name.toLowerCase() === lower);
+  if (!matchedProduct) {
+    matchedProduct = products.find(p => p.name.length >= 3 && lower.includes(p.name.toLowerCase()));
+  }
+
+  if (matchedProduct) {
+    await addToCart(phone, contactId, orgId, matchedProduct.name);
+    return true;
+  }
+
   if (lower === "1" || lower === "2" || lower === "3" || lower === "4") {
     const map: Record<string, string> = { "1": "catalog", "2": "cart", "3": "orders", "4": "menu" };
     const action = map[lower];
