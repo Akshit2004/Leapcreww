@@ -15,9 +15,15 @@ export async function DELETE(
 
     const { contactId } = await params;
 
-    await prisma.contact.delete({
-      where: { id: contactId },
-    });
+    // Use a transaction to delete related orders and then the contact to satisfy foreign key constraints
+    await prisma.$transaction([
+      prisma.order.deleteMany({
+        where: { contactId },
+      }),
+      prisma.contact.delete({
+        where: { id: contactId },
+      }),
+    ]);
 
     return NextResponse.json({ status: "ok" });
   } catch (err: any) {
