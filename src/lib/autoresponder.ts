@@ -85,6 +85,14 @@ If you do not know the answer, politely tell the customer that a human agent wil
     const result = await sendWhatsAppMessage({ to: cleanPhone, text: botReplyText });
     if (!result.ok) {
       console.warn("Auto-responder WhatsApp dispatch skipped/failed:", result.error);
+      await prisma.systemLog.create({
+        data: {
+          timestamp: timeStr,
+          type: "chat",
+          message: `AI Bot WhatsApp dispatch failed: ${result.error}`,
+          organizationId: orgId,
+        },
+      });
     }
   } catch (error: any) {
     console.error("Error in handleAutoResponder:", error);
