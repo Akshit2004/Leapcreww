@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     let dbStatus = template.metaStatus;
-    let metaData: any = null;
+    let metaData = null;
 
     // Sandbox Mock Template Auto-Approval Simulator
     if (template.metaId.startsWith("mock-meta-")) {
@@ -88,8 +88,8 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ metaStatus: dbStatus, metaData });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Check template status error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

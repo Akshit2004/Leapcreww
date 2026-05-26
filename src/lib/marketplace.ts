@@ -4,7 +4,6 @@ import { createRazorpayPaymentLink, getRazorpayInstance } from "./razorpay";
 
 const SHOP_NAME = "WappFlow Store";
 const CURRENCY_SYMBOL = "₹";
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://wapp-flow-six.vercel.app";
 
 function formatPrice(paise: number): string {
   return `${CURRENCY_SYMBOL}${(paise / 100).toFixed(2)}`;
@@ -19,7 +18,7 @@ function generateOrderId(): string {
   return result;
 }
 
-export async function sendMainMenu(phone: string, contactId: string, orgId: string) {
+export async function sendMainMenu(phone: string, _contactId: string, orgId: string) {
   const text = `🛍️ Welcome to *${SHOP_NAME}*!
 
 What would you like to do?
@@ -187,7 +186,7 @@ export async function startCheckout(phone: string, contactId: string, orgId: str
   const total = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const orderId = generateOrderId();
   const razorpayPaymentLink = await createRazorpayPaymentLink(total, orderId, contact.phone, contact.name);
-  const order = await prisma.order.create({
+  await prisma.order.create({
     data: {
       orderId,
       contactId,
@@ -269,7 +268,7 @@ export async function sendSingleOrderStatus(phone: string, contactId: string, or
   text += `\n*Status:* ${order.status.toUpperCase()}`;
   text += `\n*Payment:* ${order.paymentStatus.toUpperCase()}`;
   if (order.address && typeof order.address === "object" && "address" in order.address) {
-    text += `\n*Address:* ${(order.address as any).address}`;
+    text += `\n*Address:* ${(order.address as { address: string }).address}`;
   }
   text += `\n*Date:* ${order.createdAt.toLocaleDateString()}`;
   await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);}
@@ -370,7 +369,7 @@ export async function handleMarketplaceMessage(
         try {
           const rzp = getRazorpayInstance();
           if (rzp) {
-            const plink = await (rzp.paymentLink as any).fetch(latestOrder.razorpayOrderId);
+            const plink = await (rzp.paymentLink as unknown as Record<string, (id: string) => Promise<{ short_url?: string }>>).fetch(latestOrder.razorpayOrderId);
             if (plink && plink.short_url) {
               linkStr = `\n\n💳 *Pay here:* ${plink.short_url}`;
             }

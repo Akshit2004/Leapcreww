@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   LayoutDashboard, 
   MessageSquare, 
@@ -8,7 +8,6 @@ import {
   FileText, 
   Bot, 
   Cpu, 
-  Sparkles,
   LogOut,
   X,
   ShoppingBag,
@@ -31,12 +30,16 @@ interface SidebarProps {
 
 declare global {
   interface Window {
-    FB: any;
-    fbAsyncInit: any;
+    FB?: {
+      init: (params: { appId: string; cookie: boolean; xfbml: boolean; version: string }) => void;
+      AppEvents: {
+        logPageView: () => void;
+      };
+      login: (cb: (response: { authResponse?: { accessToken: string } }) => void, opts: { scope: string }) => void;
+    };
+    fbAsyncInit?: () => void;
   }
 }
-
-declare function require(name: string): any;
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
   activeTab, 
@@ -46,7 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const params = useParams();
   const orgId = params.orgId as string;
-  const { contacts, members } = useApp();
+  const { contacts } = useApp();
   const { data: session } = useSession();
 
   const [waConnected, setWaConnected] = useState(false);
@@ -58,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const totalUnread = contacts.reduce((acc, contact) => acc + (contact.unreadCount || 0), 0);
   
   // Use session user name, fallback to env var
-  const sessionName = (session?.user as any)?.name || "";
+  const sessionName = (session?.user as { name?: string })?.name || "";
   const agentName = sessionName || "Agent";
   const appName = "WappFlow";
   const appVersion = "v2.4.0";
@@ -73,22 +76,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
-  // Fetch WhatsApp connection status
-  const fetchStatus = useCallback(async () => {
-    if (!orgId) return;
-    try {
-      const res = await fetch(`/api/whatsapp/status?orgId=${orgId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setWaConnected(data.connected);
-        setWaPhoneNumberId(data.phoneNumberId || null);
-      }
-    } catch {}
-  }, [orgId]);
-
   useEffect(() => {
+    const fetchStatus = async () => {
+      if (!orgId) return;
+      try {
+        const res = await fetch(`/api/whatsapp/status?orgId=${orgId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setWaConnected(data.connected);
+          setWaPhoneNumberId(data.phoneNumberId || null);
+        }
+      } catch {}
+    };
     fetchStatus();
-  }, [fetchStatus]);
+  }, [orgId]);
 
   // Initialize Facebook SDK (runs once)
   useEffect(() => {
@@ -105,19 +106,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       });
       return;
     }
-
     // Set up async init
     window.fbAsyncInit = function () {
-      window.FB.init({
+      window.FB?.init({
         appId,
         cookie: true,
         xfbml: true,
         version: "v21.0",
       });
-      window.FB.AppEvents.logPageView();
-    };
-
-    // Load FB SDK
+      window.FB?.AppEvents.logPageView();
+    };    // Load FB SDK
     ((d, s, id) => {
       const fjs = d.getElementsByTagName(s)[0];
       if (d.getElementById(id)) return;
@@ -140,10 +138,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setConnectError("Facebook SDK not loaded. Please refresh.");
       return;
     }
-
     setConnecting(true);
 
-    window.FB.login((response: any) => {
+    window.FB.login((response) => {
       if (response.authResponse) {
         const token = response.authResponse.accessToken;
         fetch("/api/whatsapp/connect", {

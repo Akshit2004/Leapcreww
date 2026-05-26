@@ -22,26 +22,26 @@ function LoginContent() {
     const errorParam = searchParams.get("error");
     const registeredParam = searchParams.get("registered");
     
-    setErrorMsg("");
-    setSuccessMsg("");
+    setTimeout(() => { setErrorMsg(""); setSuccessMsg(""); }, 0);
     
-    if (errorParam) {
-      if (errorParam === "CredentialsSignin") {
-        setErrorMsg("Incorrect email address or password.");
-      } else {
-        setErrorMsg("An authentication error occurred. Please try again.");
+    setTimeout(() => {
+      if (errorParam) {
+        if (errorParam === "CredentialsSignin") {
+          setErrorMsg("Incorrect email address or password.");
+        } else {
+          setErrorMsg("An authentication error occurred. Please try again.");
+        }
+      } else if (registeredParam === "true") {
+        setSuccessMsg("SaaS Sandbox Workspace created! Enter email and password to enter your dashboard.");
       }
-    } else if (registeredParam === "true") {
-      setSuccessMsg("SaaS Sandbox Workspace created! Enter email and password to enter your dashboard.");
-    }
+    }, 0);
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;
 
-    setErrorMsg("");
-    setSuccessMsg("");
+    setTimeout(() => { setErrorMsg(""); setSuccessMsg(""); }, 0);
     setLoading(true);
 
     try {
@@ -57,7 +57,11 @@ function LoginContent() {
       } else {
         // Retrieve session to resolve organizational slugs
         const session = await getSession();
-        const activeOrgId = (session?.user as any)?.activeOrgId || (session?.user as any)?.organizations?.[0]?.id;
+        interface CustomSessionUser {
+          activeOrgId?: string | null;
+          organizations?: Array<{ id: string; name: string; slug: string }>;
+        }
+        const activeOrgId = (session?.user as unknown as CustomSessionUser)?.activeOrgId || (session?.user as unknown as CustomSessionUser)?.organizations?.[0]?.id;
 
         if (activeOrgId) {
           router.push(`/org/${activeOrgId}`);
@@ -66,7 +70,7 @@ function LoginContent() {
           setLoading(false);
         }
       }
-    } catch (err) {
+    } catch {
       setErrorMsg("An unexpected connection issue occurred. Please check your credentials.");
       setLoading(false);
     }

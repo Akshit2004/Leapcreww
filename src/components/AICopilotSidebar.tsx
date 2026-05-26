@@ -17,12 +17,13 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { useApp } from "../context/AppContext";
+import { useApp, Contact, Campaign, Template } from "../context/AppContext";
 
-type CopilotAction = {
-  type: "go_to_tab" | "create_campaign" | "send_message" | "add_tag";
-  data: Record<string, any>;
-};
+type CopilotAction = 
+  | { type: "go_to_tab"; data: { tab?: string } }
+  | { type: "create_campaign"; data: { name?: string; targetTag?: string; templateName?: string; delay?: number; scheduledAt?: string } }
+  | { type: "send_message"; data: { contactName?: string; text?: string } }
+  | { type: "add_tag"; data: { contactName?: string; tags?: string[] } };
 
 interface Suggestion {
   id: string;
@@ -47,9 +48,9 @@ interface AICopilotSidebarProps {
 }
 
 function generateSuggestions(
-  contacts: any[],
-  campaigns: any[],
-  templates: any[],
+  contacts: Contact[],
+  campaigns: Campaign[],
+  templates: Template[],
   activeTab: string
 ): Suggestion[] {
   const suggestions: Suggestion[] = [];
@@ -193,20 +194,21 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
   }, [messages, scrollToBottom]);
 
   useEffect(() => {
-    if (isOpen && messages.length === 0 && !initialAnalysis) {
-      const totalUnread = contacts.reduce(
-        (acc, c) => acc + (c.unreadCount || 0),
-        0
-      );
-      const greetings: ChatMessage[] = [
+    let mounted = true;
+    if (isOpen && !initialAnalysis && contacts.length > 0) {
+      const greetings = [
         {
-          role: "assistant",
-          content: `👋 Hey! I'm your AI Copilot. I see ${contacts.length} contact${contacts.length !== 1 ? "s" : ""}, ${campaigns.length} campaign${campaigns.length !== 1 ? "s" : ""}, and ${totalUnread} unread message${totalUnread !== 1 ? "s" : ""}. What would you like me to do?`,
+          role: "assistant" as "user" | "assistant",
+          content: "I'm analyzing your audience and latest campaign metrics...",
         },
       ];
-      setMessages(greetings);
-      setInitialAnalysis(true);
+      setTimeout(() => {
+        if (!mounted) return;
+        setMessages(greetings);
+        setInitialAnalysis(true);
+      }, 0);
     }
+    return () => { mounted = false; };
   }, [isOpen, contacts, campaigns, messages, initialAnalysis]);
 
   const getContext = useCallback(() => {
@@ -345,7 +347,7 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
       }
 
       default:
-        return { success: false, message: `Unknown action type: ${(action as any).type}` };
+        return { success: false, message: `Unknown action type: ${(action as { type: string }).type}` };
     }
   };
 
@@ -371,9 +373,15 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
 
       const data = await res.json();
 
+      interface IncomingSuggestion {
+        title: string;
+        description: string;
+        action?: CopilotAction;
+      }
+
       const assistantSuggestions: Suggestion[] = (
-        data.suggestions || []
-      ).map((s: any, i: number) => ({
+        (data.suggestions || []) as IncomingSuggestion[]
+      ).map((s, i: number) => ({
         id: `ai-sug-${Date.now()}-${i}`,
         title: s.title,
         description: s.description,

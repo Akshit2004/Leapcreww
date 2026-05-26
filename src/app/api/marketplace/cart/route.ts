@@ -69,8 +69,8 @@ export async function POST(req: NextRequest) {
       amount: razorpayOrder.amount,
       keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Create order error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

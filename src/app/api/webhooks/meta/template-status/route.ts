@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ status: "ok" }, { status: 200 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[Meta Template Webhook] Error:", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }

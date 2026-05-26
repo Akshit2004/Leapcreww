@@ -4,7 +4,7 @@ import { handleAutoResponder } from "@/lib/autoresponder";
 
 export async function POST(req: NextRequest) {
   try {
-    const { from, text, msgId, timestamp } = await req.json();
+    const { from, text } = await req.json();
     if (!from || !text) {
       return NextResponse.json({ error: "Missing from or text" }, { status: 400 });
     }
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ status: "ok", contactId: contact.id }, { status: 200 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("WhatsApp process error:", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }

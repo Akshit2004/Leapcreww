@@ -14,7 +14,8 @@ export async function GET(
     }
 
     const { orgId } = await params;
-    const userId = (session.user as any).id;
+    interface CustomSessionUser { id: string }
+    const userId = (session.user as unknown as CustomSessionUser).id;
 
     // 1. Verify User has active tenancy/membership in requested organization
     const membership = await prisma.membership.findUnique({
@@ -31,6 +32,23 @@ export async function GET(
         { error: "Access forbidden. You do not belong to this workspace." },
         { status: 403 }
       );
+    }
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        whatsappConnected: true,
+        whatsappBusinessAccountId: true,
+        whatsappAccessToken: true,
+        onboardingDismissed: true,
+      }
+    });
+
+    if (!organization) {
+      return NextResponse.json({ error: "Organization not found." }, { status: 404 });
     }
 
     // 2. Fetch org members (users with membership in this org)
@@ -62,110 +80,145 @@ export async function GET(
     });
 
     // Sync templates with Meta before querying them
-    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
     const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
+    const syncConfigs: Array<{ wabaId: string; accessToken: string }> = [];
+    
+    // Multi-tenant Sync Configuration: Exclusive isolation
+    if (organization.whatsappConnected && organization.whatsappBusinessAccountId && organization.whatsappAccessToken) {
+      syncConfigs.push({
+        wabaId: organization.whatsappBusinessAccountId,
+        accessToken: organization.whatsappAccessToken
+      });
+    } else if (process.env.WHATSAPP_BUSINESS_ACCOUNT_ID && process.env.WHATSAPP_ACCESS_TOKEN) {
+      syncConfigs.push({
+        wabaId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID,
+        accessToken: process.env.WHATSAPP_ACCESS_TOKEN
+      });
+    }
 
-    if (wabaId && accessToken) {
+    const allMetaTemplates = new Map();
+
+    for (const config of syncConfigs) {
       try {
         const metaRes = await fetch(
-          `https://graph.facebook.com/${apiVersion}/${wabaId}/message_templates?limit=250`,
+          `https://graph.facebook.com/${apiVersion}/${config.wabaId}/message_templates?limit=250`,
           {
-            headers: { Authorization: `Bearer ${accessToken}` },
+            headers: { Authorization: `Bearer ${config.accessToken}` },
           }
         );
         if (metaRes.ok) {
           const metaData = await metaRes.json();
           const metaTemplates = metaData.data || [];
-          const activeMetaIds = metaTemplates.map((t: any) => t.id).filter(Boolean);
-
-          // 1. Purge all local templates for this org that are NOT in Meta's returned active list or don't have a metaId
-          await prisma.template.deleteMany({
-            where: {
-              organizationId: orgId,
-              OR: [
-                { metaId: { notIn: activeMetaIds } },
-                { metaId: null }
-              ]
-            }
-          });
-
-          // 2. Upsert each real template returned by Meta
           for (const t of metaTemplates) {
-            const bodyComp = t.components?.find((c: any) => c.type === "BODY");
-            const bodyText = bodyComp?.text || "";
-
-            const buttonsComp = t.components?.find((c: any) => c.type === "BUTTONS");
-            const buttonsList = buttonsComp?.buttons?.map((b: any) => b.text).filter(Boolean) || [];
-
-            const headerComp = t.components?.find((c: any) => c.type === "HEADER");
-            let mediaType = "none";
-            if (headerComp?.format === "IMAGE") mediaType = "image";
-            else if (headerComp?.format === "VIDEO") mediaType = "video";
-            else if (headerComp?.format === "DOCUMENT") mediaType = "file";
-
-            const categoryFormatted = 
-              t.category === "UTILITY" ? "Utility" :
-              t.category === "MARKETING" ? "Marketing" :
-              t.category === "AUTHENTICATION" ? "Authentication" :
-              t.category.charAt(0) + t.category.slice(1).toLowerCase();
-
-            const statusFormatted = 
-              t.status === "APPROVED" ? "approved" :
-              t.status === "REJECTED" ? "rejected" : "pending";
-
-            // Find if there is an existing record (by name or metaId)
-            const existingTemplates = await prisma.template.findMany({
-              where: {
-                organizationId: orgId,
-                OR: [
-                  { name: t.name },
-                  { metaId: t.id }
-                ]
-              }
-            });
-
-            if (existingTemplates.length > 0) {
-              // Update the first one and delete any duplicates to keep DB clean
-              const primary = existingTemplates[0];
-              await prisma.template.update({
-                where: { id: primary.id },
-                data: {
-                  name: t.name,
-                  body: bodyText,
-                  category: categoryFormatted,
-                  buttons: buttonsList,
-                  mediaType: mediaType,
-                  metaStatus: statusFormatted,
-                  metaId: t.id,
-                }
-              });
-
-              if (existingTemplates.length > 1) {
-                const duplicateIds = existingTemplates.slice(1).map(x => x.id);
-                await prisma.template.deleteMany({
-                  where: { id: { in: duplicateIds } }
-                });
-              }
-            } else {
-              // Create new record
-              await prisma.template.create({
-                data: {
-                  organizationId: orgId,
-                  name: t.name,
-                  body: bodyText,
-                  category: categoryFormatted,
-                  buttons: buttonsList,
-                  mediaType: mediaType,
-                  metaStatus: statusFormatted,
-                  metaId: t.id,
-                }
-              });
-            }
+            if (t.id) allMetaTemplates.set(t.id, t);
           }
         }
       } catch (syncErr) {
         console.error("⚠️ Failed to sync templates from Meta:", syncErr);
+      }
+    }
+
+    const activeMetaIds = Array.from(allMetaTemplates.keys());
+
+    if (activeMetaIds.length > 0 || syncConfigs.length > 0) {
+      // 1. Purge all local templates for this org that are NOT in Meta's returned active list or don't have a metaId
+      await prisma.template.deleteMany({
+        where: {
+          organizationId: orgId,
+          OR: [
+            { metaId: { notIn: activeMetaIds.length > 0 ? activeMetaIds : ["dummy_to_prevent_error"] } },
+            { metaId: null }
+          ]
+        }
+      });
+
+      interface MetaTemplateComponent {
+        type: string;
+        text?: string;
+        format?: string;
+        buttons?: Array<{ text: string }>;
+      }
+
+      interface MetaTemplateInput {
+        id: string;
+        name: string;
+        category: string;
+        status: string;
+        components?: MetaTemplateComponent[];
+      }
+
+      // 2. Upsert each real template returned by Meta
+      for (const t of Array.from(allMetaTemplates.values()) as unknown as MetaTemplateInput[]) {
+        const bodyComp = t.components?.find((c) => c.type === "BODY");
+        const bodyText = bodyComp?.text || "";
+
+        const buttonsComp = t.components?.find((c) => c.type === "BUTTONS");
+        const buttonsList = buttonsComp?.buttons?.map((b) => b.text).filter(Boolean) || [];
+
+        const headerComp = t.components?.find((c) => c.type === "HEADER");
+        let mediaType = "none";
+        if (headerComp?.format === "IMAGE") mediaType = "image";
+        else if (headerComp?.format === "VIDEO") mediaType = "video";
+        else if (headerComp?.format === "DOCUMENT") mediaType = "file";
+
+        const categoryFormatted = 
+          t.category === "UTILITY" ? "Utility" :
+          t.category === "MARKETING" ? "Marketing" :
+          t.category === "AUTHENTICATION" ? "Authentication" :
+          t.category.charAt(0) + t.category.slice(1).toLowerCase();
+
+        const statusFormatted = 
+          t.status === "APPROVED" ? "approved" :
+          t.status === "REJECTED" ? "rejected" : "pending";
+
+        // Find if there is an existing record (by name or metaId)
+        const existingTemplates = await prisma.template.findMany({
+          where: {
+            organizationId: orgId,
+            OR: [
+              { name: t.name },
+              { metaId: t.id }
+            ]
+          }
+        });
+
+        if (existingTemplates.length > 0) {
+          // Update the first one and delete any duplicates to keep DB clean
+          const primary = existingTemplates[0];
+          await prisma.template.update({
+            where: { id: primary.id },
+            data: {
+              name: t.name,
+              body: bodyText,
+              category: categoryFormatted,
+              buttons: buttonsList,
+              mediaType: mediaType,
+              metaStatus: statusFormatted,
+              metaId: t.id,
+            }
+          });
+
+          if (existingTemplates.length > 1) {
+            const duplicateIds = existingTemplates.slice(1).map(x => x.id);
+            await prisma.template.deleteMany({
+              where: { id: { in: duplicateIds } }
+            });
+          }
+        } else {
+          // Create new record
+          await prisma.template.create({
+            data: {
+              organizationId: orgId,
+              name: t.name,
+              body: bodyText,
+              category: categoryFormatted,
+              buttons: buttonsList,
+              mediaType: mediaType,
+              metaStatus: statusFormatted,
+              metaId: t.id,
+            }
+          });
+        }
       }
     }
 
@@ -201,24 +254,24 @@ export async function GET(
     });
 
     // 3. Assemble relational Message rows into dynamic ChatHistory map structure
-    const chatHistory: Record<string, any[]> = {};
+    const chatHistory: Record<string, unknown[]> = {};
     
     // Initialize contact buckets
-    contacts.forEach((c: any) => {
+    contacts.forEach((c) => {
       chatHistory[c.id] = [];
     });
 
-    messages.forEach((m: any) => {
+    messages.forEach((m) => {
       if (!chatHistory[m.contactId]) {
         chatHistory[m.contactId] = [];
       }
       chatHistory[m.contactId].push({
         id: m.id,
-        sender: m.sender,
+        sender: m.sender as "user" | "agent" | "system",
         text: m.text,
         timestamp: m.timestamp,
-        status: m.status,
-        buttons: m.buttons,
+        status: m.status as "sent" | "delivered" | "read" | undefined,
+        buttons: m.buttons as string[],
       });
     });
 
@@ -230,6 +283,7 @@ export async function GET(
 
     // 4. Return unified JSON payloads
     return NextResponse.json({
+      organization,
       contacts,
       campaigns,
       templates,
@@ -240,7 +294,7 @@ export async function GET(
       members,
       orders,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Scoped Data Fetch API failed:", err);
     return NextResponse.json(
       { error: "An unexpected error occurred during database hydration." },

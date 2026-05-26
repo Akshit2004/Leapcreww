@@ -60,8 +60,13 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
-        token.organizations = (user as any).organizations || [];
-        token.activeOrgId = (user as any).organizations?.[0]?.id || null;
+        interface CustomUser {
+          id: string;
+          organizations?: Array<{ id: string; name: string; slug: string }>;
+          activeOrgId?: string | null;
+        }
+        token.organizations = (user as unknown as CustomUser).organizations || [];
+        token.activeOrgId = (user as unknown as CustomUser).organizations?.[0]?.id || null;
       }
       
       // Handle dynamic session updates from client (e.g. switching orgs)
@@ -75,9 +80,14 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id;
-        (session.user as any).organizations = token.organizations || [];
-        (session.user as any).activeOrgId = token.activeOrgId || null;
+        interface CustomUser {
+          id: string;
+          organizations?: Array<{ id: string; name: string; slug: string }>;
+          activeOrgId?: string | null;
+        }
+        (session.user as unknown as CustomUser).id = token.id as string;
+        (session.user as unknown as CustomUser).organizations = (token.organizations as Array<{ id: string; name: string; slug: string }>) || [];
+        (session.user as unknown as CustomUser).activeOrgId = (token.activeOrgId as string) || null;
       }
       return session;
     }

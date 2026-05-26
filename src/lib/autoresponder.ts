@@ -2,7 +2,39 @@ import { prisma } from "./prisma";
 import { getGroqChatCompletion } from "./groq";
 import { sendWhatsAppMessage } from "./whatsapp";
 
-function extractJsonFromString(str: string): any {
+interface BotMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+interface BotNode {
+  id: string;
+  type: string;
+  content: string;
+  options?: string[];
+  nextId?: string | null;
+  routes?: Record<string, string> | null;
+}
+
+interface BotContact {
+  id: string;
+  name: string;
+  phone: string;
+  tags: string[];
+  assignedAgent?: string | null;
+  currentNodeId?: string | null;
+  organization?: { name: string };
+}
+
+interface CrmAnalysis {
+  purchaseIntent: boolean;
+  budget: string | null;
+  interests: string[] | null;
+  frustrated: boolean;
+  needsEscalation: boolean;
+}
+
+function extractJsonFromString(str: string): Record<string, unknown> | null {
   try {
     const cleanStr = str.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(cleanStr);
@@ -20,13 +52,7 @@ function extractJsonFromString(str: string): any {
   }
 }
 
-async function analyzeConversationAgent(recentMessages: any[]): Promise<{
-  purchaseIntent: boolean;
-  budget: string | null;
-  interests: string[] | null;
-  frustrated: boolean;
-  needsEscalation: boolean;
-} | null> {
+async function analyzeConversationAgent(recentMessages: BotMessage[]): Promise<CrmAnalysis | null> {
   try {
     const analysisPrompt = [
       {
@@ -63,11 +89,11 @@ Do not include any explanation, code fences, or markdown wrapping. Return ONLY t
     const parsed = extractJsonFromString(resultString);
     if (parsed) {
       return {
-        purchaseIntent: !!parsed.purchaseIntent,
-        budget: parsed.budget || null,
-        interests: Array.isArray(parsed.interests) ? parsed.interests : null,
-        frustrated: !!parsed.frustrated,
-        needsEscalation: !!parsed.needsEscalation
+        purchaseIntent: Boolean(parsed.purchaseIntent),
+        budget: (parsed.budget as string) || null,
+        interests: Array.isArray(parsed.interests) ? (parsed.interests as string[]) : null,
+        frustrated: Boolean(parsed.frustrated),
+        needsEscalation: Boolean(parsed.needsEscalation)
       };
     }
     return null;
@@ -123,7 +149,7 @@ async function sendReply(
 
 async function advanceFlow(
   fromNodeId: string,
-  nodes: any[],
+  nodes: BotNode[],
   contactId: string,
   orgId: string,
   timeStr: string,
@@ -204,7 +230,7 @@ async function advanceFlow(
 // ─── Free-form AI fallback (original behavior) ─────────────────────────────
 
 async function freeFormAiReply(
-  contact: any,
+  contact: BotContact,
   orgId: string,
   orgName: string,
   timeStr: string
@@ -260,8 +286,8 @@ Response guidelines:
   }
 }
 
-async function applyCrmAnalysis(analysis: any, contact: any, orgId: string, timeStr: string) {
-  let updatedTags = [...contact.tags];
+async function applyCrmAnalysis(analysis: CrmAnalysis, contact: BotContact, orgId: string, timeStr: string) {
+  const updatedTags = [...contact.tags];
   let tagChanged = false;
 
   if (analysis.purchaseIntent && !updatedTags.includes("Hot Prospect")) {
@@ -360,13 +386,13 @@ export async function handleAutoResponder(contactId: string, orgId: string) {
     });
 
     if (nodes.length > 0) {
-      const handled = await handleNodeFlow(contact, nodes, orgId, timeStr);
+      const handled = await handleNodeFlow(contact, nodes as unknown as BotNode[], orgId, timeStr);
       if (handled) return;
     }
 
     // 2. Fall back to free-form AI
     await freeFormAiReply(contact, orgId, orgName, timeStr);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in handleAutoResponder:", error);
     try {
       const d = new Date();
@@ -375,7 +401,7 @@ export async function handleAutoResponder(contactId: string, orgId: string) {
         data: {
           timestamp: timeStr,
           type: "chat",
-          message: `AI Bot Error: ${error.message || error}`,
+          message: `AI Bot Error: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : "Unknown error"}`,
           organizationId: orgId,
         },
       });
@@ -386,8 +412,8 @@ export async function handleAutoResponder(contactId: string, orgId: string) {
 }
 
 async function handleNodeFlow(
-  contact: any,
-  nodes: any[],
+  contact: BotContact,
+  nodes: BotNode[],
   orgId: string,
   timeStr: string
 ): Promise<boolean> {
@@ -489,7 +515,7 @@ async function handleNodeFlow(
   return true;
 }
 
-async function runCrmAnalysis(contact: any, orgId: string, timeStr: string) {
+async function runCrmAnalysis(contact: BotContact, orgId: string, timeStr: string) {
   try {
     const recentMessages = await prisma.message.findMany({
       where: { contactId: contact.id },

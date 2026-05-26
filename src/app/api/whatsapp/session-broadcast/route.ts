@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
             organizationId
           }
         });
-      } catch (workerErr: any) {
+      } catch (workerErr: unknown) {
         console.error("[Session Broadcast Worker Error]:", workerErr);
       }
     })();
@@ -205,8 +205,8 @@ export async function POST(request: NextRequest) {
       totalTagged: taggedContacts.length,
       skippedInactive: taggedContacts.length - recipientCount
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Session broadcast error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

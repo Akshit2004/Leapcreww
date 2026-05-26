@@ -44,7 +44,7 @@ export default function SignupPage() {
         // Redirect to login with dynamic registered success flag
         router.push("/login?registered=true");
       }
-    } catch (err) {
+    } catch {
       setErrorMsg("Unable to connect to registration servers. Please check your network.");
       setLoading(false);
     }

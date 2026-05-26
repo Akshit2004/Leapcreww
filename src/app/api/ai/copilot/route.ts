@@ -3,7 +3,16 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { getGroqChatCompletion } from "@/lib/groq";
 
-function extractJsonFromString(str: string): any {
+interface CopilotResponse {
+  reply: string;
+  suggestions?: unknown[];
+  action?: {
+    type: string;
+    data?: Record<string, unknown>;
+  } | null;
+}
+
+function extractJsonFromString(str: string): CopilotResponse | null {
   try {
     const cleanStr = str.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(cleanStr);
@@ -103,7 +112,7 @@ If just chatting (no action needed), omit "action" or set to null.
       action: null
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("AI Copilot error:", err);
     return NextResponse.json({
       reply: "I ran into an issue. Let's try again.",

@@ -18,7 +18,7 @@ import { Loader, AlertCircle, Bot, Menu } from "lucide-react";
 export default function TenantDashboard() {
   const params = useParams();
   const router = useRouter();
-  const { status, data: session } = useSession();
+  const { status } = useSession();
   const { initializeWorkspace } = useApp();
 
   const orgId = params.orgId as string;
@@ -58,7 +58,7 @@ export default function TenantDashboard() {
         const data = await response.json();
         initializeWorkspace(data);
         setLoading(false);
-      } catch (err) {
+      } catch {
         if (showLoading) {
           setErrorMsg("Failed to synchronize with local PostgreSQL. Connection timeout.");
           setLoading(false);

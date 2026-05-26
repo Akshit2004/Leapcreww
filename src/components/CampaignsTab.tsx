@@ -40,7 +40,9 @@ export const CampaignsTab: React.FC = () => {
   // Campaign Form States
   const [campaignName, setCampaignName] = useState("");
   const [targetTag, setTargetTag] = useState("Shopify");
+  const [excludeTag, setExcludeTag] = useState("None");
   const [templateName, setTemplateName] = useState("");
+  const [mediaUrl, setMediaUrl] = useState("");
   const [broadcastMode, setBroadcastMode] = useState<"template" | "session">("template");
   const [sessionText, setSessionText] = useState("");
   
@@ -56,35 +58,42 @@ export const CampaignsTab: React.FC = () => {
 
   // Auto-initialize template choice and variables
   useEffect(() => {
+    let mounted = true;
     if (!templateName && templates.length > 0) {
-      setTemplateName(templates[0].name);
+      setTimeout(() => {
+        if (mounted) setTemplateName(templates[0].name);
+      }, 0);
     }
+    return () => { mounted = false; };
   }, [templates, templateName]);
 
   const activeTemplate = templates.find((t) => t.name === templateName);
 
   // Scan and parse variables from active template body
   useEffect(() => {
-    const tpl = templates.find((t) => t.name === templateName);
-    if (!tpl) return;
-
-    const varRegex = /\{\{(\d+)\}\}/g;
-    const matches = Array.from(tpl.body.matchAll(varRegex)).map((m) => m[0]);
-    const uniqueVars = Array.from(new Set(matches));
-
+    let mounted = true;
+    const t = templates.find((x) => x.name === templateName);
     const initialMapping: Record<string, { type: "contact_field" | "static"; value: string }> = {};
-    uniqueVars.forEach((v, index) => {
-      if (index === 0) {
-        initialMapping[v] = { type: "contact_field", value: "name" };
-      } else {
-        initialMapping[v] = { type: "static", value: "" };
+    if (t?.body) {
+      const matches = t.body.match(/\{\{\d+\}\}/g);
+      if (matches) {
+        matches.forEach((match) => {
+          initialMapping[match] = { type: "contact_field", value: "name" };
+        });
       }
-    });
-    setVariablesMapping(initialMapping);
-  }, [templateName]);
+    }
+    setTimeout(() => {
+      if (mounted) setVariablesMapping(initialMapping);
+    }, 0);
+    return () => { mounted = false; };
+  }, [templateName, templates]);
 
   // Calculate target audience size in real-time
-  const targetAudienceSize = contacts.filter((c) => c.tags.includes(targetTag)).length;
+  const targetAudienceSize = contacts.filter((c) => {
+    const hasTarget = targetTag === "all" || c.tags.includes(targetTag);
+    const isExcluded = excludeTag !== "None" && c.tags.includes(excludeTag);
+    return hasTarget && !isExcluded;
+  }).length;
 
   const handleLaunchCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,8 +127,8 @@ export const CampaignsTab: React.FC = () => {
           return;
         }
         addSystemLog("campaign", `Session broadcast launched! ${data.eligibleCount} contacts in 24h window.`);
-      } catch (err: any) {
-        addSystemLog("campaign", `Session broadcast error: ${err.message}`);
+      } catch (err: unknown) {
+        addSystemLog("campaign", `Session broadcast error: ${(err instanceof Error ? err.message : String(err))}`);
       }
     } else {
       const variablesPayload = Object.entries(variablesMapping).map(([key, map]) => ({
@@ -135,7 +144,10 @@ export const CampaignsTab: React.FC = () => {
         organizationId: orgId,
         variables: variablesPayload,
         delay: sendDelay,
-        scheduledAt: scheduledAtStr
+        scheduledAt: scheduledAtStr,
+        excludeTag: excludeTag === "None" ? undefined : excludeTag,
+        mediaType: activeTemplate?.mediaType,
+        mediaUrl: mediaUrl.trim() || undefined,
       });
     }
 
@@ -145,6 +157,7 @@ export const CampaignsTab: React.FC = () => {
     setScheduledTime("");
     setSendDelay(1);
     setSessionText("");
+    setMediaUrl("");
     setIsModalOpen(false);
   };
 
@@ -452,6 +465,23 @@ export const CampaignsTab: React.FC = () => {
                 )}
               </div>
 
+              {/* Exclude Tag Targeting */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500 flex justify-between">
+                  <span>Exclude Audience segment</span>
+                </label>
+                <select
+                  value={excludeTag}
+                  onChange={(e) => setExcludeTag(e.target.value)}
+                  className="w-full bg-orange-50 border border-orange-100 rounded-xl py-2.5 px-4 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500"
+                >
+                  <option value="None">-- No Exclusion --</option>
+                  {allUniqueTags.map((tag) => (
+                    <option key={tag} value={tag}>{tag}</option>
+                  ))}
+                </select>
+              </div>
+
               {broadcastMode === "template" ? (
                 <>
                   {/* Approved Templates list */}
@@ -467,6 +497,22 @@ export const CampaignsTab: React.FC = () => {
                       ))}
                     </select>
                   </div>
+
+                  {/* Dynamic Media Input */}
+                  {activeTemplate && activeTemplate.mediaType && activeTemplate.mediaType !== "none" && (
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
+                        {activeTemplate.mediaType} Media URL
+                      </label>
+                      <input
+                        type="url"
+                        placeholder={`https://example.com/media.${activeTemplate.mediaType === 'image' ? 'jpg' : 'mp4'}`}
+                        value={mediaUrl}
+                        onChange={(e) => setMediaUrl(e.target.value)}
+                        className="w-full bg-orange-50 border border-orange-100 rounded-xl py-2.5 px-4 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      />
+                    </div>
+                  )}
 
                   {/* Dynamic Variables Mapping Form */}
                   {activeTemplate && Object.keys(variablesMapping).length > 0 && (

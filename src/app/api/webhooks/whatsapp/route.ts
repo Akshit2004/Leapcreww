@@ -52,7 +52,6 @@ export async function POST(req: NextRequest) {
           for (const msg of value.messages) {
             const waFrom = msg.from;
             const text = msg.text?.body || msg.interactive?.button_reply?.id || "";
-            const timestamp = msg.timestamp;
             const profileName = value.contacts?.[0]?.profile?.name || `Customer ${waFrom.slice(-4)}`;
 
             console.log(`WhatsApp message from ${waFrom} (${profileName}): ${text}`);
@@ -66,7 +65,6 @@ export async function POST(req: NextRequest) {
               continue;
             }
 
-            const phoneClean = waFrom.startsWith("+") ? waFrom : `+${waFrom}`;
             const normalizedPhone = `+${waFrom.replace(/[^0-9]/g, "")}`;
 
             // Use the org from the webhook metadata match, or fall back to contacting org
@@ -159,7 +157,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ status: "ok" }, { status: 200 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("WhatsApp webhook error:", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect} from "react";
 import { useParams } from "next/navigation";
 import {
   ShoppingBag,
@@ -9,12 +9,10 @@ import {
   Edit3,
   Trash2,
   X,
-  CheckCircle2,
-  AlertCircle,
-  ExternalLink,
   Search,
-  ArrowUpRight,
   RefreshCw,
+  CheckCircle2,
+  ExternalLink,
 } from "lucide-react";
 
 interface Product {
@@ -42,7 +40,7 @@ interface Order {
   status: string;
   paymentStatus: string;
   phone: string;
-  address: any;
+  address: Record<string, unknown> | string;
   items: OrderItem[];
   createdAt: string;
 }
@@ -67,30 +65,39 @@ export const MarketplaceTab: React.FC = () => {
     stock: "0",
   });
 
-  const fetchProducts = useCallback(async () => {
+  useEffect(() => {
+    let mounted = true;
+    const loadAll = async () => {
+      try {
+        const [resP, resO] = await Promise.all([
+          fetch(`/api/marketplace/catalog?orgId=${orgId}`),
+          fetch(`/api/org/${orgId}/data`)
+        ]);
+        const dataP = await resP.json();
+        const dataO = await resO.json();
+        if (mounted) {
+          setProducts(dataP.products || []);
+          if (dataO.orders) setOrders(dataO.orders);
+        }
+      } catch (err) {
+        console.error("Failed to fetch marketplace data", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    loadAll();
+    return () => { mounted = false; };
+  }, [orgId]);
+
+  const fetchProducts = async () => {
     try {
       const res = await fetch(`/api/marketplace/catalog?orgId=${orgId}`);
       const data = await res.json();
       setProducts(data.products || []);
     } catch (err) {
-      console.error("Failed to fetch products", err);
+      console.error(err);
     }
-  }, [orgId]);
-
-  const fetchOrders = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/org/${orgId}/data`);
-      const data = await res.json();
-      if (data.orders) setOrders(data.orders);
-    } catch (err) {
-      console.error("Failed to fetch orders", err);
-    }
-  }, [orgId]);
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([fetchProducts(), fetchOrders()]).finally(() => setLoading(false));
-  }, [fetchProducts, fetchOrders]);
+  };
 
   const resetForm = () => {
     setForm({ name: "", description: "", price: "", category: "", stock: "0" });
@@ -370,7 +377,7 @@ export const MarketplaceTab: React.FC = () => {
   );
 };
 
-function StatCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: string | number; color: string }) {
+function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: string | number; color: string }) {
   const colors: Record<string, string> = {
     blue: "bg-blue-50 text-blue-600 border-blue-100",
     orange: "bg-orange-50 text-orange-600 border-orange-100",

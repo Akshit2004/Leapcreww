@@ -14,7 +14,8 @@ export async function POST(
     }
 
     const { orgId } = await params;
-    const userId = (session.user as any).id;
+    interface CustomSessionUser { id: string }
+    const userId = (session.user as unknown as CustomSessionUser).id;
 
     // 1. Verify User has active tenancy/membership in requested organization
     const membership = await prisma.membership.findUnique({
@@ -39,6 +40,17 @@ export async function POST(
       return NextResponse.json({ error: "Invalid nodes list payload" }, { status: 400 });
     }
 
+    interface ChatbotNodeInput {
+      id: string;
+      type: string;
+      title: string;
+      content: string;
+      options?: string[];
+      delayTime?: string | number | null;
+      nextId?: string | null;
+      routes?: Record<string, string> | null;
+    }
+
     // 2. Perform Transaction to atomic upsert nodes layout
     await prisma.$transaction([
       // A. Purge all existing chatbot nodes for this organization
@@ -47,13 +59,13 @@ export async function POST(
       }),
       // B. Create the new node list
       prisma.chatbotNode.createMany({
-        data: nodes.map((node: any) => ({
+        data: (nodes as ChatbotNodeInput[]).map((node) => ({
           id: node.id,
           type: node.type,
           title: node.title,
           content: node.content,
           options: Array.isArray(node.options) ? node.options : [],
-          delayTime: node.delayTime !== undefined ? parseInt(node.delayTime) : null,
+          delayTime: node.delayTime !== undefined ? parseInt(String(node.delayTime)) : null,
           nextId: node.nextId || null,
           routes: node.routes ? node.routes : {},
           organizationId: orgId
@@ -74,8 +86,8 @@ export async function POST(
     });
 
     return NextResponse.json({ success: true, count: nodes.length });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Save chatbot nodes endpoint error:", err);
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) || "Internal server error" }, { status: 500 });
   }
 }

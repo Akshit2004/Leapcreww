@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
       message: dbMsg,
       waMessageId: result.data?.messages?.[0]?.id || null,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("WhatsApp send API error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

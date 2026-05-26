@@ -67,6 +67,42 @@ export async function POST(req: Request) {
         }
       });
 
+      // Seed Default Welcome Chatbot Node
+      await tx.chatbotNode.create({
+        data: {
+          id: "n1",
+          type: "message",
+          title: "Welcome Message",
+          content: "Hello! Welcome to our store. How can we help you today?",
+          options: ["Support", "Sales"],
+          organizationId: org.id,
+        }
+      });
+
+      // Seed Default Templates
+      await tx.template.createMany({
+        data: [
+          {
+            name: "welcome_verification",
+            body: "Welcome! Your verification code is {{1}}.",
+            category: "Authentication",
+            buttons: [],
+            mediaType: "none",
+            metaStatus: "approved",
+            organizationId: org.id,
+          },
+          {
+            name: "special_offer",
+            body: "Hi {{1}}, we have a special offer for you! Reply YES to claim.",
+            category: "Marketing",
+            buttons: ["YES", "NO"],
+            mediaType: "none",
+            metaStatus: "approved",
+            organizationId: org.id,
+          }
+        ]
+      });
+
       return { user, org };
     });
 
@@ -74,7 +110,7 @@ export async function POST(req: Request) {
       { message: "Registration successful. Workspace created.", orgId: result.org.id },
       { status: 201 }
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("❌ Registration API failed:", err);
     return NextResponse.json(
       { error: "An unexpected error occurred during database registration." },

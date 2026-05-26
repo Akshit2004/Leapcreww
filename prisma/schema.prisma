@@ -30,6 +30,9 @@ model Organization {
   whatsappAccessToken      String?
   whatsappConnected        Boolean    @default(false)
 
+  // Onboarding state
+  onboardingDismissed      Boolean    @default(false)
+
   memberships  Membership[]
   contacts     Contact[]
   campaigns    Campaign[]
@@ -108,6 +111,14 @@ model Campaign {
   clicked        Int          @default(0)
   status         String       // "Completed" | "Active" | "Scheduled" | "Sending"
   date           String
+  
+  // New scheduling & media fields
+  scheduledAt    DateTime?
+  excludeTag     String?
+  mediaType      String?      // "image" | "video" | "document" | "none"
+  mediaUrl       String?
+  variables      Json?
+  delay          Int?         @default(1)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())

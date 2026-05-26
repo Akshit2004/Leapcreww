@@ -20,7 +20,7 @@ export async function DELETE(
     });
 
     return NextResponse.json({ status: "ok" });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Delete campaign error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

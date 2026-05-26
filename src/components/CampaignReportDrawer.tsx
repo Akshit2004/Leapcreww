@@ -9,10 +9,7 @@ import {
   Activity, 
   Clock, 
   CheckCircle,
-  AlertCircle,
-  HelpCircle,
-  FileText,
-  MousePointerClick
+  HelpCircle
 } from "lucide-react";
 import { Campaign, Contact, SystemLog } from "../context/AppContext";
 

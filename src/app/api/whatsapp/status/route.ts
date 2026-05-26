@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       businessAccountId: org.whatsappBusinessAccountId,
       phoneNumberId: org.whatsappPhoneNumberId,
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

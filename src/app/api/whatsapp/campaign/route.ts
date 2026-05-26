@@ -18,7 +18,10 @@ export async function POST(request: NextRequest) {
       organizationId,
       variables = [], // Array<{ key: string; type: 'contact_field' | 'static'; value: string }>
       delay = 1,      // Message spacing delay in seconds
-      scheduledAt     // Optional Date-time string for future scheduling
+      scheduledAt,    // Optional Date-time string for future scheduling
+      excludeTag,
+      mediaType,
+      mediaUrl
     } = await request.json();
 
     if (!name || !targetTag || !templateName || !organizationId) {
@@ -26,11 +29,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Get matching contacts in DB
-    const contacts = await prisma.contact.findMany({
+    const allContacts = await prisma.contact.findMany({
       where: targetTag === "all"
         ? { organizationId }
         : { organizationId, tags: { has: targetTag } }
     });
+
+    const contacts = excludeTag 
+      ? allContacts.filter(c => !c.tags.includes(excludeTag))
+      : allContacts;
 
     const recipientCount = contacts.length;
     const isScheduled = !!scheduledAt;
@@ -42,18 +49,27 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         targetTag,
+        excludeTag,
         templateName,
+        mediaType,
+        mediaUrl,
+        variables: variables || [],
+        delay: delay || 1,
         sent: recipientCount,
         delivered: 0,
         read: 0,
         clicked: 0,
         status: isScheduled ? "Scheduled" : "Sending",
-        date: isScheduled 
-          ? new Date(scheduledAt).toLocaleString() 
-          : new Date().toISOString().split("T")[0],
+        date: new Date().toISOString().split("T")[0],
+        scheduledAt: isScheduled ? new Date(scheduledAt) : null,
         organizationId
       }
     });
+
+    if (isScheduled) {
+      // Return early and let the cron job process it later
+      return NextResponse.json({ campaign });
+    }
 
     // Fire off asynchronous background campaign worker!
     // This allows WappFlow to instantly return the created campaign to the frontend UI
@@ -64,30 +80,6 @@ export async function POST(request: NextRequest) {
           return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
         };
 
-        // Sandbox Simulation: If scheduled, sleep for 8 seconds to demonstrate transition from Scheduled -> Sending
-        if (isScheduled) {
-          console.log(`[Campaign Scheduler] Campaign ${campaign.id} is scheduled for ${scheduledAt}. Simulating scheduling wait...`);
-          await new Promise((resolve) => setTimeout(resolve, 8000));
-          
-          // Update status to Sending
-          await prisma.campaign.update({
-            where: { id: campaign.id },
-            data: { 
-              status: "Sending",
-              date: new Date().toISOString().split("T")[0] // set to actual run date
-            }
-          });
-          
-          await prisma.systemLog.create({
-            data: {
-              timestamp: timeHelper(),
-              type: "campaign",
-              message: `Scheduled broadcast '${name}' has commenced sending.`,
-              organizationId
-            }
-          });
-        }
-
         let deliveredCount = 0;
 
         // Process message sending sequentially with user-defined delay
@@ -95,8 +87,14 @@ export async function POST(request: NextRequest) {
           const phone = formatPhoneNumber(contact.phone);
           console.log(`[Broadcast Engine] Sending template message to ${phone}`);
 
+          interface CampaignVariable {
+            key: string;
+            type: "contact_field" | "static";
+            value: string;
+          }
+          const parsedVariables = (variables as unknown as CampaignVariable[]) || [];
           // Formulate parameters dynamically
-          const parameters = variables.map((v: any) => {
+          const parameters = parsedVariables.map((v) => {
             if (v.type === "contact_field") {
               if (v.value === "name") return { type: "text", text: contact.name };
               if (v.value === "email") return { type: "text", text: contact.email };
@@ -105,8 +103,25 @@ export async function POST(request: NextRequest) {
             return { type: "text", text: v.value || "" };
           });
 
+          interface WhatsAppTemplateParameter {
+            type: string;
+            text?: string;
+            [key: string]: unknown;
+          }
+          
+          interface WhatsAppTemplateComponent {
+            type: string;
+            parameters: WhatsAppTemplateParameter[];
+          }
+
+          interface WhatsAppTemplatePayload {
+            name: string;
+            language: { code: string };
+            components?: WhatsAppTemplateComponent[];
+          }
+
           // Meta-compliant template payload
-          const templatePayload: any = {
+          const templatePayload: WhatsAppTemplatePayload = {
             name: templateName,
             language: { code: "en_US" }
           };
@@ -120,9 +135,24 @@ export async function POST(request: NextRequest) {
             ];
           }
 
+          if (mediaType && mediaType !== "none" && mediaUrl) {
+            const headerParams: WhatsAppTemplateParameter = {
+              type: mediaType,
+            };
+            headerParams[mediaType] = { link: mediaUrl };
+
+            if (!templatePayload.components) {
+              templatePayload.components = [];
+            }
+            templatePayload.components.push({
+              type: "header",
+              parameters: [headerParams]
+            });
+          }
+
           const result = await sendWhatsAppMessage({
             to: phone,
-            template: templatePayload
+            template: templatePayload as unknown as { name: string; language: { code: string; }; components?: Record<string, unknown>[] }
           }, organizationId);
 
           const timeStr = timeHelper();
@@ -154,7 +184,7 @@ export async function POST(request: NextRequest) {
             // Reconstruct text body with parameter values for the Inbox/CRM preview
             let previewText = `[Template Message: ${templateName}]`;
             if (parameters.length > 0) {
-              previewText = `[Template: ${templateName}] | Params: ${parameters.map((p: any) => p.text).join(", ")}`;
+              previewText = `[Template: ${templateName}] | Params: ${parameters.map((p: WhatsAppTemplateParameter) => p.text).join(", ")}`;
             }
 
             // Add a message bubble in their chat history so they can see it in CRM inbox!
@@ -225,14 +255,14 @@ export async function POST(request: NextRequest) {
           }
         });
 
-      } catch (workerErr: any) {
+      } catch (workerErr: unknown) {
         console.error("[Broadcast Background Worker Error]:", workerErr);
       }
     })();
 
     return NextResponse.json({ campaign });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Launch campaign error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

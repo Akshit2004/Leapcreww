@@ -6,16 +6,11 @@ import {
   Bot, 
   MessageSquare, 
   Megaphone, 
-  FileText, 
   Cpu, 
-  Zap, 
-  Shield, 
-  Users, 
   ArrowRight,
   Sparkles,
   CheckCircle,
-  ExternalLink,
-  Laptop
+  ExternalLink
 } from "lucide-react";
 
 export default function LandingPage() {

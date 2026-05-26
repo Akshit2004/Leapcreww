@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { Settings, Globe, Phone, CheckCircle2, Loader, AlertCircle } from "lucide-react";
+import { Globe, Phone, CheckCircle2, Loader, AlertCircle } from "lucide-react";
 
 interface PhoneNumber {
   id: string;
@@ -31,34 +31,33 @@ export const SettingsTab: React.FC = () => {
   const [data, setData] = useState<PortfolioData | null>(null);
   const [linking, setLinking] = useState<string | null>(null);
 
-  const fetchPortfolio = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/whatsapp/portfolio?orgId=${orgId}`);
-      if (!res.ok) {
-        if (res.status === 404) {
-          setError("WhatsApp is not connected yet. Please connect via Facebook from the sidebar first.");
-        } else {
-          setError("Failed to load Facebook Portfolio data.");
-        }
-        setLoading(false);
-        return;
-      }
-      const json = await res.json();
-      setData(json);
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId]);
-
   useEffect(() => {
     if (orgId) {
-      fetchPortfolio();
+      const load = async () => {
+        setLoading(true);
+        setError("");
+        try {
+          const res = await fetch(`/api/whatsapp/portfolio?orgId=${orgId}`);
+          if (!res.ok) {
+            if (res.status === 404) {
+              setError("WhatsApp is not connected yet. Please connect via Facebook from the sidebar first.");
+            } else {
+              setError("Failed to load Facebook Portfolio data.");
+            }
+            setLoading(false);
+            return;
+          }
+          const json = await res.json();
+          setData(json);
+        } catch (err: unknown) {
+          setError(err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "An unexpected error occurred.");
+        } finally {
+          setLoading(false);
+        }
+      };
+      load();
     }
-  }, [orgId, fetchPortfolio]);
+  }, [orgId]);
 
   const handleLinkNumber = async (wabaId: string, phoneNumberId: string) => {
     setLinking(phoneNumberId);
@@ -77,7 +76,7 @@ export const SettingsTab: React.FC = () => {
       } else {
         alert("Failed to link phone number.");
       }
-    } catch (err) {
+    } catch {
       alert("Network error.");
     } finally {
       setLinking(null);

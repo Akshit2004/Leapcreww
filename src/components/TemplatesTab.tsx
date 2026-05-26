@@ -13,20 +13,18 @@ import {
   Plus,
   Sparkles,
   AlertCircle,
-  ThumbsUp,
+  ArrowRight,
+  Trash2,
   CheckCircle,
   HelpCircle,
-  Megaphone,
-  ArrowRight,
-  Trash2
+  ThumbsUp
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { useParams } from "next/navigation";
 
 export const TemplatesTab: React.FC = () => {
-  const { templates, submitMetaTemplate, deleteTemplate, addSystemLog, refreshWorkspace } = useApp();
-  const [isPushingLibrary, setIsPushingLibrary] = useState(false);
-  const [pushResults, setPushResults] = useState<{ successCount: number; failCount: number; details: string } | null>(null);
+  const { templates, submitMetaTemplate, deleteTemplate, addSystemLog } = useApp();
+  
   const params = useParams();
   const orgId = params.orgId as string;
 
@@ -67,46 +65,49 @@ export const TemplatesTab: React.FC = () => {
 
   // Real-time client-side compliance scanning
   useEffect(() => {
-    const warnings: string[] = [];
-    if (!bodyText) {
-      setClientWarnings([]);
-      return;
-    }
+    const timer = setTimeout(() => {
+      const warnings: string[] = [];
+      if (!bodyText) {
+        setClientWarnings([]);
+        return;
+      }
 
-    // 1. Text Length check (Meta limit: 1024 characters for body)
-    if (bodyText.length > 1024) {
-      warnings.push("Body text length exceeds Meta limit of 1024 characters.");
-    }
+      // 1. Text Length check (Meta limit: 1024 characters for body)
+      if (bodyText.length > 1024) {
+        warnings.push("Body text length exceeds Meta limit of 1024 characters.");
+      }
 
-    // 2. Variable formatting checks
-    const varRegex = /\{\{(\d+)\}\}/g;
-    const matches = Array.from(bodyText.matchAll(varRegex)).map((m) => parseInt(m[1]));
-    
-    if (matches.length > 0) {
-      // Check if variables are sequential starting at 1 e.g. {{1}}, {{2}}
-      const sorted = [...matches].sort((a, b) => a - b);
-      const isSequential = sorted.every((val, idx) => val === idx + 1);
+      // 2. Variable formatting checks
+      const varRegex = /\{\{(\d+)\}\}/g;
+      const matches = Array.from(bodyText.matchAll(varRegex)).map((m) => parseInt(m[1]));
       
-      if (!isSequential) {
-        warnings.push("Variables must start at {{1}} and be sequential (e.g. {{1}}, {{2}}, {{3}}).");
+      if (matches.length > 0) {
+        // Check if variables are sequential starting at 1 e.g. {{1}}, {{2}}
+        const sorted = [...matches].sort((a, b) => a - b);
+        const isSequential = sorted.every((val, idx) => val === idx + 1);
+        
+        if (!isSequential) {
+          warnings.push("Variables must start at {{1}} and be sequential (e.g. {{1}}, {{2}}, {{3}}).");
+        }
+
+        // Check for back-to-back variables like {{1}}{{2}}
+        if (/\{\{\d\}\}\s*\{\{\d\}\}/.test(bodyText)) {
+          warnings.push("Meta rejects back-to-back variables (e.g., '{{1}}{{2}}'). Add surrounding descriptive words.");
+        }
       }
 
-      // Check for back-to-back variables like {{1}}{{2}}
-      if (/\{\{\d\}\}\s*\{\{\d\}\}/.test(bodyText)) {
-        warnings.push("Meta rejects back-to-back variables (e.g., '{{1}}{{2}}'). Add surrounding descriptive words.");
+      // 3. Prohibited terms check for Utility category
+      if (category === "Utility") {
+        const promotionalTerms = ["discount", "offer", "sale", "coupon", "promo", "free", "buy"];
+        const containsPromo = promotionalTerms.some(term => bodyText.toLowerCase().includes(term));
+        if (containsPromo) {
+          warnings.push("Utility templates cannot contain promotional language (e.g., 'discount', 'coupon', 'sale'). Submissions may be rejected.");
+        }
       }
-    }
 
-    // 3. Prohibited terms check for Utility category
-    if (category === "Utility") {
-      const promotionalTerms = ["discount", "offer", "sale", "coupon", "promo", "free", "buy"];
-      const containsPromo = promotionalTerms.some(term => bodyText.toLowerCase().includes(term));
-      if (containsPromo) {
-        warnings.push("Utility templates cannot contain promotional language (e.g., 'discount', 'coupon', 'sale'). Submissions may be rejected.");
-      }
-    }
-
-    setClientWarnings(warnings);
+      setClientWarnings(warnings);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [bodyText, category]);
 
   // AI Optimize Call
@@ -584,7 +585,7 @@ export const TemplatesTab: React.FC = () => {
                       }}
                       className="text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition-all cursor-pointer"
                     >
-                      Apply "{suggestedCategory}" Category
+                      Apply &quot;{suggestedCategory}&quot; Category
                     </button>
                   </div>
                 )}

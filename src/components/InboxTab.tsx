@@ -20,7 +20,7 @@ import {
   Laptop,
   ArrowLeft
 } from "lucide-react";
-import { useApp, Contact, Message } from "../context/AppContext";
+import { useApp, Message } from "../context/AppContext";
 import { useSession } from "next-auth/react";
 
 export const InboxTab: React.FC = () => {
@@ -35,7 +35,6 @@ export const InboxTab: React.FC = () => {
     sendLiveChatMessage, 
     updateContact,
     deleteContact,
-    integrations,
     members,
     lockSync,
     unlockSync,
@@ -77,7 +76,7 @@ export const InboxTab: React.FC = () => {
     if (activeContactId && activeContact && (activeContact.unreadCount || 0) > 0) {
       updateContact(activeContactId, { unreadCount: 0 });
     }
-  }, [activeChat.length, activeContactId]);
+  }, [activeChat.length, activeContactId, activeContact, updateContact]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();

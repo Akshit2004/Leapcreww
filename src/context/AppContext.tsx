@@ -1,8 +1,14 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, ReactNode, useRef } from "react";
 
-// Types
+export interface Organization {
+  id: string;
+  name?: string;
+  onboardingDismissed?: boolean;
+  [key: string]: unknown;
+}
+
 export interface Contact {
   id: string;
   name: string;
@@ -90,6 +96,7 @@ export interface Member {
 }
 
 interface AppContextType {
+  organization: Organization | null;
   contacts: Contact[];
   campaigns: Campaign[];
   templates: Template[];
@@ -113,6 +120,9 @@ interface AppContextType {
     variables?: Array<{ key: string; type: "contact_field" | "static"; value: string }>;
     delay?: number;
     scheduledAt?: string;
+    excludeTag?: string;
+    mediaType?: string;
+    mediaUrl?: string;
   }) => Promise<void>;
   sendLiveChatMessage: (contactId: string, text: string, sender?: "user" | "agent" | "system", buttons?: string[]) => void;
   updateChatbotNodes: (nodes: ChatbotNode[], organizationId: string) => Promise<void>;
@@ -131,7 +141,9 @@ interface AppContextType {
   lockSync: () => void;
   unlockSync: () => void;
   refreshWorkspace: (orgId: string) => Promise<void>;
+  dismissOnboarding: (orgId: string) => Promise<void>;
   initializeWorkspace: (data: {
+    organization: Organization | null;
     contacts: Contact[];
     campaigns: Campaign[];
     templates: Template[];
@@ -146,6 +158,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [organization, setOrganization] = useState<Organization | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -198,8 +211,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const data = await res.json();
       setTemplates((prev) => [...prev, data.template]);
       addSystemLog("crm", `Template "${data.template.name}" submitted successfully! Status: ${data.template.metaStatus}`);
-    } catch (err: any) {
-      addSystemLog("crm", `Template creation error: ${err.message}`);
+    } catch (err: unknown) {
+      addSystemLog("crm", `Template creation error: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
     }
   };
 
@@ -218,8 +231,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } else {
         addSystemLog("crm", `Successfully deleted template ID ${id} from WappFlow and Meta.`);
       }
-    } catch (err: any) {
-      addSystemLog("crm", `Error deleting template ID ${id}: ${err.message}`);
+    } catch (err: unknown) {
+      addSystemLog("crm", `Error deleting template ID ${id}: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
     } finally {
       unlockSync();
     }
@@ -238,6 +251,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   const initializeWorkspace = useCallback((data: {
+    organization: Organization | null;
     contacts: Contact[];
     campaigns: Campaign[];
     templates: Template[];
@@ -250,6 +264,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (syncLockedRef.current) {
       return;
     }
+    setOrganization(data.organization);
     setContacts(data.contacts);
     setCampaigns(data.campaigns);
     setTemplates(data.templates);
@@ -272,7 +287,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const data = await res.json();
         initializeWorkspace(data);
       }
-    } catch { }
+    } catch (err) {
+      console.error("Refresh Workspace Error", err);
+    }
   }, [initializeWorkspace]);
 
   // Actions
@@ -307,8 +324,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!res.ok) {
         addSystemLog("crm", `Failed to save contact updates for ID ${id} to sandbox database.`);
       }
-    } catch (err: any) {
-      addSystemLog("crm", `Error updating contact ID ${id}: ${err.message}`);
+    } catch (err: unknown) {
+      addSystemLog("crm", `Error updating contact ID ${id}: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
     } finally {
       unlockSync();
     }
@@ -327,8 +344,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } else {
         addSystemLog("crm", `Permanently deleted contact ID ${id}`);
       }
-    } catch (err: any) {
-      addSystemLog("crm", `Error permanently deleting contact ID ${id}: ${err.message}`);
+    } catch (err: unknown) {
+      addSystemLog("crm", `Error permanently deleting contact ID ${id}: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
     } finally {
       unlockSync();
     }
@@ -405,6 +422,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     variables?: Array<{ key: string; type: "contact_field" | "static"; value: string }>;
     delay?: number;
     scheduledAt?: string;
+    excludeTag?: string;
+    mediaType?: string;
+    mediaUrl?: string;
   }) => {
     try {
       const isScheduled = !!campaignData.scheduledAt;
@@ -436,8 +456,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           ? `Broadcast successfully scheduled! Active date: ${new Date(campaignData.scheduledAt!).toLocaleString()}`
           : `Broadcast launched successfully! Queueing dispatch to ${data.campaign.sent} matching leads.`
       );
-    } catch (err: any) {
-      addSystemLog("campaign", `Broadcast action error: ${err.message}`);
+    } catch (err: unknown) {
+      addSystemLog("campaign", `Broadcast action error: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
     }
   };
 
@@ -453,8 +473,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } else {
         addSystemLog("campaign", `Permanently deleted campaign ID ${id}`);
       }
-    } catch (err: any) {
-      addSystemLog("campaign", `Error permanently deleting campaign ID ${id}: ${err.message}`);
+    } catch (err: unknown) {
+      addSystemLog("campaign", `Error permanently deleting campaign ID ${id}: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
     } finally {
       unlockSync();
     }
@@ -476,8 +496,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } else {
         addSystemLog("crm", "Chatbot Builder nodes successfully persisted to PostgreSQL.");
       }
-    } catch (err: any) {
-      addSystemLog("crm", `Error saving chatbot layout: ${err.message}`);
+    } catch (err: unknown) {
+      addSystemLog("crm", `Error saving chatbot layout: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
     }
   };
 
@@ -499,9 +519,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
+  const dismissOnboarding = async (orgId: string) => {
+    try {
+      setOrganization((prev: Organization | null) => (prev ? { ...prev, onboardingDismissed: true } : prev));
+      await fetch(`/api/org/${orgId}/onboarding`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dismissed: true }),
+      });
+    } catch (err: unknown) {
+      console.error(err);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
+        organization,
         contacts,
         campaigns,
         templates,
@@ -527,6 +561,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         lockSync,
         unlockSync,
         refreshWorkspace,
+        dismissOnboarding,
         initializeWorkspace,
       }}
     >

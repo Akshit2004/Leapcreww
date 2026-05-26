@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
-const crypto = require("crypto");
+import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
   try {
@@ -98,8 +98,8 @@ We'll notify you when it ships. Reply *ORDERS* to check status anytime.`;
     }
 
     return NextResponse.json({ status: "ok" });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Razorpay webhook error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

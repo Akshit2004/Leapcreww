@@ -1,9 +1,10 @@
 import { prisma } from "./prisma";
+import * as crypto from "crypto";
 
 export interface WhatsAppMessage {
   to: string;
   text?: string;
-  template?: { name: string; language: { code: string }; components?: any[] };
+  template?: { name: string; language: { code: string }; components?: Record<string, unknown>[] };
   image?: { link?: string; id?: string };
   video?: { link?: string; id?: string };
   document?: { link?: string; id?: string; filename?: string };
@@ -85,14 +86,15 @@ export async function getWhatsAppConfig(orgId?: string) {
   return { phoneNumberId, accessToken, apiVersion, verifyToken, appSecret, businessAccountId: "" };
 }
 
-function isValidConfig(config: Awaited<ReturnType<typeof getWhatsAppConfig>>): config is NonNullable<Awaited<ReturnType<typeof getWhatsAppConfig>>> {
-  return config !== null;
+
+export interface WhatsAppResponseData {
+  messages?: Array<{ id: string }>;
 }
 
 export async function sendWhatsAppMessage(
   message: WhatsAppMessage,
   orgId?: string
-): Promise<{ ok: boolean; data?: any; error?: string }> {
+): Promise<{ ok: boolean; data?: WhatsAppResponseData; error?: string }> {
   const config = await getWhatsAppConfig(orgId);
   if (!config) {
     return { ok: false, error: "WhatsApp API not configured. Connect a WhatsApp Business number first." };
@@ -100,7 +102,7 @@ export async function sendWhatsAppMessage(
 
   const { phoneNumberId, accessToken, apiVersion } = config;
 
-  const body: Record<string, any> = {
+  const body: Record<string, unknown> = {
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to: message.to,
@@ -146,8 +148,8 @@ export async function sendWhatsAppMessage(
       return { ok: false, data, error: data.error?.message || "WhatsApp API request failed" };
     }
     return { ok: true, data };
-  } catch (err: any) {
-    return { ok: false, error: err.message || "Network error sending WhatsApp message" };
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Network error sending WhatsApp message" };
   }
 }
 
@@ -168,7 +170,6 @@ export function validateWebhookSignature(signature: string | null, body: string)
   const appSecret = process.env.WHATSAPP_APP_SECRET;
   if (!appSecret || !signature) return false;
 
-  const crypto = require("crypto");
   const expected = crypto
     .createHmac("sha256", appSecret)
     .update(body)

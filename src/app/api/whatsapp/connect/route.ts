@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       businessId: foundBusinessId || null,
       message: wabaId ? "Connected automatically." : "Token saved. Please select a number in Settings.",
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

@@ -26,7 +26,7 @@ export async function DELETE(
     ]);
 
     return NextResponse.json({ status: "ok" });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Delete contact error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -46,7 +46,7 @@ export async function PATCH(
     const body = await request.json();
 
     const allowedFields = ["name", "email", "status", "tags", "assignedAgent", "unreadCount"];
-    const updates: Record<string, any> = {};
+    const updates: Record<string, unknown> = {};
 
     for (const key of allowedFields) {
       if (body[key] !== undefined) {
@@ -60,7 +60,7 @@ export async function PATCH(
     });
 
     return NextResponse.json({ status: "ok", contact: updatedContact });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Update contact error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

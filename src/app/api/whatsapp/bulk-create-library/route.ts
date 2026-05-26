@@ -110,7 +110,14 @@ export async function POST(request: NextRequest) {
         const matches = Array.from(tpl.body.matchAll(varRegex)).map((m) => parseInt(m[1]));
         const uniqueVarCount = new Set(matches).size;
 
-        const bodyComponent: any = {
+        interface LibraryBodyComponent {
+          type: string;
+          text: string;
+          example?: {
+            body_text: string[][];
+          };
+        }
+        const bodyComponent: LibraryBodyComponent = {
           type: "BODY",
           text: tpl.body,
         };
@@ -122,7 +129,7 @@ export async function POST(request: NextRequest) {
           };
         }
 
-        const components: any[] = [bodyComponent];
+        const components: unknown[] = [bodyComponent];
 
         if (tpl.buttons.length > 0) {
           components.push({
@@ -191,8 +198,8 @@ export async function POST(request: NextRequest) {
           const fullError = `[${ec}] ${em}${et ? ` — ${et}: ${eu}` : ""}`;
           results.push({ name: tpl.name, success: false, error: fullError });
         }
-      } catch (err: any) {
-        results.push({ name: tpl.name, success: false, error: err.message });
+      } catch (err: unknown) {
+        results.push({ name: tpl.name, success: false, error: (err instanceof Error ? err.message : String(err)) });
       }
     }
 
@@ -211,8 +218,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ results, successCount, failCount });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Bulk library submission error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }

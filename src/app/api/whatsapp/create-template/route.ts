@@ -48,10 +48,17 @@ export async function POST(request: NextRequest) {
         try {
           // Parse variables from body text (Meta strictly requires example body_text values)
           const varRegex = /\{\{(\d+)\}\}/g;
-          const matches = Array.from(body.matchAll(varRegex)).map((m: any) => parseInt(m[1]));
+          const matches = (Array.from(body.matchAll(varRegex)) as RegExpExecArray[]).map((m) => parseInt(m[1]));
           const uniqueVarCount = new Set(matches).size;
 
-          const bodyComponent: any = {
+          interface LocalBodyComponent {
+            type: string;
+            text: string;
+            example?: {
+              body_text: string[][];
+            };
+          }
+          const bodyComponent: LocalBodyComponent = {
             type: "BODY",
             text: body
           };
@@ -65,7 +72,7 @@ export async function POST(request: NextRequest) {
             };
           }
 
-          const components: any[] = [];
+          const components: unknown[] = [];
 
           // 1. Add HEADER component first (if media is configured)
           if (mediaType && mediaType !== "none") {
@@ -152,8 +159,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ template });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Create template endpoint error:", err);
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) || "Internal server error" }, { status: 500 });
   }
 }

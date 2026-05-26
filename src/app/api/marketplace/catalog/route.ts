@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "orgId required" }, { status: 400 });
   }
 
-  const where: any = { organizationId: orgId, isActive: true };
+  const where: { organizationId: string; isActive: boolean; category?: string } = { organizationId: orgId, isActive: true };
   if (category) where.category = category;
 
   const products = await prisma.product.findMany({

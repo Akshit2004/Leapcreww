@@ -20,7 +20,6 @@ import {
   Save,
   CheckCircle,
   AlertTriangle,
-  ArrowRight,
   Info
 } from "lucide-react";
 
@@ -69,10 +68,20 @@ export const ChatbotTab: React.FC = () => {
 
   // Synchronize localNodes with database nodes when they first load
   useEffect(() => {
+    let mounted = true;
     if (chatbotNodes.length > 0 && localNodes.length === 0) {
-      setLocalNodes(chatbotNodes);
+      setTimeout(() => {
+        if (mounted) setLocalNodes(chatbotNodes);
+      }, 0);
     }
+    return () => { mounted = false; };
   }, [chatbotNodes, localNodes]);
+
+  // Keep a ref of localNodes to read inside effects without triggering dependencies
+  const localNodesRef = useRef<ChatbotNode[]>([]);
+  useEffect(() => {
+    localNodesRef.current = localNodes;
+  }, [localNodes]);
 
   // Global window listeners for Spacebar traversal
   useEffect(() => {
@@ -124,13 +133,13 @@ export const ChatbotTab: React.FC = () => {
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isAiLoading) {
-      setLoadingMessageIdx(0);
+      setTimeout(() => setLoadingMessageIdx(0), 0);
       interval = setInterval(() => {
         setLoadingMessageIdx((prev) => (prev + 1) % loadingMessages.length);
       }, 2000);
     }
     return () => clearInterval(interval);
-  }, [isAiLoading]);
+  }, [isAiLoading, loadingMessages.length]);
 
   // AI Prompt templates
   const promptTemplates = [
@@ -239,36 +248,45 @@ export const ChatbotTab: React.FC = () => {
 
   // Sync positions when localNodes are first populated
   useEffect(() => {
+    let mounted = true;
     if (localNodes.length > 0 && Object.keys(positions).length === 0) {
-      handleAutoLayout(localNodes);
-      // Auto select the first trigger
-      const trigger = localNodes.find(n => n.id === "n1") || localNodes[0];
-      if (trigger) {
-        setSelectedNodeId(trigger.id);
-      }
+      setTimeout(() => {
+        if (!mounted) return;
+        handleAutoLayout(localNodes);
+        // Auto select the first trigger
+        const trigger = localNodes.find(n => n.id === "n1") || localNodes[0];
+        if (trigger) {
+          setSelectedNodeId(trigger.id);
+        }
+      }, 0);
     }
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localNodes]);
 
   // Handle local form inputs when selected node changes (only triggers on selectedNodeId change!)
   useEffect(() => {
-    if (selectedNodeId) {
-      const node = localNodes.find((n) => n.id === selectedNodeId);
-      if (node) {
-        setFormTitle(node.title || "");
-        setFormContent(node.content || "");
-        setFormDelayTime(node.delayTime || 5);
-        setFormOptions(node.options || []);
-        setFormRoutes(node.routes || {});
-        setFormNextId(node.nextId || "");
+    const timer = setTimeout(() => {
+      if (selectedNodeId) {
+        const node = localNodesRef.current.find((n) => n.id === selectedNodeId);
+        if (node) {
+          setFormTitle(node.title || "");
+          setFormContent(node.content || "");
+          setFormDelayTime(node.delayTime || 5);
+          setFormOptions(node.options || []);
+          setFormRoutes(node.routes || {});
+          setFormNextId(node.nextId || "");
+        }
+      } else {
+        setFormTitle("");
+        setFormContent("");
+        setFormDelayTime(5);
+        setFormOptions([]);
+        setFormRoutes({});
+        setFormNextId("");
       }
-    } else {
-      setFormTitle("");
-      setFormContent("");
-      setFormDelayTime(5);
-      setFormOptions([]);
-      setFormRoutes({});
-      setFormNextId("");
-    }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [selectedNodeId]);
 
   // Canvas Mouse Event Drag/Pan Handlers
@@ -485,7 +503,7 @@ export const ChatbotTab: React.FC = () => {
         handleAutoLayout(data.nodes);
 
         // Select the first trigger
-        const first = data.nodes.find((n: any) => n.id === "n1") || data.nodes[0];
+        const first = data.nodes.find((n: ChatbotNode) => n.id === "n1") || data.nodes[0];
         if (first) {
           setSelectedNodeId(first.id);
         }
@@ -497,9 +515,9 @@ export const ChatbotTab: React.FC = () => {
       } else {
         throw new Error("Invalid node schema payload.");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setAiError(err.message || "An unexpected compile error occurred.");
+      setAiError(err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "An unexpected compile error occurred.");
     } finally {
       setIsAiLoading(false);
     }
@@ -832,20 +850,16 @@ export const ChatbotTab: React.FC = () => {
               const isSelected = selectedNodeId === node.id;
 
               // Choose color & icon styles
-              let themeColor = "border-blue-200 bg-blue-50/10 text-blue-700 ring-blue-500/10";
               let badgeColor = "bg-blue-50 text-blue-700 border-blue-200/50";
               let NodeIcon = MessageSquare;
 
               if (node.type === "trigger") {
-                themeColor = "border-orange-200 bg-orange-50/10 text-orange-700 ring-orange-500/10";
                 badgeColor = "bg-orange-50 text-orange-700 border-orange-200/50";
                 NodeIcon = Play;
               } else if (node.type === "question") {
-                themeColor = "border-pink-200 bg-pink-50/10 text-pink-700 ring-pink-500/10";
                 badgeColor = "bg-pink-50 text-pink-700 border-pink-200/50";
                 NodeIcon = HelpCircle;
               } else if (node.type === "delay") {
-                themeColor = "border-amber-200 bg-amber-50/10 text-amber-700 ring-amber-500/10";
                 badgeColor = "bg-amber-50 text-amber-700 border-amber-200/50";
                 NodeIcon = Clock;
               }
@@ -1104,7 +1118,7 @@ export const ChatbotTab: React.FC = () => {
                 {/* Friendly hint explaining the visual auto-apply flow */}
                 <div className="flex items-start gap-2 bg-amber-50/80 border border-orange-200/40 rounded-2xl p-3.5 text-[10px] text-amber-800 leading-relaxed font-semibold">
                   <Info className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
-                  <span>💡 Edits apply to the visual canvas instantly. Click "Save & Publish" at the top header toolbar when you're ready to persist your full conversational tree to WappFlow's PostgreSQL sandbox.</span>
+                  <span>💡 Edits apply to the visual canvas instantly. Click &quot;Save & Publish&quot; at the top header toolbar when you&apos;re ready to persist your full conversational tree to WappFlow&apos;s PostgreSQL sandbox.</span>
                 </div>
               </div>
             ) : (

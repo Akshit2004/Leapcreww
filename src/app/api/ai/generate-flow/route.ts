@@ -4,11 +4,11 @@ import { authOptions } from "../../auth/[...nextauth]/route";
 import { getGroqChatCompletion } from "@/lib/groq";
 
 // Helper: Extract valid JSON from LLM string output
-function extractJsonFromString(str: string): any {
+function extractJsonFromString(str: string): unknown {
   try {
     const cleanStr = str.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(cleanStr);
-  } catch (err) {
+  } catch {
     const match = str.match(/\[[\s\S]*\]/);
     if (match) {
       try {
@@ -78,8 +78,8 @@ Return ONLY the raw JSON string array. Do not include any explanations, markdown
     }
 
     return NextResponse.json({ nodes: parsedNodes });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("AI Flow Generator error:", err);
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) || "Internal server error" }, { status: 500 });
   }
 }

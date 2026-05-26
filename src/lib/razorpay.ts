@@ -1,4 +1,5 @@
 import Razorpay from "razorpay";
+import * as crypto from "crypto";
 
 export function getRazorpayConfig() {
   const keyId = process.env.RAZORPAY_KEY_ID;
@@ -17,7 +18,7 @@ export function getRazorpayInstance(): Razorpay | null {
 export async function createRazorpayOrder(amountPaise: number, receipt: string) {
   const rzp = getRazorpayInstance();
   if (!rzp) throw new Error("Razorpay not configured");
-  const order = (await (rzp.orders.create as any)(
+  const order = (await (rzp.orders.create as unknown as (params: Record<string, unknown>) => Promise<unknown>)(
     { amount: amountPaise, currency: "INR", receipt, payment_capture: 1 }
   )) as { id: string; amount: number; currency: string; receipt: string; status: string };
   return order;
@@ -26,7 +27,7 @@ export async function createRazorpayOrder(amountPaise: number, receipt: string) 
 export async function createRazorpayPaymentLink(amountPaise: number, referenceId: string, phone: string, name: string) {
   const rzp = getRazorpayInstance();
   if (!rzp) throw new Error("Razorpay not configured");
-  const paymentLink = await (rzp.paymentLink as any).create({
+  const paymentLink = await (rzp.paymentLink as unknown as Record<string, (params: Record<string, unknown>) => Promise<unknown>>).create({
     amount: amountPaise,
     currency: "INR",
     accept_partial: false,
@@ -50,7 +51,6 @@ export function verifyRazorpayPayment(
   paymentId: string,
   signature: string
 ): boolean {
-  const crypto = require("crypto");
   const config = getRazorpayConfig();
   if (!config?.webhookSecret) return false;
   const expected = crypto

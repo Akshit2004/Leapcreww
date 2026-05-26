@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
     console.log(`[WhatsApp Connect] Org ${orgId}: WABA=${wabaId}, PhoneID=${phoneNumberId}`);
 
     return NextResponse.redirect(new URL(`/org/${orgId}?whatsapp=connected`, request.url));
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[WhatsApp Callback] Error:", err);
     return NextResponse.redirect(new URL("/login?whatsapp=error", request.url));
   }

@@ -25,7 +25,11 @@ export async function GET(request: NextRequest) {
     const portfolios = [];
 
     // 1. Try fetching WABAs directly associated with the user
-    let wabas: any[] = [];
+    interface MeWaba {
+      id: string;
+      name?: string;
+    }
+    const wabas: MeWaba[] = [];
     const directRes = await fetch(`https://graph.facebook.com/v25.0/me/whatsapp_business_accounts?access_token=${fbToken}`);
     if (directRes.ok) {
       const data = await directRes.json();
@@ -87,8 +91,8 @@ export async function GET(request: NextRequest) {
       activePhoneNumberId: org.whatsappPhoneNumberId,
       portfolios
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
 
@@ -113,7 +117,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
   }
 }
