@@ -115,7 +115,7 @@ async function sendReply(
   });
 
   const cleanPhone = contactPhone.replace(/[^0-9]/g, "");
-  const result = await sendWhatsAppMessage({ to: cleanPhone, text, buttons });
+  const result = await sendWhatsAppMessage({ to: cleanPhone, text, buttons }, orgId);
   if (!result.ok) {
     console.warn("WhatsApp dispatch failed:", result.error);
   }

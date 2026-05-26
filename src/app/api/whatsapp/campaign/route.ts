@@ -27,10 +27,9 @@ export async function POST(request: NextRequest) {
 
     // Get matching contacts in DB
     const contacts = await prisma.contact.findMany({
-      where: {
-        organizationId,
-        tags: { has: targetTag }
-      }
+      where: targetTag === "all"
+        ? { organizationId }
+        : { organizationId, tags: { has: targetTag } }
     });
 
     const recipientCount = contacts.length;
@@ -124,7 +123,7 @@ export async function POST(request: NextRequest) {
           const result = await sendWhatsAppMessage({
             to: phone,
             template: templatePayload
-          });
+          }, organizationId);
 
           const timeStr = timeHelper();
 

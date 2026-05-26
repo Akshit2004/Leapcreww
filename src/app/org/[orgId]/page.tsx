@@ -11,6 +11,8 @@ import { CampaignsTab } from "../../../components/CampaignsTab";
 import { TemplatesTab } from "../../../components/TemplatesTab";
 import { ChatbotTab } from "../../../components/ChatbotTab";
 import { MarketplaceTab } from "../../../components/MarketplaceTab";
+import { SettingsTab } from "../../../components/SettingsTab";
+import { AICopilotSidebar } from "../../../components/AICopilotSidebar";
 import { Loader, AlertCircle, Bot, Menu } from "lucide-react";
 
 export default function TenantDashboard() {
@@ -81,6 +83,8 @@ export default function TenantDashboard() {
         return <ChatbotTab />;
       case "marketplace":
         return <MarketplaceTab />;
+      case "settings":
+        return <SettingsTab />;
       default:
         return <OverviewTab />;
     }
@@ -159,6 +163,12 @@ export default function TenantDashboard() {
 
         {renderActiveTab()}
       </main>
+
+      <AICopilotSidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        orgId={orgId}
+      />
     </div>
   );
 }

@@ -33,7 +33,7 @@ export async function DELETE(
     const isMock = template.metaId?.startsWith("mock-meta-") || !template.metaId;
     
     if (!isMock) {
-      const config = getWhatsAppConfig();
+      const config = await getWhatsAppConfig();
       const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
 
       if (config && wabaId) {

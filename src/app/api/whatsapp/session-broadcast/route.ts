@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
           const phone = formatPhoneNumber(contact.phone);
           const timeStr = timeHelper();
 
-          const result = await sendWhatsAppMessage({ to: phone, text });
+          const result = await sendWhatsAppMessage({ to: phone, text }, organizationId);
 
           if (!result.ok) {
             console.error(`Session broadcast failed to ${phone}:`, result.error);

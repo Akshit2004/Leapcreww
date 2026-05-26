@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Dispatch real message via Meta API if credentials are set
-    const result = await sendWhatsAppMessage({ to: formattedPhone, text });
+    const result = await sendWhatsAppMessage({ to: formattedPhone, text }, orgId);
 
     if (!result.ok) {
       console.warn("WhatsApp dispatch skipped/failed:", result.error);

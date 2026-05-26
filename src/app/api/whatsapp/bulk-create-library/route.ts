@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing organizationId" }, { status: 400 });
     }
 
-    const config = getWhatsAppConfig();
+    const config = await getWhatsAppConfig();
     if (!config) {
       return NextResponse.json({ error: "WhatsApp API not configured" }, { status: 400 });
     }

@@ -38,7 +38,7 @@ Reply with a number or just say what you need! 😊`;
       { type: "reply", reply: { id: "cart", title: "🛒 My Cart" } },
       { type: "reply", reply: { id: "orders", title: "📋 My Orders" } },
     ],
-  });
+  }, orgId);
 }
 
 export async function sendCatalogCategories(phone: string, orgId: string) {
@@ -49,7 +49,7 @@ export async function sendCatalogCategories(phone: string, orgId: string) {
   });
   const categories = [...new Set(products.map((p) => p.category))];
   if (categories.length === 0) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Sorry, no products available right now. Please check back later! 😊" });
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Sorry, no products available right now. Please check back later! 😊" }, orgId);
     return;
   }
   const buttons = categories.slice(0, 3).map((cat) => ({
@@ -62,7 +62,7 @@ export async function sendCatalogCategories(phone: string, orgId: string) {
 
 Select a category to browse products:`,
     buttons,
-  });
+  }, orgId);
 }
 
 export async function sendCategoryProducts(phone: string, category: string, orgId: string) {
@@ -72,7 +72,7 @@ export async function sendCategoryProducts(phone: string, category: string, orgI
     take: 10,
   });
   if (products.length === 0) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: `No products found in "${category}" category.` });
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: `No products found in "${category}" category.` }, orgId);
     return;
   }
   let text = `📁 *${category}*\n\n`;
@@ -82,7 +82,7 @@ export async function sendCategoryProducts(phone: string, category: string, orgI
     text += "\n";
   });
   text += `Reply with product *name* to add to cart.\nOr type *MENU* to go back.`;
-  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text });
+  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
 }
 
 export async function addToCart(phone: string, contactId: string, orgId: string, productName: string) {
@@ -94,7 +94,7 @@ export async function addToCart(phone: string, contactId: string, orgId: string,
     },
   });
   if (!product || product.stock < 1) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Sorry, that product is not available or out of stock. 😔" });
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Sorry, that product is not available or out of stock. 😔" }, orgId);
     return;
   }
   let cart = await prisma.cart.findUnique({ where: { contactId } });
@@ -124,7 +124,7 @@ Reply *MENU* for main menu.`,
       { type: "reply", reply: { id: "cart", title: "🛒 View Cart" } },
       { type: "reply", reply: { id: "menu", title: "🏠 Menu" } },
     ],
-  });
+  }, orgId);
 }
 
 export async function sendCart(phone: string, contactId: string, orgId: string) {
@@ -137,7 +137,7 @@ export async function sendCart(phone: string, contactId: string, orgId: string) 
       to: formatPhoneNumber(phone),
       text: "🛒 Your cart is empty.\n\nBrowse our catalog and add items!",
       buttons: [{ type: "reply", reply: { id: "catalog", title: "📦 Browse Catalog" } }],
-    });
+    }, orgId);
     return;
   }
   let total = 0;
@@ -156,21 +156,21 @@ export async function sendCart(phone: string, contactId: string, orgId: string) 
       { type: "reply", reply: { id: "checkout", title: "🚀 Checkout" } },
       { type: "reply", reply: { id: "menu", title: "🏠 Menu" } },
     ],
-  });
+  }, orgId);
 }
 
-export async function removeCartItem(phone: string, contactId: string, index: number) {
+export async function removeCartItem(phone: string, contactId: string, index: number, orgId: string) {
   const cart = await prisma.cart.findUnique({
     where: { contactId },
     include: { items: { include: { product: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!cart || !cart.items[index]) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Invalid item number. Please check your cart." });
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Invalid item number. Please check your cart." }, orgId);
     return;
   }
   const item = cart.items[index];
   await prisma.cartItem.delete({ where: { id: item.id } });
-  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: `Removed *${item.product.name}* from your cart. ✅` });
+  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: `Removed *${item.product.name}* from your cart. ✅` }, orgId);
 }
 
 export async function startCheckout(phone: string, contactId: string, orgId: string) {
@@ -179,7 +179,7 @@ export async function startCheckout(phone: string, contactId: string, orgId: str
     include: { items: { include: { product: true } } },
   });
   if (!cart || cart.items.length === 0) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Your cart is empty! Browse our catalog first. 😊" });
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Your cart is empty! Browse our catalog first. 😊" }, orgId);
     return;
   }
   const contact = await prisma.contact.findUnique({ where: { id: contactId } });
@@ -229,7 +229,7 @@ Or reply *CONFIRM* after payment to verify your order.`;
       { type: "reply", reply: { id: "confirm_order", title: "✅ Paid" } },
       { type: "reply", reply: { id: "menu", title: "🏠 Menu" } },
     ],
-  });
+  }, orgId);
 }
 
 export async function sendOrderStatus(phone: string, contactId: string, orgId: string) {
@@ -239,7 +239,7 @@ export async function sendOrderStatus(phone: string, contactId: string, orgId: s
     take: 5,
   });
   if (orders.length === 0) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "You haven't placed any orders yet. Browse our catalog! 😊" });
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "You haven't placed any orders yet. Browse our catalog! 😊" }, orgId);
     return;
   }
   let text = `📋 *Your Orders*\n\n`;
@@ -249,7 +249,7 @@ export async function sendOrderStatus(phone: string, contactId: string, orgId: s
     text += `Date: ${o.createdAt.toLocaleDateString()}\n\n`;
   });
   text += `Reply *ORDER <ID>* for details.\nE.g. *ORDER ${orders[0].orderId}*`;
-  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text });
+  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
 }
 
 export async function sendSingleOrderStatus(phone: string, contactId: string, orderId: string, orgId: string) {
@@ -258,7 +258,7 @@ export async function sendSingleOrderStatus(phone: string, contactId: string, or
     include: { items: true },
   });
   if (!order) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: `Order *${orderId}* not found.` });
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: `Order *${orderId}* not found.` }, orgId);
     return;
   }
   let text = `📋 *Order ${order.orderId}*\n\n`;
@@ -272,8 +272,7 @@ export async function sendSingleOrderStatus(phone: string, contactId: string, or
     text += `\n*Address:* ${(order.address as any).address}`;
   }
   text += `\n*Date:* ${order.createdAt.toLocaleDateString()}`;
-  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text });
-}
+  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);}
 
 export async function handleMarketplaceMessage(
   text: string,
@@ -327,7 +326,7 @@ export async function handleMarketplaceMessage(
   if (lower.startsWith("remove ")) {
     const idx = parseInt(lower.replace("remove ", "")) - 1;
     if (!isNaN(idx)) {
-      await removeCartItem(phone, contactId, idx);
+      await removeCartItem(phone, contactId, idx, orgId);
       return true;
     }
   }
@@ -356,7 +355,7 @@ export async function handleMarketplaceMessage(
       await sendWhatsAppMessage({
         to: formatPhoneNumber(phone),
         text: "You don't have any pending orders. Reply *CATALOG* to browse products.",
-      });
+      }, orgId);
       return true;
     }
 

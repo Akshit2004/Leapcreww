@@ -1,3 +1,5 @@
+import { prisma } from "./prisma";
+
 export interface WhatsAppMessage {
   to: string;
   text?: string;
@@ -40,7 +42,36 @@ export interface WhatsAppWebhookPayload {
   }[];
 }
 
-export function getWhatsAppConfig() {
+export async function getWhatsAppConfig(orgId?: string) {
+  // Try org-level credentials first
+  if (orgId) {
+    try {
+      const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: {
+          whatsappConnected: true,
+          whatsappPhoneNumberId: true,
+          whatsappAccessToken: true,
+          whatsappBusinessAccountId: true,
+        },
+      });
+
+      if (org?.whatsappConnected && org.whatsappPhoneNumberId && org.whatsappAccessToken) {
+        return {
+          phoneNumberId: org.whatsappPhoneNumberId,
+          accessToken: org.whatsappAccessToken,
+          businessAccountId: org.whatsappBusinessAccountId || "",
+          apiVersion: process.env.WHATSAPP_API_VERSION || "v21.0",
+          verifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "wappflow_verify_2026",
+          appSecret: process.env.WHATSAPP_APP_SECRET || "",
+        };
+      }
+    } catch {
+      // Fall through to env fallback
+    }
+  }
+
+  // Fallback to environment-level credentials
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
   const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
@@ -51,19 +82,20 @@ export function getWhatsAppConfig() {
     return null;
   }
 
-  return { phoneNumberId, accessToken, apiVersion, verifyToken, appSecret };
+  return { phoneNumberId, accessToken, apiVersion, verifyToken, appSecret, businessAccountId: "" };
 }
 
-function isValidConfig(): boolean {
-  return getWhatsAppConfig() !== null;
+function isValidConfig(config: Awaited<ReturnType<typeof getWhatsAppConfig>>): config is NonNullable<Awaited<ReturnType<typeof getWhatsAppConfig>>> {
+  return config !== null;
 }
 
 export async function sendWhatsAppMessage(
-  message: WhatsAppMessage
+  message: WhatsAppMessage,
+  orgId?: string
 ): Promise<{ ok: boolean; data?: any; error?: string }> {
-  const config = getWhatsAppConfig();
+  const config = await getWhatsAppConfig(orgId);
   if (!config) {
-    return { ok: false, error: "WhatsApp API not configured (missing PHONE_NUMBER_ID, ACCESS_TOKEN, or APP_SECRET)" };
+    return { ok: false, error: "WhatsApp API not configured. Connect a WhatsApp Business number first." };
   }
 
   const { phoneNumberId, accessToken, apiVersion } = config;
@@ -124,8 +156,7 @@ export function verifyWebhook(
   token: string | null,
   challenge: string | null
 ): { verified: boolean; challenge?: string } {
-  const config = getWhatsAppConfig();
-  const expectedToken = config?.verifyToken || "wappflow_verify_2026";
+  const expectedToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "wappflow_verify_2026";
 
   if (mode === "subscribe" && token === expectedToken && challenge) {
     return { verified: true, challenge };
@@ -134,13 +165,12 @@ export function verifyWebhook(
 }
 
 export function validateWebhookSignature(signature: string | null, body: string): boolean {
-  const config = getWhatsAppConfig();
-  if (!config?.appSecret) return false;
-  if (!signature) return false;
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!appSecret || !signature) return false;
 
   const crypto = require("crypto");
   const expected = crypto
-    .createHmac("sha256", config.appSecret)
+    .createHmac("sha256", appSecret)
     .update(body)
     .digest("hex");
 

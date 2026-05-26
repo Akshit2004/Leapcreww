@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Try Meta Graph API Submission if configured
-    const config = getWhatsAppConfig();
+    const config = await getWhatsAppConfig();
     let metaId: string | null = null;
     let metaStatus = "pending";
 

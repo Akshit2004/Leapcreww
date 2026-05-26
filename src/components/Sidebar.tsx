@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { 
   LayoutDashboard, 
   MessageSquare, 
@@ -8,14 +8,19 @@ import {
   FileText, 
   Bot, 
   Cpu, 
-  CircleDot,
   Sparkles,
   LogOut,
   X,
-  ShoppingBag
+  ShoppingBag,
+  Smartphone,
+  CheckCircle2,
+  Loader,
+  AlertCircle,
+  Settings,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useApp } from "../context/AppContext";
+import { useParams } from "next/navigation";
 
 interface SidebarProps {
   activeTab: string;
@@ -24,15 +29,31 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
+declare global {
+  interface Window {
+    FB: any;
+    fbAsyncInit: any;
+  }
+}
+
+declare function require(name: string): any;
+
 export const Sidebar: React.FC<SidebarProps> = ({ 
   activeTab, 
   setActiveTab,
   isOpen = false,
   onClose
 }) => {
+  const params = useParams();
+  const orgId = params.orgId as string;
   const { contacts, members } = useApp();
   const { data: session } = useSession();
-  
+
+  const [waConnected, setWaConnected] = useState(false);
+  const [waPhoneNumberId, setWaPhoneNumberId] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState("");
+
   // Calculate total unread messages
   const totalUnread = contacts.reduce((acc, contact) => acc + (contact.unreadCount || 0), 0);
   
@@ -49,7 +70,118 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "templates", label: "Templates", icon: FileText },
     { id: "chatbot", label: "Bot Builder", icon: Cpu },
     { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
+    { id: "settings", label: "Settings", icon: Settings },
   ];
+
+  // Fetch WhatsApp connection status
+  const fetchStatus = useCallback(async () => {
+    if (!orgId) return;
+    try {
+      const res = await fetch(`/api/whatsapp/status?orgId=${orgId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setWaConnected(data.connected);
+        setWaPhoneNumberId(data.phoneNumberId || null);
+      }
+    } catch {}
+  }, [orgId]);
+
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
+  // Initialize Facebook SDK (runs once)
+  useEffect(() => {
+    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+    if (!appId || typeof window === "undefined") return;
+
+    // If FB is already loaded, just init
+    if (window.FB) {
+      window.FB.init({
+        appId,
+        cookie: true,
+        xfbml: true,
+        version: "v21.0",
+      });
+      return;
+    }
+
+    // Set up async init
+    window.fbAsyncInit = function () {
+      window.FB.init({
+        appId,
+        cookie: true,
+        xfbml: true,
+        version: "v21.0",
+      });
+      window.FB.AppEvents.logPageView();
+    };
+
+    // Load FB SDK
+    ((d, s, id) => {
+      const fjs = d.getElementsByTagName(s)[0];
+      if (d.getElementById(id)) return;
+      const script = d.createElement(s) as HTMLScriptElement;
+      script.id = id;
+      script.src = "https://connect.facebook.net/en_US/sdk.js";
+      fjs?.parentNode?.insertBefore(script, fjs);
+    })(document, "script", "facebook-jssdk");
+  }, []);
+
+  const handleConnectWhatsApp = () => {
+    setConnectError("");
+
+    if (typeof window !== "undefined" && window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
+      setConnectError("HTTPS required. Deploy to Vercel or use a HTTPS proxy for local dev.");
+      return;
+    }
+
+    if (!window.FB) {
+      setConnectError("Facebook SDK not loaded. Please refresh.");
+      return;
+    }
+
+    setConnecting(true);
+
+    window.FB.login((response: any) => {
+      if (response.authResponse) {
+        const token = response.authResponse.accessToken;
+        fetch("/api/whatsapp/connect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fbToken: token, orgId }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.error) {
+              setConnectError(data.error);
+            } else {
+              setWaConnected(true);
+              setWaPhoneNumberId(data.phoneNumberId);
+            }
+          })
+          .catch(() => setConnectError("Network error. Try again."))
+          .finally(() => setConnecting(false));
+      } else {
+        setConnectError("Facebook login cancelled or failed.");
+        setConnecting(false);
+      }
+    }, {
+      scope: "whatsapp_business_management,whatsapp_business_messaging,business_management",
+    });
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      await fetch("/api/whatsapp/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId }),
+      });
+      setWaConnected(false);
+      setWaPhoneNumberId(null);
+    } catch {}
+  };
 
   return (
     <>
@@ -75,7 +207,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[10px] text-stone-500 font-mono mt-0.5 block">{appVersion}</span>
             </div>
           </div>
-          {/* Close button for mobile inside the sidebar */}
           <button 
             onClick={onClose}
             className="lg:hidden p-1 rounded-lg hover:bg-orange-50 text-stone-500 cursor-pointer"
@@ -118,7 +249,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </span>
                 )}
 
-                {/* Hover indicator glow */}
                 {isActive && (
                   <div className="absolute left-0 top-3 bottom-3 w-1 bg-orange-300 rounded-r-full" />
                 )}
@@ -127,21 +257,79 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
+        {/* WhatsApp Connection Card */}
+        <div className="px-4 pt-3 pb-1">
+          <div className={`p-3 rounded-xl border ${
+            waConnected
+              ? "bg-green-50 border-green-200/60"
+              : "bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200/60"
+          }`}>
+            <div className="flex items-start gap-2.5">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                waConnected ? "bg-green-600" : "bg-orange-600"
+              }`}>
+                {waConnected ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                ) : (
+                  <Smartphone className="w-3.5 h-3.5 text-white" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="text-xs font-bold text-stone-800 leading-tight">
+                  {waConnected ? "WhatsApp Connected" : "Connect WhatsApp"}
+                </h4>
+                {waConnected ? (
+                  <div className="mt-1.5 space-y-1.5">
+                    <p className="text-[10px] text-green-700 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Phone ID: {waPhoneNumberId ? `${waPhoneNumberId.slice(0, 8)}...` : "Linked"}
+                    </p>
+                    <button
+                      onClick={handleDisconnect}
+                      className="text-[10px] text-red-500 hover:text-red-600 underline underline-offset-2"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-1.5 space-y-1.5">
+                    <p className="text-[10px] text-stone-500 leading-relaxed">
+                      Link your WhatsApp Business number via Facebook.
+                    </p>
+                    {connectError && (
+                      <p className="text-[10px] text-red-500 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {connectError}
+                      </p>
+                    )}
+                    <button
+                      onClick={handleConnectWhatsApp}
+                      disabled={connecting}
+                      className="w-full mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-50 transition-all cursor-pointer"
+                    >
+                      {connecting ? (
+                        <Loader className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Smartphone className="w-3 h-3" />
+                      )}
+                      {connecting ? "Connecting..." : "Connect with Facebook"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Bottom Profile / Signout */}
         <div className="p-4 border-t border-orange-100 bg-orange-50/60">
           <div className="flex items-center gap-3 px-2 py-1.5">
-            <div className="relative">
-              <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center text-sm font-semibold text-stone-700 border border-orange-200 uppercase">
-                {agentName.split(" ").map((n: string) => n[0]).join("")}
-              </div>
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-orange-500 border-2 border-white animate-pulse" />
+            <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center text-sm font-semibold text-stone-700 border border-orange-200 uppercase">
+              {agentName.split(" ").map((n: string) => n[0]).join("")}
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-stone-900 truncate">{agentName}</div>
-              <div className="text-[11px] text-stone-500 flex items-center gap-1.5">
-                <CircleDot className="w-3 h-3 text-orange-500 animate-pulse-soft" />
-                <span>Live Support Online</span>
-              </div>
+              <div className="text-[11px] text-stone-500">Signed in</div>
             </div>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
