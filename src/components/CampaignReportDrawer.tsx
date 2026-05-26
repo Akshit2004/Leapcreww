@@ -32,14 +32,14 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
 
   if (!campaign || !isOpen) return null;
 
-  // Filter contacts matching campaign target tag
-  const campaignContacts = contacts.filter((c) => c.tags.includes(campaign.targetTag));
+  // Filter contacts matching campaign target tag (handle "all" tag)
+  const campaignContacts = campaign.targetTag === "all"
+    ? contacts
+    : contacts.filter((c) => c.tags.includes(campaign.targetTag));
   
-  // Filter system logs matching this campaign
+  // Filter system logs matching this campaign by campaignId if available, fallback to string match
   const campaignLogs = systemLogs.filter((log) => 
-    log.type === "campaign" && 
-    (log.message.includes(campaign.name) || 
-     log.message.toLowerCase().includes(campaign.templateName.toLowerCase()))
+    log.type === "campaign" && log.message.includes(campaign.id)
   );
 
   // Conversion Funnel Math
@@ -311,10 +311,24 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
                           <div className="text-[10px] text-stone-400 font-mono">{contact.phone} | {contact.email}</div>
                         </div>
 
-                        {/* Status Label */}
+                        {/* Status Label — accurate from campaign metrics */}
                         <div className="flex items-center gap-1.5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-soft" />
-                          <span className="text-[10px] font-bold text-stone-500 uppercase">Delivered</span>
+                          {campaign.status === "Completed" ? (
+                            <>
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              <span className="text-[10px] font-bold text-stone-500 uppercase">Sent</span>
+                            </>
+                          ) : campaign.status === "Sending" || campaign.status === "Scheduled" ? (
+                            <>
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse-soft" />
+                              <span className="text-[10px] font-bold text-amber-600 uppercase">Pending</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="h-1.5 w-1.5 rounded-full bg-stone-400" />
+                              <span className="text-[10px] font-bold text-stone-400 uppercase">Unknown</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}

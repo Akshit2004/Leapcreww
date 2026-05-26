@@ -24,12 +24,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Find contacts with the target tag
+    // Find contacts with the target tag (or all contacts)
     const taggedContacts = await prisma.contact.findMany({
-      where: {
-        organizationId,
-        tags: { has: targetTag }
-      }
+      where: targetTag === "all"
+        ? { organizationId }
+        : { organizationId, tags: { has: targetTag } }
     });
 
     if (taggedContacts.length === 0) {
@@ -73,12 +72,21 @@ export async function POST(request: NextRequest) {
         read: 0,
         clicked: 0,
         status: isScheduled ? "Scheduled" : "Sending",
-        date: isScheduled
-          ? new Date(scheduledAt).toLocaleString()
-          : new Date().toISOString().split("T")[0],
+        date: new Date().toISOString().split("T")[0],
+        scheduledAt: isScheduled ? new Date(scheduledAt) : null,
         organizationId
       }
     });
+
+    if (isScheduled) {
+      // Return early and let the cron job process it
+      return NextResponse.json({
+        campaign,
+        eligibleCount: recipientCount,
+        totalTagged: taggedContacts.length,
+        skippedInactive: taggedContacts.length - recipientCount
+      });
+    }
 
     (async () => {
       try {
@@ -87,25 +95,6 @@ export async function POST(request: NextRequest) {
           return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
         };
 
-        if (isScheduled) {
-          await new Promise((resolve) => setTimeout(resolve, 8000));
-          await prisma.campaign.update({
-            where: { id: campaign.id },
-            data: {
-              status: "Sending",
-              date: new Date().toISOString().split("T")[0]
-            }
-          });
-          await prisma.systemLog.create({
-            data: {
-              timestamp: timeHelper(),
-              type: "campaign",
-              message: `Scheduled session broadcast '${name}' has commenced sending.`,
-              organizationId
-            }
-          });
-        }
-
         let deliveredCount = 0;
 
         for (const contact of eligibleContacts) {
@@ -113,6 +102,7 @@ export async function POST(request: NextRequest) {
           const timeStr = timeHelper();
 
           const result = await sendWhatsAppMessage({ to: phone, text }, organizationId);
+          const waMessageId = result.data?.messages?.[0]?.id;
 
           if (!result.ok) {
             console.error(`Session broadcast failed to ${phone}:`, result.error);
@@ -121,7 +111,8 @@ export async function POST(request: NextRequest) {
                 timestamp: timeStr,
                 type: "campaign",
                 message: `Session broadcast delivery failed to ${contact.name} (${phone}): ${result.error}`,
-                organizationId
+                organizationId,
+                campaignId: campaign.id
               }
             });
           } else {
@@ -133,7 +124,9 @@ export async function POST(request: NextRequest) {
                 text: previewText,
                 timestamp: timeStr,
                 contactId: contact.id,
-                organizationId
+                organizationId,
+                waMessageId,
+                campaignId: campaign.id
               }
             });
             await prisma.contact.update({
@@ -148,7 +141,8 @@ export async function POST(request: NextRequest) {
                 timestamp: timeStr,
                 type: "campaign",
                 message: `Session broadcast sent to ${contact.name} (${phone})`,
-                organizationId
+                organizationId,
+                campaignId: campaign.id
               }
             });
           }
@@ -161,26 +155,6 @@ export async function POST(request: NextRequest) {
           await new Promise((resolve) => setTimeout(resolve, delay * 1000));
         }
 
-        // Simulate read/click funnel growth
-        if (deliveredCount > 0) {
-          const funnelStages = [
-            { readPercent: 0.35, clickPercent: 0.05 },
-            { readPercent: 0.65, clickPercent: 0.15 },
-            { readPercent: 0.85, clickPercent: 0.28 },
-            { readPercent: 0.95, clickPercent: 0.42 }
-          ];
-          for (let step = 0; step < funnelStages.length; step++) {
-            await new Promise((resolve) => setTimeout(resolve, 3000));
-            const stage = funnelStages[step];
-            const activeRead = Math.min(deliveredCount, Math.round(deliveredCount * stage.readPercent));
-            const activeClicked = Math.min(activeRead, Math.round(deliveredCount * stage.clickPercent));
-            await prisma.campaign.update({
-              where: { id: campaign.id },
-              data: { read: activeRead, clicked: activeClicked }
-            });
-          }
-        }
-
         await prisma.campaign.update({
           where: { id: campaign.id },
           data: { status: "Completed" }
@@ -191,11 +165,16 @@ export async function POST(request: NextRequest) {
             timestamp: timeHelper(),
             type: "campaign",
             message: `Session broadcast '${name}' completed.`,
-            organizationId
+            organizationId,
+            campaignId: campaign.id
           }
         });
       } catch (workerErr: unknown) {
         console.error("[Session Broadcast Worker Error]:", workerErr);
+        await prisma.campaign.update({
+          where: { id: campaign.id },
+          data: { status: "Failed" }
+        }).catch(() => {});
       }
     })();
 

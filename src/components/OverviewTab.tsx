@@ -17,7 +17,11 @@ import {
 import { useApp } from "../context/AppContext";
 import { CSVImporterModal } from "./CSVImporterModal";
 
-export const OverviewTab: React.FC = () => {
+interface OverviewTabProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
   const { organization, contacts, campaigns, templates, integrations, systemLogs, clearSystemLogs, dismissOnboarding, refreshWorkspace } = useApp();
   const [logFilter, setLogFilter] = useState<string>("all");
   const [logSearch, setLogSearch] = useState<string>("");
@@ -79,37 +83,49 @@ export const OverviewTab: React.FC = () => {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className={`bg-white/10 rounded-xl p-4 border border-white/20 flex flex-col gap-2 ${fbConnected ? 'opacity-70' : ''}`}>
+            <button
+              onClick={() => onNavigate?.("settings")}
+              className={`bg-white/10 rounded-xl p-4 border border-white/20 flex flex-col gap-2 text-left cursor-pointer hover:bg-white/20 transition-all ${fbConnected ? 'opacity-70' : ''}`}
+            >
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-sm">1. Connect Meta</span>
                 {fbConnected ? <CheckCircle2 className="w-5 h-5 text-green-300" /> : <ChevronRight className="w-4 h-4" />}
               </div>
               <p className="text-xs text-orange-100">Link your WhatsApp Business Account.</p>
-            </div>
+            </button>
             
-            <div className={`bg-white/10 rounded-xl p-4 border border-white/20 flex flex-col gap-2 ${templatesApproved ? 'opacity-70' : ''}`}>
+            <button
+              onClick={() => onNavigate?.("templates")}
+              className={`bg-white/10 rounded-xl p-4 border border-white/20 flex flex-col gap-2 text-left cursor-pointer hover:bg-white/20 transition-all ${templatesApproved ? 'opacity-70' : ''}`}
+            >
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-sm">2. Sync Templates</span>
                 {templatesApproved ? <CheckCircle2 className="w-5 h-5 text-green-300" /> : <ChevronRight className="w-4 h-4" />}
               </div>
               <p className="text-xs text-orange-100">Ensure Meta approves your templates.</p>
-            </div>
+            </button>
             
-            <div className={`bg-white/10 rounded-xl p-4 border border-white/20 flex flex-col gap-2 ${contactsImported ? 'opacity-70' : ''}`}>
+            <button
+              onClick={() => setIsCSVModalOpen(true)}
+              className={`bg-white/10 rounded-xl p-4 border border-white/20 flex flex-col gap-2 text-left cursor-pointer hover:bg-white/20 transition-all ${contactsImported ? 'opacity-70' : ''}`}
+            >
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-sm">3. Import Contacts</span>
                 {contactsImported ? <CheckCircle2 className="w-5 h-5 text-green-300" /> : <ChevronRight className="w-4 h-4" />}
               </div>
               <p className="text-xs text-orange-100">Upload a CSV or sync from plugins.</p>
-            </div>
+            </button>
             
-            <div className={`bg-white/10 rounded-xl p-4 border border-white/20 flex flex-col gap-2 ${campaignSent ? 'opacity-70' : ''}`}>
+            <button
+              onClick={() => onNavigate?.("campaigns")}
+              className={`bg-white/10 rounded-xl p-4 border border-white/20 flex flex-col gap-2 text-left cursor-pointer hover:bg-white/20 transition-all ${campaignSent ? 'opacity-70' : ''}`}
+            >
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-sm">4. Send Campaign</span>
                 {campaignSent ? <CheckCircle2 className="w-5 h-5 text-green-300" /> : <ChevronRight className="w-4 h-4" />}
               </div>
               <p className="text-xs text-orange-100">Launch your first test broadcast!</p>
-            </div>
+            </button>
           </div>
         </div>
       )}

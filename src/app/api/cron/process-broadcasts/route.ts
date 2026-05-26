@@ -49,8 +49,9 @@ async function processCampaigns() {
         data: {
           timestamp: timeHelper(),
           type: "campaign",
-          message: `Scheduled broadcast campaign '${name}' processing has commenced.`,
+          message: `Scheduled broadcast campaign '${name}' processing has commenced. (${campaignId})`,
           organizationId,
+          campaignId,
         },
       });
 
@@ -153,6 +154,7 @@ async function processCampaigns() {
         );
 
         const logTime = timeHelper();
+        const waMessageId = result.data?.messages?.[0]?.id;
 
         if (!result.ok) {
           console.error(`[Scheduled Cron Engine] Failed to send to ${phone}:`, result.error);
@@ -162,6 +164,7 @@ async function processCampaigns() {
               type: "campaign",
               message: `Scheduled broadcast failed to ${contact.name} (${phone}): ${result.error}`,
               organizationId,
+              campaignId,
             },
           });
         } else {
@@ -173,6 +176,7 @@ async function processCampaigns() {
               type: "campaign",
               message: `Scheduled broadcast successfully sent to ${contact.name} (${phone})`,
               organizationId,
+              campaignId,
             },
           });
 
@@ -190,6 +194,8 @@ async function processCampaigns() {
               timestamp: logTime,
               contactId: contact.id,
               organizationId,
+              waMessageId,
+              campaignId,
             },
           });
         }
@@ -208,38 +214,7 @@ async function processCampaigns() {
         }
       }
 
-      // 4. Trigger progressive funnel growth simulation (simulating delivery/read tracking) in background
-      if (deliveredCount > 0) {
-        (async () => {
-          try {
-            const funnelStages = [
-              { readPercent: 0.35, clickPercent: 0.05 },
-              { readPercent: 0.65, clickPercent: 0.15 },
-              { readPercent: 0.85, clickPercent: 0.28 },
-              { readPercent: 0.95, clickPercent: 0.42 },
-            ];
-
-            for (let step = 0; step < funnelStages.length; step++) {
-              await new Promise((resolve) => setTimeout(resolve, 3000));
-              const stage = funnelStages[step];
-              const activeRead = Math.min(deliveredCount, Math.round(deliveredCount * stage.readPercent));
-              const activeClicked = Math.min(activeRead, Math.round(deliveredCount * stage.clickPercent));
-
-              await prisma.campaign.update({
-                where: { id: campaignId },
-                data: {
-                  read: activeRead,
-                  clicked: activeClicked,
-                },
-              });
-            }
-          } catch (funnelErr) {
-            console.error("[Cron Funnel Simulator Error]:", funnelErr);
-          }
-        })();
-      }
-
-      // 5. Finalize Campaign status
+      // 4. Finalize Campaign status
       await prisma.campaign.update({
         where: { id: campaignId },
         data: {
@@ -251,8 +226,9 @@ async function processCampaigns() {
         data: {
           timestamp: timeHelper(),
           type: "campaign",
-          message: `Scheduled broadcast campaign '${name}' successfully processed and completed.`,
+          message: `Scheduled broadcast campaign '${name}' successfully processed and completed. (${campaignId})`,
           organizationId,
+          campaignId,
         },
       });
 
@@ -293,7 +269,12 @@ export async function GET(request: NextRequest) {
     const secretParam = searchParams.get("secret");
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}` && secretParam !== cronSecret) {
+    if (!cronSecret) {
+      console.error("[Cron] CRON_SECRET environment variable is not set");
+      return NextResponse.json({ error: "Server misconfigured: CRON_SECRET not set" }, { status: 500 });
+    }
+
+    if (authHeader !== `Bearer ${cronSecret}` && secretParam !== cronSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -316,7 +297,12 @@ export async function POST(request: NextRequest) {
     const secretParam = searchParams.get("secret");
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}` && secretParam !== cronSecret) {
+    if (!cronSecret) {
+      console.error("[Cron] CRON_SECRET environment variable is not set");
+      return NextResponse.json({ error: "Server misconfigured: CRON_SECRET not set" }, { status: 500 });
+    }
+
+    if (authHeader !== `Bearer ${cronSecret}` && secretParam !== cronSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

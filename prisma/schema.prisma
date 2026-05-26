@@ -97,6 +97,8 @@ model Message {
   contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  waMessageId    String?      // WhatsApp API message ID for delivery tracking
+  campaignId     String?      // Links broadcast messages to a campaign for targeted log queries
   createdAt      DateTime     @default(now())
 }
 
@@ -176,6 +178,7 @@ model SystemLog {
   message        String       @db.Text
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaignId     String?      // Links log to a campaign for precise filtering in reports
   createdAt      DateTime     @default(now())
 }
 

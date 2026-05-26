@@ -71,8 +71,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ campaign });
     }
 
-    // Fire off asynchronous background campaign worker!
-    // This allows WappFlow to instantly return the created campaign to the frontend UI
+    // Fire off asynchronous background campaign worker
     (async () => {
       try {
         const timeHelper = () => {
@@ -82,7 +81,6 @@ export async function POST(request: NextRequest) {
 
         let deliveredCount = 0;
 
-        // Process message sending sequentially with user-defined delay
         for (const contact of contacts) {
           const phone = formatPhoneNumber(contact.phone);
           console.log(`[Broadcast Engine] Sending template message to ${phone}`);
@@ -93,7 +91,6 @@ export async function POST(request: NextRequest) {
             value: string;
           }
           const parsedVariables = (variables as unknown as CampaignVariable[]) || [];
-          // Formulate parameters dynamically
           const parameters = parsedVariables.map((v) => {
             if (v.type === "contact_field") {
               if (v.value === "name") return { type: "text", text: contact.name };
@@ -120,7 +117,6 @@ export async function POST(request: NextRequest) {
             components?: WhatsAppTemplateComponent[];
           }
 
-          // Meta-compliant template payload
           const templatePayload: WhatsAppTemplatePayload = {
             name: templateName,
             language: { code: "en_US" }
@@ -156,6 +152,7 @@ export async function POST(request: NextRequest) {
           }, organizationId);
 
           const timeStr = timeHelper();
+          const waMessageId = result.data?.messages?.[0]?.id;
 
           if (!result.ok) {
             console.error(`Failed to send campaign message to ${phone}:`, result.error);
@@ -164,42 +161,42 @@ export async function POST(request: NextRequest) {
                 timestamp: timeStr,
                 type: "campaign",
                 message: `Broadcast delivery failed to ${contact.name} (${phone}): ${result.error}`,
-                organizationId
+                organizationId,
+                campaignId: campaign.id
               }
             });
           } else {
             console.log(`Successfully sent template to ${phone}`);
             deliveredCount++;
 
-            // Create a successful log in system logs
             await prisma.systemLog.create({
               data: {
                 timestamp: timeStr,
                 type: "campaign",
                 message: `Broadcast successfully sent to ${contact.name} (${phone})`,
-                organizationId
+                organizationId,
+                campaignId: campaign.id
               }
             });
 
-            // Reconstruct text body with parameter values for the Inbox/CRM preview
             let previewText = `[Template Message: ${templateName}]`;
             if (parameters.length > 0) {
               previewText = `[Template: ${templateName}] | Params: ${parameters.map((p: WhatsAppTemplateParameter) => p.text).join(", ")}`;
             }
 
-            // Add a message bubble in their chat history so they can see it in CRM inbox!
             await prisma.message.create({
               data: {
                 sender: "agent",
                 text: previewText,
                 timestamp: timeStr,
                 contactId: contact.id,
-                organizationId
+                organizationId,
+                waMessageId,
+                campaignId: campaign.id
               }
             });
           }
 
-          // Update metrics progressively after each recipient
           await prisma.campaign.update({
             where: { id: campaign.id },
             data: {
@@ -207,38 +204,9 @@ export async function POST(request: NextRequest) {
             }
           });
 
-          // Custom anti-blocking / rate limiting spacing delay
           await new Promise((resolve) => setTimeout(resolve, delay * 1000));
         }
 
-        // Simulating the conversion funnel metrics progressive growth (opens -> clicks) over next several seconds
-        // This simulates natural WhatsApp recipient engagement over time
-        if (deliveredCount > 0) {
-          const funnelStages = [
-            { readPercent: 0.35, clickPercent: 0.05 },
-            { readPercent: 0.65, clickPercent: 0.15 },
-            { readPercent: 0.85, clickPercent: 0.28 },
-            { readPercent: 0.95, clickPercent: 0.42 }
-          ];
-
-          for (let step = 0; step < funnelStages.length; step++) {
-            await new Promise((resolve) => setTimeout(resolve, 3000)); // 3 seconds interval
-
-            const stage = funnelStages[step];
-            const activeRead = Math.min(deliveredCount, Math.round(deliveredCount * stage.readPercent));
-            const activeClicked = Math.min(activeRead, Math.round(deliveredCount * stage.clickPercent));
-
-            await prisma.campaign.update({
-              where: { id: campaign.id },
-              data: {
-                read: activeRead,
-                clicked: activeClicked
-              }
-            });
-          }
-        }
-
-        // Finalize Campaign
         await prisma.campaign.update({
           where: { id: campaign.id },
           data: {
@@ -251,12 +219,17 @@ export async function POST(request: NextRequest) {
             timestamp: timeHelper(),
             type: "campaign",
             message: `Broadcast campaign '${name}' processing completely finalized.`,
-            organizationId
+            organizationId,
+            campaignId: campaign.id
           }
         });
 
       } catch (workerErr: unknown) {
         console.error("[Broadcast Background Worker Error]:", workerErr);
+        await prisma.campaign.update({
+          where: { id: campaign.id },
+          data: { status: "Failed" }
+        }).catch(() => {});
       }
     })();
 

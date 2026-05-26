@@ -45,8 +45,16 @@ export interface Campaign {
   delivered: number;
   read: number;
   clicked: number;
-  status: "Completed" | "Active" | "Scheduled" | "Sending";
+  status: "Completed" | "Active" | "Scheduled" | "Sending" | "Failed";
   date: string;
+  scheduledAt?: string;
+  excludeTag?: string;
+  mediaType?: string;
+  mediaUrl?: string;
+  variables?: Array<{ key: string; type: "contact_field" | "static"; value: string }>;
+  delay?: number;
+  organizationId?: string;
+  createdAt?: string;
 }
 
 export interface Template {

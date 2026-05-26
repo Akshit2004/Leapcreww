@@ -72,7 +72,7 @@ export default function TenantDashboard() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case "overview":
-        return <OverviewTab />;
+        return <OverviewTab onNavigate={setActiveTab} />;
       case "inbox":
         return <InboxTab />;
       case "campaigns":
