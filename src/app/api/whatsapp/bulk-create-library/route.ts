@@ -54,15 +54,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing organizationId" }, { status: 400 });
     }
 
-    const config = await getWhatsAppConfig();
+    const config = await getWhatsAppConfig(organizationId);
     if (!config) {
       return NextResponse.json({ error: "WhatsApp API not configured" }, { status: 400 });
     }
 
-    const { accessToken, apiVersion } = config;
-    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+    const { accessToken, apiVersion, businessAccountId: wabaId } = config;
     if (!wabaId) {
-      return NextResponse.json({ error: "WHATSAPP_BUSINESS_ACCOUNT_ID not set" }, { status: 400 });
+      return NextResponse.json({ error: "No WhatsApp Business Account linked to this organization" }, { status: 400 });
     }
 
     // First fetch all existing templates from Meta to check for name conflicts

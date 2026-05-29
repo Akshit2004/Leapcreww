@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       metaData = { status: dbStatus.toUpperCase(), simulated: true };
     } else {
       // Real Meta API verification
-      const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+      const accessToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
       const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
 
       if (!accessToken) {

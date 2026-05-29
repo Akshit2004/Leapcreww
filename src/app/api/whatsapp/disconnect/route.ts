@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       data: {
         whatsappBusinessAccountId: null,
         whatsappPhoneNumberId: null,
-        whatsappAccessToken: null,
+        metaBusinessId: null,
         whatsappConnected: false,
       },
     });

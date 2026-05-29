@@ -57,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [waPhoneNumberId, setWaPhoneNumberId] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState("");
+  const [hasSystemAccess, setHasSystemAccess] = useState<boolean | null>(null);
 
   const [isHovered, setIsHovered] = useState(false);
   const isExpanded = isHovered;
@@ -97,6 +98,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           const data = await res.json();
           setWaConnected(data.connected);
           setWaPhoneNumberId(data.phoneNumberId || null);
+        }
+        const accessRes = await fetch(`/api/whatsapp/partner-invite?orgId=${orgId}`);
+        if (accessRes.ok) {
+          const accessData = await accessRes.json();
+          setHasSystemAccess(accessData.hasAccess);
         }
       } catch {}
     };
@@ -145,9 +151,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           body: JSON.stringify({ fbToken: token, orgId }),
         })
           .then((res) => res.json())
-          .then((data) => {
+          .then(async (data) => {
             if (data.error) { setConnectError(data.error); }
-            else { setWaConnected(true); setWaPhoneNumberId(data.phoneNumberId); }
+            else {
+              setWaConnected(true);
+              setWaPhoneNumberId(data.phoneNumberId);
+              // Check system user access after connect
+              const accessRes = await fetch(`/api/whatsapp/partner-invite?orgId=${orgId}`);
+              if (accessRes.ok) {
+                const accessData = await accessRes.json();
+                setHasSystemAccess(accessData.hasAccess);
+              }
+            }
           })
           .catch(() => setConnectError("Network error. Try again."))
           .finally(() => setConnecting(false));
@@ -169,6 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       });
       setWaConnected(false);
       setWaPhoneNumberId(null);
+      setHasSystemAccess(null);
     } catch {}
   };
 
@@ -281,35 +297,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="transition-all duration-300 overflow-hidden w-full"
           >
             {waConnected ? (
-              <div className="flex items-center gap-2.5 p-2 border border-stone-200 bg-[#fafaf9] transition-all duration-300">
-                <div className="relative shrink-0">
-                  <div className="w-8 h-8 bg-wa-green text-white flex items-center justify-center">
-                     <CheckCircle2 className="w-4.5 h-4.5" />
-                   </div>
-                   <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-wa-green border border-white rounded-full" />
-                </div>
-                <div
-                  data-stagger-pos="0.88"
-                  className={`flex-1 min-w-[130px] transition-all duration-300 ${
-                    isExpanded ? "opacity-100 translate-x-0" : "lg:opacity-0 lg:-translate-x-4 lg:pointer-events-none"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-bold text-stone-900 leading-none">WhatsApp Live</p>
-                      <p className="text-[9px] text-stone-500 font-bold mt-1 leading-none uppercase">
-                        {waPhoneNumberId ? `ID: ${waPhoneNumberId.slice(0, 10)}…` : "Linked"}
-                      </p>
+              <div>
+                <div className="flex items-center gap-2.5 p-2 border border-stone-200 bg-[#fafaf9] transition-all duration-300">
+                  <div className="relative shrink-0">
+                    <div className="w-8 h-8 bg-wa-green text-white flex items-center justify-center">
+                       <CheckCircle2 className="w-4.5 h-4.5" />
+                     </div>
+                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-wa-green border border-white rounded-full" />
+                  </div>
+                  <div
+                    data-stagger-pos="0.88"
+                    className={`flex-1 min-w-[130px] transition-all duration-300 ${
+                      isExpanded ? "opacity-100 translate-x-0" : "lg:opacity-0 lg:-translate-x-4 lg:pointer-events-none"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-stone-900 leading-none">WhatsApp Live</p>
+                        <p className="text-[9px] text-stone-500 font-bold mt-1 leading-none uppercase">
+                          {waPhoneNumberId ? `ID: ${waPhoneNumberId.slice(0, 10)}…` : "Linked"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleDisconnect}
+                        className="p-1 rounded-none text-stone-400 hover:text-stone-900 hover:bg-stone-200/50 transition-all duration-200 cursor-pointer"
+                        title="Disconnect WhatsApp"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button
-                      onClick={handleDisconnect}
-                      className="p-1 rounded-none text-stone-400 hover:text-stone-900 hover:bg-stone-200/50 transition-all duration-200 cursor-pointer"
-                      title="Disconnect WhatsApp"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
                   </div>
                 </div>
+                {hasSystemAccess === false && (
+                  <div className="flex items-center gap-1.5 px-2 py-1.5 bg-amber-50 border-x border-b border-amber-200">
+                    <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
+                    <span className="text-[8px] font-bold text-amber-700 uppercase leading-tight">
+                      System User not configured
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col gap-2 p-2 border border-stone-200 bg-white transition-all duration-300">

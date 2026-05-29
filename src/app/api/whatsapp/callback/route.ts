@@ -109,13 +109,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Store credentials in the organization record
+    // Store credentials in the organization record (token is NOT persisted — system user token used for API calls)
     await prisma.organization.update({
       where: { id: orgId },
       data: {
         whatsappBusinessAccountId: wabaId || null,
         whatsappPhoneNumberId: phoneNumberId || null,
-        whatsappAccessToken: accessToken,
+        metaBusinessId: businessId || null,
         whatsappConnected: true,
       },
     });

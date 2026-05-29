@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { Globe, Phone, CheckCircle2, Loader, AlertCircle } from "lucide-react";
+import { Globe, Phone, CheckCircle2, Loader, AlertCircle, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
 
 interface PhoneNumber {
   id: string;
@@ -31,6 +31,11 @@ export const SettingsTab: React.FC = () => {
   const [data, setData] = useState<PortfolioData | null>(null);
   const [linking, setLinking] = useState<string | null>(null);
 
+  const [hasSystemAccess, setHasSystemAccess] = useState<boolean | null>(null);
+  const [accessChecking, setAccessChecking] = useState(true);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+
   useEffect(() => {
     if (orgId) {
       const load = async () => {
@@ -49,15 +54,60 @@ export const SettingsTab: React.FC = () => {
           }
           const json = await res.json();
           setData(json);
+
+          // Check system user access
+          const accessRes = await fetch(`/api/whatsapp/partner-invite?orgId=${orgId}`);
+          if (accessRes.ok) {
+            const accessData = await accessRes.json();
+            setHasSystemAccess(accessData.hasAccess);
+          }
         } catch (err: unknown) {
           setError(err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "An unexpected error occurred.");
         } finally {
+          setAccessChecking(false);
           setLoading(false);
         }
       };
       load();
     }
   }, [orgId]);
+
+  const handleGenerateInvite = async () => {
+    setInviteLoading(true);
+    try {
+      const res = await fetch("/api/whatsapp/partner-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setInviteUrl(data.url);
+        window.open(data.url, "_blank");
+      } else {
+        alert("Failed to generate invite link. Make sure META_BUSINESS_MANAGER_ID is configured.");
+      }
+    } catch {
+      alert("Network error.");
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const handleRefreshAccess = async () => {
+    setAccessChecking(true);
+    try {
+      const res = await fetch(`/api/whatsapp/partner-invite?orgId=${orgId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setHasSystemAccess(data.hasAccess);
+      }
+    } catch {
+      setHasSystemAccess(null);
+    } finally {
+      setAccessChecking(false);
+    }
+  };
 
   const handleLinkNumber = async (wabaId: string, phoneNumberId: string) => {
     setLinking(phoneNumberId);
@@ -91,6 +141,69 @@ export const SettingsTab: React.FC = () => {
           <h2 className="text-xl font-bold tracking-tight text-stone-900 uppercase">Settings</h2>
           <p className="text-stone-500 text-xs mt-1">Manage your workspace configuration and WhatsApp connection.</p>
         </div>
+      </div>
+
+      {/* System User Access Status */}
+      <div className="bg-white p-6 rounded-none border border-stone-200 flex flex-col shadow-none max-w-3xl">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900 flex items-center gap-2 mb-6">
+          <ShieldCheck className="w-5 h-5 text-stone-900" />
+          System User Access
+        </h3>
+        {error ? null : accessChecking ? (
+          <div className="flex items-center gap-2 p-3 border border-stone-200 bg-stone-50">
+            <Loader className="w-4 h-4 animate-spin text-stone-500" />
+            <span className="text-xs text-stone-500 font-semibold">Checking System User access...</span>
+          </div>
+        ) : hasSystemAccess === true ? (
+          <div className="flex items-center justify-between p-3 border border-green-300 bg-green-50">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-green-700" />
+              <span className="text-xs font-bold text-green-800 uppercase">System User has access to this WABA</span>
+            </div>
+            <button
+              onClick={handleRefreshAccess}
+              disabled={accessChecking}
+              className="flex items-center gap-1 px-3 py-1 text-[10px] font-bold text-green-800 border border-green-300 hover:bg-green-100 cursor-pointer"
+            >
+              <RefreshCw className="w-3 h-3" /> Refresh
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 p-3 border border-amber-300 bg-amber-50">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+              <span className="text-xs font-bold text-amber-800 uppercase">System User does NOT have access to this WABA</span>
+            </div>
+            <p className="text-[10px] text-amber-700">
+              Your System User needs to be added to this WABA before you can send messages. Click below to generate an invitation link for the customer's Business Manager.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleGenerateInvite}
+                disabled={inviteLoading}
+                className="flex items-center gap-1.5 px-4 py-2 bg-stone-950 text-white text-[10px] font-bold uppercase tracking-wider border border-stone-950 hover:bg-stone-900 cursor-pointer disabled:opacity-50"
+              >
+                {inviteLoading ? <Loader className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
+                {inviteLoading ? "Generating..." : "Generate Invite Link"}
+              </button>
+              <button
+                onClick={handleRefreshAccess}
+                disabled={accessChecking}
+                className="flex items-center gap-1 px-3 py-2 text-[10px] font-bold text-stone-700 border border-stone-300 hover:bg-stone-100 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className="w-3 h-3" /> Check Again
+              </button>
+            </div>
+            {inviteUrl && (
+              <div className="mt-1 p-2 bg-white border border-stone-200 text-[10px] text-stone-600 break-all">
+                <span className="font-bold">Invite URL:</span>{" "}
+                <a href={inviteUrl} target="_blank" rel="noopener noreferrer" className="underline text-stone-900">
+                  {inviteUrl}
+                </a>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="bg-white p-6 rounded-none border border-stone-200 flex flex-col shadow-none max-w-3xl">

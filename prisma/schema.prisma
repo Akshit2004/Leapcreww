@@ -27,7 +27,8 @@ model Organization {
   // WhatsApp Business credentials (per-org after Embedded Signup)
   whatsappBusinessAccountId String?
   whatsappPhoneNumberId    String?
-  whatsappAccessToken      String?
+  metaBusinessId           String?
+  wabaScopedUserId         String?
   whatsappConnected        Boolean    @default(false)
 
   // Wallet & SaaS credits

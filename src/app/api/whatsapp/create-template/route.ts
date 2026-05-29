@@ -36,13 +36,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Try Meta Graph API Submission if configured
-    const config = await getWhatsAppConfig();
+    const config = await getWhatsAppConfig(organizationId);
     let metaId: string | null = null;
     let metaStatus = "pending";
 
     if (config) {
-      const { accessToken, apiVersion } = config;
-      const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+      const { accessToken, apiVersion, businessAccountId: wabaId } = config;
 
       if (wabaId) {
         try {

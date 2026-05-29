@@ -33,11 +33,10 @@ export async function DELETE(
     const isMock = template.metaId?.startsWith("mock-meta-") || !template.metaId;
     
     if (!isMock) {
-      const config = await getWhatsAppConfig();
-      const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+      const config = await getWhatsAppConfig(template.organizationId);
 
-      if (config && wabaId) {
-        const { accessToken, apiVersion } = config;
+      if (config && config.businessAccountId) {
+        const { accessToken, apiVersion, businessAccountId: wabaId } = config;
         const url = `https://graph.facebook.com/${apiVersion}/${wabaId}/message_templates?name=${template.name}`;
         
         try {

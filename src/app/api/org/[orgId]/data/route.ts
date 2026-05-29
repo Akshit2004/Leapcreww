@@ -42,7 +42,6 @@ export async function GET(
         slug: true,
         whatsappConnected: true,
         whatsappBusinessAccountId: true,
-        whatsappAccessToken: true,
         walletBalance: true, // Fetch generated walletBalance column
         onboardingDismissed: true,
       }
@@ -84,18 +83,12 @@ export async function GET(
     const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
     const syncConfigs: Array<{ wabaId: string; accessToken: string; isCustom: boolean }> = [];
     
-    // Multi-tenant Sync Configuration: Exclusive isolation
-    if (organization.whatsappConnected && organization.whatsappBusinessAccountId && organization.whatsappAccessToken) {
+    const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
+    if (organization.whatsappConnected && organization.whatsappBusinessAccountId && systemToken) {
       syncConfigs.push({
         wabaId: organization.whatsappBusinessAccountId,
-        accessToken: organization.whatsappAccessToken,
+        accessToken: systemToken,
         isCustom: true
-      });
-    } else if (process.env.WHATSAPP_BUSINESS_ACCOUNT_ID && process.env.WHATSAPP_ACCESS_TOKEN) {
-      syncConfigs.push({
-        wabaId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID,
-        accessToken: process.env.WHATSAPP_ACCESS_TOKEN,
-        isCustom: false
       });
     }
 
@@ -119,26 +112,6 @@ export async function GET(
           hasSuccessfulSync = true;
         } else {
           console.error(`⚠️ Failed to sync templates from Meta (Status ${metaRes.status})`);
-          if (config.isCustom && metaRes.status === 401) {
-            console.warn(`[Token Expired] Org ${orgId} access token has expired or is invalid. Disconnecting WhatsApp...`);
-            await prisma.organization.update({
-              where: { id: orgId },
-              data: { whatsappConnected: false }
-            });
-            const d = new Date();
-            const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-            await prisma.systemLog.create({
-              data: {
-                timestamp: timeStr,
-                type: "crm",
-                message: "⚠️ Your WhatsApp integration session has expired. Please re-authenticate under settings to restore synchronization.",
-                organizationId: orgId
-              }
-            });
-            if (organization) {
-              organization.whatsappConnected = false;
-            }
-          }
         }
       } catch (syncErr) {
         console.error("⚠️ Failed to sync templates from Meta:", syncErr);

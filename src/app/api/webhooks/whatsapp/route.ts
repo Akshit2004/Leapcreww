@@ -56,19 +56,23 @@ export async function POST(req: NextRequest) {
 
             console.log(`WhatsApp message from ${waFrom} (${profileName}): ${text}`);
 
+            const phoneNumberId = value.metadata?.phone_number_id;
+            if (!phoneNumberId) {
+              console.warn("WhatsApp webhook: missing phone_number_id in metadata, skipping");
+              continue;
+            }
+
             const org = await prisma.organization.findFirst({
-              orderBy: { createdAt: "desc" },
+              where: { whatsappPhoneNumberId: phoneNumberId },
             });
 
             if (!org) {
-              console.warn("No organization found to store WhatsApp message");
+              console.warn(`WhatsApp webhook: no org found for phone_number_id ${phoneNumberId}, skipping`);
               continue;
             }
 
             const normalizedPhone = `+${waFrom.replace(/[^0-9]/g, "")}`;
-
-            // Use the org from the webhook metadata match, or fall back to contacting org
-            let activeOrgId = org.id;
+            const activeOrgId = org.id;
 
             let contact = await prisma.contact.findFirst({
               where: {
@@ -85,10 +89,6 @@ export async function POST(req: NextRequest) {
                   phone: { contains: waFrom.slice(-10) },
                 },
               });
-            }
-
-            if (contact) {
-              activeOrgId = contact.organizationId;
             }
 
             const d = new Date();

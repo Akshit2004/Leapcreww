@@ -44,46 +44,44 @@ export interface WhatsAppWebhookPayload {
 }
 
 export async function getWhatsAppConfig(orgId?: string) {
-  // Try org-level credentials first
-  if (orgId) {
-    try {
-      const org = await prisma.organization.findUnique({
-        where: { id: orgId },
-        select: {
-          whatsappConnected: true,
-          whatsappPhoneNumberId: true,
-          whatsappAccessToken: true,
-          whatsappBusinessAccountId: true,
-        },
-      });
-
-      if (org?.whatsappConnected && org.whatsappPhoneNumberId && org.whatsappAccessToken) {
-        return {
-          phoneNumberId: org.whatsappPhoneNumberId,
-          accessToken: org.whatsappAccessToken,
-          businessAccountId: org.whatsappBusinessAccountId || "",
-          apiVersion: process.env.WHATSAPP_API_VERSION || "v21.0",
-          verifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "wappflow_verify_2026",
-          appSecret: process.env.WHATSAPP_APP_SECRET || "",
-        };
-      }
-    } catch {
-      // Fall through to env fallback
-    }
-  }
-
-  // Fallback to environment-level credentials
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
   const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
   const verifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "wappflow_verify_2026";
   const appSecret = process.env.WHATSAPP_APP_SECRET;
 
-  if (!phoneNumberId || !accessToken || !appSecret) {
+  if (!systemToken || !appSecret) {
     return null;
   }
 
-  return { phoneNumberId, accessToken, apiVersion, verifyToken, appSecret, businessAccountId: "" };
+  if (!orgId) {
+    return null;
+  }
+
+  try {
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: {
+        whatsappConnected: true,
+        whatsappPhoneNumberId: true,
+        whatsappBusinessAccountId: true,
+      },
+    });
+
+    if (org?.whatsappConnected && org.whatsappPhoneNumberId) {
+      return {
+        phoneNumberId: org.whatsappPhoneNumberId,
+        accessToken: systemToken,
+        businessAccountId: org.whatsappBusinessAccountId || "",
+        apiVersion,
+        verifyToken,
+        appSecret,
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 
