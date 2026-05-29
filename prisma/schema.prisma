@@ -30,6 +30,9 @@ model Organization {
   whatsappAccessToken      String?
   whatsappConnected        Boolean    @default(false)
 
+  // Wallet & SaaS credits
+  walletBalance            Float      @default(0.0)
+
   // Onboarding state
   onboardingDismissed      Boolean    @default(false)
 

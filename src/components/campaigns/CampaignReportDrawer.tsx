@@ -11,7 +11,7 @@ import {
   CheckCircle,
   HelpCircle
 } from "lucide-react";
-import { Campaign, Contact, SystemLog } from "../context/AppContext";
+import { Campaign, Contact, SystemLog } from "../../context/AppContext";
 
 interface CampaignReportDrawerProps {
   isOpen: boolean;
@@ -66,9 +66,9 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Completed":
-        return "text-orange-600 bg-orange-50 border-orange-500/20";
+        return "text-emerald-650 bg-emerald-50 border-emerald-500/20";
       case "Sending":
-        return "text-amber-600 bg-amber-50 border-amber-500/20 animate-pulse";
+        return "text-teal-650 bg-teal-50 border-teal-500/20 animate-pulse";
       case "Scheduled":
         return "text-blue-600 bg-blue-50 border-blue-500/20";
       default:
@@ -82,10 +82,10 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
       <div className="absolute inset-0 cursor-default" onClick={onClose} />
 
       {/* Slide-over Content Drawer */}
-      <div className="relative w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col z-10 animate-slide-left border-l border-orange-100 overflow-hidden">
+      <div className="relative w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col z-10 animate-slide-left border-l border-slate-100 overflow-hidden">
         
         {/* Header Section */}
-        <div className="p-6 border-b border-orange-100 flex items-center justify-between shrink-0 bg-gradient-to-r from-amber-50/40 via-white to-white">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-gradient-to-r from-emerald-50/10 via-white to-white">
           <div className="space-y-1">
             <span className="text-[10px] uppercase font-bold tracking-widest text-stone-400">Broadcast Detailed Audit</span>
             <h3 className="text-lg font-bold text-stone-900 leading-snug">{campaign.name}</h3>
@@ -102,7 +102,7 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
           </div>
           <button 
             onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-orange-50 text-stone-500 transition-colors shrink-0"
+            className="p-1.5 rounded-xl hover:bg-slate-50 text-stone-500 transition-colors shrink-0"
           >
             <X className="w-5.5 h-5.5" />
           </button>
@@ -113,28 +113,28 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
           
           {/* Metrics Grid Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-orange-100 shadow-sm relative overflow-hidden">
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
               <span className="text-[9px] uppercase tracking-wider font-bold text-stone-400 block">Total Target</span>
               <span className="text-xl font-extrabold text-stone-900 mt-1 block">{sent}</span>
               <span className="text-[10px] text-stone-500 mt-1 block">Leads Segmented</span>
               <div className="absolute right-3 bottom-3 text-stone-100"><Users className="w-8 h-8" /></div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-orange-100 shadow-sm relative overflow-hidden">
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
               <span className="text-[9px] uppercase tracking-wider font-bold text-stone-400 block">Delivered</span>
               <span className="text-xl font-extrabold text-stone-900 mt-1 block">{delivered}</span>
               <span className="text-[10px] text-emerald-600 font-bold mt-1 block">{delRate}% Delivery Rate</span>
               <div className="absolute right-3 bottom-3 text-stone-100"><CheckCircle className="w-8 h-8" /></div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-orange-100 shadow-sm relative overflow-hidden">
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
               <span className="text-[9px] uppercase tracking-wider font-bold text-stone-400 block">Reads</span>
               <span className="text-xl font-extrabold text-stone-900 mt-1 block">{read}</span>
-              <span className="text-[10px] text-orange-600 font-bold mt-1 block">{readRate}% Open Rate</span>
+              <span className="text-[10px] text-teal-650 font-bold mt-1 block">{readRate}% Open Rate</span>
               <div className="absolute right-3 bottom-3 text-stone-100"><Activity className="w-8 h-8" /></div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-orange-100 shadow-sm relative overflow-hidden">
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
               <span className="text-[9px] uppercase tracking-wider font-bold text-stone-400 block">Clicks</span>
               <span className="text-xl font-extrabold text-stone-900 mt-1 block">{clicked}</span>
               <span className="text-[10px] text-pink-600 font-bold mt-1 block">{clickRate}% Click-to-Read</span>
@@ -143,9 +143,9 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
           </div>
 
           {/* SVG Conversion Funnel Section */}
-          <div className="bg-white p-6 rounded-2xl border border-orange-100 shadow-sm space-y-4">
-            <h4 className="font-bold text-xs uppercase tracking-wider text-stone-500 flex items-center gap-1.5 border-b border-orange-100/50 pb-2">
-              <Layers className="w-4 h-4 text-orange-500" />
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+            <h4 className="font-bold text-xs uppercase tracking-wider text-stone-500 flex items-center gap-1.5 border-b border-slate-100/50 pb-2">
+              <Layers className="w-4 h-4 text-emerald-500" />
               Conversion Funnel Visualization
             </h4>
 
@@ -156,8 +156,8 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
                 <svg width="320" height="240" viewBox="0 0 320 240" className="drop-shadow-md">
                   <defs>
                     <linearGradient id="funnelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#ea580c" stopOpacity="0.85" />
-                      <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.85" />
+                      <stop offset="0%" stopColor="#059669" stopOpacity="0.85" />
+                      <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0.85" />
                     </linearGradient>
                   </defs>
 
@@ -219,7 +219,7 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
                     fill="url(#funnelGrad)" 
                     opacity="0.45"
                   />
-                  <text x="160" y="211" textAnchor="middle" fill="#7c2d12" fontSize="9" fontWeight="extrabold">
+                  <text x="160" y="211" textAnchor="middle" fill="#115e59" fontSize="9" fontWeight="extrabold">
                     TOTAL OUTCOME: {clicked} LEADS ({totalCtr}% CTR)
                   </text>
                 </svg>
@@ -240,10 +240,10 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-xs font-semibold">
                     <span className="text-stone-500">Recipients Open Rate</span>
-                    <span className="text-orange-500 font-bold">{readRate}%</span>
+                    <span className="text-teal-605 font-bold text-teal-650">{readRate}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-orange-500" style={{ width: `${readRate}%` }} />
+                    <div className="h-full bg-teal-600 animate-pulse-soft" style={{ width: `${readRate}%` }} />
                   </div>
                 </div>
 
@@ -257,8 +257,8 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
                   </div>
                 </div>
 
-                <div className="bg-orange-50/40 p-2.5 rounded-xl border border-orange-100 text-[10px] text-stone-500 leading-relaxed">
-                  <HelpCircle className="w-3.5 h-3.5 text-orange-500 inline mr-1.5 shrink-0" />
+                <div className="bg-emerald-50/20 p-2.5 rounded-xl border border-emerald-100 text-[10px] text-stone-500 leading-relaxed">
+                  <HelpCircle className="w-3.5 h-3.5 text-emerald-600 inline mr-1.5 shrink-0" />
                   <strong>Tip:</strong> Re-engage leads that fall off the funnel using follow-up campaign broadcasts.
                 </div>
               </div>
@@ -267,16 +267,16 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
           </div>
 
           {/* Tabbed CRM Recipients Listing & Action logs */}
-          <div className="bg-white rounded-2xl border border-orange-100 shadow-sm overflow-hidden flex flex-col">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
             
             {/* Tabs Selector Header */}
-            <div className="flex border-b border-orange-100 bg-orange-50/30 shrink-0">
+            <div className="flex border-b border-slate-100 bg-slate-50 shrink-0">
               <button
                 onClick={() => setActiveSubTab("recipients")}
-                className={`flex-1 py-3 text-xs font-bold text-center border-r border-orange-100/50 transition-colors ${
+                className={`flex-1 py-3 text-xs font-bold text-center border-r border-slate-100/50 transition-colors ${
                   activeSubTab === "recipients" 
-                    ? "bg-white text-orange-600 border-b-2 border-b-orange-500" 
-                    : "text-stone-500 hover:bg-orange-50/20"
+                    ? "bg-white text-emerald-600 border-b-2 border-b-emerald-600" 
+                    : "text-stone-500 hover:bg-slate-50/20"
                 }`}
               >
                 Audience Segment ({campaignContacts.length})
@@ -285,8 +285,8 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
                 onClick={() => setActiveSubTab("logs")}
                 className={`flex-1 py-3 text-xs font-bold text-center transition-colors ${
                   activeSubTab === "logs" 
-                    ? "bg-white text-orange-600 border-b-2 border-b-orange-500" 
-                    : "text-stone-500 hover:bg-orange-50/20"
+                    ? "bg-white text-emerald-600 border-b-2 border-b-emerald-600" 
+                    : "text-stone-500 hover:bg-slate-50/20"
                 }`}
               >
                 Broadcast Logs ({campaignLogs.length})
@@ -320,8 +320,8 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
                             </>
                           ) : campaign.status === "Sending" || campaign.status === "Scheduled" ? (
                             <>
-                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse-soft" />
-                              <span className="text-[10px] font-bold text-amber-600 uppercase">Pending</span>
+                              <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-pulse-soft" />
+                              <span className="text-[10px] font-bold text-teal-650 uppercase">Pending</span>
                             </>
                           ) : (
                             <>
@@ -346,7 +346,7 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
                   <div className="space-y-2">
                     {campaignLogs.map((log) => (
                       <div key={log.id} className="p-3 bg-zinc-50 border border-zinc-200/60 rounded-xl text-xs font-mono select-text flex items-start gap-2.5">
-                        <span className="text-[10px] text-stone-400 font-bold bg-white px-2 py-0.5 rounded border border-orange-100 shrink-0">
+                        <span className="text-[10px] text-stone-450 font-bold bg-white px-2 py-0.5 rounded border border-slate-200 shrink-0">
                           {log.timestamp}
                         </span>
                         <div className="text-stone-700 leading-relaxed flex-1">
@@ -364,10 +364,10 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
         </div>
 
         {/* Drawer footer actions */}
-        <div className="p-4 border-t border-orange-100 bg-orange-50/20 flex justify-end shrink-0 select-none">
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end shrink-0 select-none">
           <button
             onClick={onClose}
-            className="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs rounded-xl shadow-md shadow-orange-600/10 cursor-pointer hover:scale-102 transition-all active:scale-98"
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/10 cursor-pointer hover:scale-102 transition-all active:scale-98"
           >
             Close Audit
           </button>

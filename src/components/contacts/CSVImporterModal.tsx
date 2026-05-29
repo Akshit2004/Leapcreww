@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Upload, X, CheckCircle2, AlertCircle } from "lucide-react";
 import Papa from "papaparse";
-import { useApp } from "../context/AppContext";
+import { useApp } from "../../context/AppContext";
 
 interface CSVImporterModalProps {
   orgId: string;
@@ -91,7 +91,7 @@ export const CSVImporterModal: React.FC<CSVImporterModalProps> = ({ orgId, isOpe
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-stone-100">
           <h3 className="font-semibold text-lg flex items-center gap-2">
-            <Upload className="w-5 h-5 text-orange-500" />
+            <Upload className="w-5 h-5 text-emerald-600" />
             Import CSV Contacts
           </h3>
           <button onClick={onClose} className="p-1 hover:bg-stone-100 rounded-full transition-colors text-stone-500 hover:text-stone-700">
@@ -105,16 +105,16 @@ export const CSVImporterModal: React.FC<CSVImporterModalProps> = ({ orgId, isOpe
             Upload a CSV file containing your contacts. Required column: <b>phone</b>. Optional columns: <b>name, email</b>.
           </p>
 
-          <div className="border-2 border-dashed border-stone-200 rounded-xl p-8 text-center hover:bg-stone-50 hover:border-orange-200 transition-colors relative group">
+          <div className="border-2 border-dashed border-stone-200 rounded-xl p-8 text-center hover:bg-stone-50 hover:border-emerald-200 transition-colors relative group">
             <input 
               type="file" 
               accept=".csv" 
               onChange={handleFile} 
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
-            <Upload className="w-8 h-8 mx-auto text-stone-300 group-hover:text-orange-400 mb-2 transition-colors" />
+            <Upload className="w-8 h-8 mx-auto text-stone-300 group-hover:text-emerald-500 mb-2 transition-colors" />
             <p className="text-sm font-medium text-stone-700">Click or drag CSV here</p>
-            {file && <p className="text-xs text-orange-600 mt-2 font-semibold truncate px-4">{file.name}</p>}
+            {file && <p className="text-xs text-emerald-600 mt-2 font-semibold truncate px-4">{file.name}</p>}
           </div>
 
           {error && (
@@ -142,7 +142,7 @@ export const CSVImporterModal: React.FC<CSVImporterModalProps> = ({ orgId, isOpe
           <button 
             onClick={handleUpload} 
             disabled={parsedContacts.length === 0 || loading}
-            className="px-4 py-2 bg-orange-600 text-white text-sm font-semibold rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+            className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
           >
             {loading ? "Importing..." : "Import Contacts"}
           </button>

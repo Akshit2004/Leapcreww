@@ -46,7 +46,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL(`/org/${orgId}?whatsapp=token_error`, request.url));
     }
 
-    const accessToken = tokenData.access_token;
+    let accessToken = tokenData.access_token;
+
+    // Exchange short-lived token (2 hours) for a long-lived token (60 days)
+    try {
+      const exchangeRes = await fetch(
+        `https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${accessToken}`,
+        { method: "GET" }
+      );
+      if (exchangeRes.ok) {
+        const exchangeData = await exchangeRes.json();
+        if (exchangeData.access_token) {
+          accessToken = exchangeData.access_token;
+          console.log("[WhatsApp Callback] Successfully exchanged short-lived token for long-lived 60-day token.");
+        }
+      } else {
+        console.warn("[WhatsApp Callback] Failed to exchange for long-lived token, falling back to short-lived token:", await exchangeRes.json());
+      }
+    } catch (exchangeErr) {
+      console.error("[WhatsApp Callback] Error exchanging for long-lived token:", exchangeErr);
+    }
 
     // Use the token to get the WABA ID
     const debugRes = await fetch(

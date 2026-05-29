@@ -4,15 +4,16 @@ import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useApp } from "../../../context/AppContext";
-import { Sidebar } from "../../../components/Sidebar";
-import { OverviewTab } from "../../../components/OverviewTab";
-import { InboxTab } from "../../../components/InboxTab";
-import { CampaignsTab } from "../../../components/CampaignsTab";
-import { TemplatesTab } from "../../../components/TemplatesTab";
-import { ChatbotTab } from "../../../components/ChatbotTab";
-import { MarketplaceTab } from "../../../components/MarketplaceTab";
-import { SettingsTab } from "../../../components/SettingsTab";
-import { AICopilotSidebar } from "../../../components/AICopilotSidebar";
+import { Sidebar } from "../../../components/layout/Sidebar";
+import { OverviewTab } from "../../../components/overview/OverviewTab";
+import { InboxTab } from "../../../components/inbox/InboxTab";
+import { CampaignsTab } from "../../../components/campaigns/CampaignsTab";
+import { TemplatesTab } from "../../../components/templates/TemplatesTab";
+import { ChatbotTab } from "../../../components/chatbot/ChatbotTab";
+import { MarketplaceTab } from "../../../components/marketplace/MarketplaceTab";
+import { SettingsTab } from "../../../components/settings/SettingsTab";
+import { AnalyticsTab } from "../../../components/analytics/AnalyticsTab";
+import { AICopilotSidebar } from "../../../components/layout/AICopilotSidebar";
 import { Loader, AlertCircle, Bot, Menu } from "lucide-react";
 
 export default function TenantDashboard() {
@@ -73,6 +74,8 @@ export default function TenantDashboard() {
     switch (activeTab) {
       case "overview":
         return <OverviewTab onNavigate={setActiveTab} />;
+      case "analytics":
+        return <AnalyticsTab />;
       case "inbox":
         return <InboxTab />;
       case "campaigns":
@@ -93,12 +96,20 @@ export default function TenantDashboard() {
   // Render authenticating screen
   if (status === "loading" || (loading && !errorMsg)) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-amber-50 text-orange-600 font-sans">
-        <div className="flex flex-col items-center gap-3.5 animate-pulse-soft">
-          <div className="w-12 h-12 rounded-2xl bg-orange-600 flex items-center justify-center shadow-lg shadow-orange-600/20">
-            <Loader className="w-6 h-6 animate-spin text-white" />
+      <div className="flex h-screen w-screen items-center justify-center bg-[#f4f6f5] text-emerald-600 font-sans relative overflow-hidden">
+        {/* Decorative blur rings */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-100 rounded-full blur-3xl opacity-30 animate-pulse-soft" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-100 rounded-full blur-3xl opacity-30 animate-pulse-soft" />
+        
+        <div className="flex flex-col items-center gap-4 animate-slide-up relative z-10">
+          <div className="w-16 h-16 rounded-3xl bg-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-600/30 animate-glow-pulse relative">
+            <Loader className="w-7 h-7 animate-spin text-white" />
+            <span className="absolute -inset-1 rounded-3xl border-2 border-emerald-400 opacity-20 animate-ping" />
           </div>
-          <span className="text-[10px] tracking-widest uppercase font-bold text-stone-500">Synchronizing PostgreSQL Sandbox...</span>
+          <div className="text-center space-y-1">
+            <span className="text-[11px] tracking-widest uppercase font-extrabold text-stone-600 block">WappFlow Portal</span>
+            <span className="text-[9px] tracking-wide font-medium text-stone-400 block uppercase">Synchronizing secure PostgreSQL sandbox...</span>
+          </div>
         </div>
       </div>
     );
@@ -107,18 +118,21 @@ export default function TenantDashboard() {
   // Render Access Error Screen
   if (errorMsg) {
     return (
-      <div className="min-h-screen bg-amber-50 flex flex-col justify-center items-center px-6 relative">
-        <div className="max-w-md bg-white border border-orange-100 p-8 rounded-3xl shadow-2xl space-y-6 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mx-auto border border-red-500/10">
-            <AlertCircle className="w-6 h-6" />
+      <div className="min-h-screen bg-[#f4f6f5] flex flex-col justify-center items-center px-6 relative overflow-hidden">
+        {/* Background decorative glow */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-80 h-80 bg-red-100/50 rounded-full blur-3xl opacity-60 animate-pulse-soft" />
+        
+        <div className="max-w-md w-full bg-white/80 backdrop-blur-md border border-slate-200/60 p-8 rounded-3xl shadow-xl space-y-6 text-center animate-slide-up relative z-10">
+          <div className="w-14 h-14 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mx-auto border border-red-200">
+            <AlertCircle className="w-6 h-6 animate-pulse" />
           </div>
           <div className="space-y-2">
-            <h3 className="font-bold text-stone-900 text-base">Workspace Access Refused</h3>
-            <p className="text-stone-500 text-xs leading-relaxed select-text">{errorMsg}</p>
+            <h3 className="font-extrabold text-slate-900 text-lg tracking-tight">Workspace Access Refused</h3>
+            <p className="text-stone-500 text-xs leading-relaxed select-text font-medium">{errorMsg}</p>
           </div>
           <button
             onClick={() => router.push("/login")}
-            className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs py-3 rounded-xl transition-all cursor-pointer"
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3.5 rounded-xl transition-all duration-300 hover:shadow-md hover:shadow-emerald-600/15 cursor-pointer"
           >
             Return to Login Portal
           </button>
@@ -128,7 +142,7 @@ export default function TenantDashboard() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-amber-50 font-sans">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#f4f6f5] font-sans">
       {/* 1. Left Sidebar Navigation */}
       <Sidebar 
         activeTab={activeTab} 
@@ -138,26 +152,26 @@ export default function TenantDashboard() {
       />
 
       {/* 2. Main Tab View Panels */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden bg-amber-50 relative">
+      <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#f4f6f5] relative">
         {/* Mobile Top Navigation Header */}
-        <header className="h-14 px-4 bg-white border-b border-orange-200 flex items-center justify-between shrink-0 lg:hidden select-none">
+        <header className="h-14 px-4 bg-white/80 backdrop-blur-md border-b border-slate-200/50 flex items-center justify-between shrink-0 lg:hidden select-none z-30">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="p-1.5 rounded-lg hover:bg-orange-50 text-stone-700 cursor-pointer"
+              className="p-1.5 rounded-xl hover:bg-emerald-50/80 text-stone-700 cursor-pointer transition-colors"
             >
               <Menu className="w-5.5 h-5.5" />
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center shadow-md shadow-emerald-600/20">
                 <Bot className="w-4 h-4 text-white" />
               </div>
-              <span className="font-bold text-sm tracking-wide text-stone-900">WappFlow</span>
+              <span className="font-extrabold text-sm tracking-tight text-slate-900">WappFlow</span>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse-soft" />
-            <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-500/10 uppercase">SaaS Sandbox</span>
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-soft" />
+            <span className="text-[9px] font-extrabold text-emerald-650 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200/20 uppercase tracking-wide">SaaS Sandbox</span>
           </div>
         </header>
 

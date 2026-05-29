@@ -1,262 +1,96 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, ReactNode, useRef } from "react";
+import React, { createContext, useContext, useCallback, ReactNode } from "react";
+import {
+  Organization,
+  Contact,
+  ChatHistory,
+  Campaign,
+  Template,
+  ChatbotNode,
+  Integration,
+  SystemLog,
+  Member,
+  AppContextType
+} from "./types";
+import { useSystemState } from "./useSystemState";
+import { useContactState } from "./useContactState";
+import { useCampaignState } from "./useCampaignState";
+import { useTemplateState } from "./useTemplateState";
+import { useChatState } from "./useChatState";
 
-export interface Organization {
-  id: string;
-  name?: string;
-  onboardingDismissed?: boolean;
-  [key: string]: unknown;
-}
-
-export interface Contact {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  source: string;
-  tags: string[];
-  status: "Active" | "Inactive";
-  lastMessage?: string;
-  lastMessageTime?: string;
-  unreadCount?: number;
-  assignedAgent?: string;
-}
-
-export interface Message {
-  id: string;
-  sender: "user" | "agent" | "system";
-  text: string;
-  timestamp: string;
-  status?: "sent" | "delivered" | "read";
-  buttons?: string[];
-}
-
-export interface ChatHistory {
-  [contactId: string]: Message[];
-}
-
-export interface Campaign {
-  id: string;
-  name: string;
-  targetTag: string;
-  templateName: string;
-  sent: number;
-  delivered: number;
-  read: number;
-  clicked: number;
-  status: "Completed" | "Active" | "Scheduled" | "Sending" | "Failed";
-  date: string;
-  scheduledAt?: string;
-  excludeTag?: string;
-  mediaType?: string;
-  mediaUrl?: string;
-  variables?: Array<{ key: string; type: "contact_field" | "static"; value: string }>;
-  delay?: number;
-  organizationId?: string;
-  createdAt?: string;
-}
-
-export interface Template {
-  id: string;
-  name: string;
-  body: string;
-  category: "Marketing" | "Utility" | "Authentication";
-  buttons: string[];
-  mediaType?: "none" | "image" | "video" | "document";
-  metaStatus?: "pending" | "approved" | "rejected";
-  metaId?: string;
-}
-
-export interface ChatbotNode {
-  id: string;
-  type: "trigger" | "message" | "question" | "delay";
-  title: string;
-  content: string;
-  options?: string[]; // for questions
-  delayTime?: number; // for delay in seconds
-  nextId?: string;
-  routes?: { [option: string]: string }; // routes for question options
-}
-
-export interface Integration {
-  id: string;
-  name: string;
-  description: string;
-  status: "connected" | "disconnected";
-  icon: string;
-  apiKey?: string;
-  webhookUrl?: string;
-}
-
-export interface SystemLog {
-  id: string;
-  timestamp: string;
-  type: "campaign" | "chat" | "integration" | "crm";
-  message: string;
-}
-
-export interface Member {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
-
-interface AppContextType {
-  organization: Organization | null;
-  contacts: Contact[];
-  campaigns: Campaign[];
-  templates: Template[];
-  chatHistory: ChatHistory;
-  chatbotNodes: ChatbotNode[];
-  integrations: Integration[];
-  systemLogs: SystemLog[];
-  members: Member[];
-  activeContactId: string | null;
-  setActiveContactId: (id: string | null) => void;
-  // Actions
-  addContact: (contact: Omit<Contact, "id">) => Contact;
-  updateContact: (id: string, updates: Partial<Contact>) => void;
-  deleteContact: (id: string) => void;
-  deleteCampaign: (id: string) => Promise<void>;
-  sendBroadcast: (campaign: { 
-    name: string; 
-    targetTag: string; 
-    templateName: string; 
-    organizationId: string;
-    variables?: Array<{ key: string; type: "contact_field" | "static"; value: string }>;
-    delay?: number;
-    scheduledAt?: string;
-    excludeTag?: string;
-    mediaType?: string;
-    mediaUrl?: string;
-  }) => Promise<void>;
-  sendLiveChatMessage: (contactId: string, text: string, sender?: "user" | "agent" | "system", buttons?: string[]) => void;
-  updateChatbotNodes: (nodes: ChatbotNode[], organizationId: string) => Promise<void>;
-  toggleIntegration: (id: string, config?: { apiKey?: string; webhookUrl?: string }) => void;
-  addSystemLog: (type: SystemLog["type"], message: string) => void;
-  clearSystemLogs: () => void;
-  submitMetaTemplate: (templateData: { 
-    name: string; 
-    category: string; 
-    body: string; 
-    buttons: string[]; 
-    mediaType: string; 
-    organizationId: string; 
-  }) => Promise<void>;
-  deleteTemplate: (id: string) => Promise<void>;
-  lockSync: () => void;
-  unlockSync: () => void;
-  refreshWorkspace: (orgId: string) => Promise<void>;
-  dismissOnboarding: (orgId: string) => Promise<void>;
-  initializeWorkspace: (data: {
-    organization: Organization | null;
-    contacts: Contact[];
-    campaigns: Campaign[];
-    templates: Template[];
-    chatHistory: ChatHistory;
-    chatbotNodes: ChatbotNode[];
-    integrations: Integration[];
-    systemLogs: SystemLog[];
-    members: Member[];
-  }) => void;
-}
+// Re-export all types to maintain complete backward compatibility
+export * from "./types";
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [chatHistory, setChatHistory] = useState<ChatHistory>({});
-  const [chatbotNodes, setChatbotNodes] = useState<ChatbotNode[]>([]);
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [systemLogs, setSystemLogs] = useState<SystemLog[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [activeContactId, setActiveContactId] = useState<string | null>(null);
+  const {
+    organization,
+    setOrganization,
+    integrations,
+    setIntegrations,
+    chatbotNodes,
+    setChatbotNodes,
+    systemLogs,
+    setSystemLogs,
+    members,
+    setMembers,
+    syncLockedRef,
+    lockSync,
+    unlockSync,
+    addSystemLog,
+    clearSystemLogs,
+    toggleIntegration,
+    dismissOnboarding,
+    updateChatbotNodes,
+  } = useSystemState();
 
-  // Helper: Format Time
-  const getCurrentTime = () => {
-    const d = new Date();
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  };
+  const {
+    contacts,
+    setContacts,
+    activeContactId,
+    setActiveContactId,
+    addContact,
+    updateContact,
+    deleteContact,
+  } = useContactState({
+    addSystemLog,
+    lockSync,
+    unlockSync,
+    setChatHistory: (val) => setChatHistory(val),
+  });
 
-  const addSystemLog = (type: SystemLog["type"], message: string) => {
-    const d = new Date();
-    const ts = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
-    setSystemLogs((prev) => [
-      { id: `log-${Date.now()}`, timestamp: ts, type, message },
-      ...prev.slice(0, 49), // cap at 50 logs
-    ]);
-  };
+  const {
+    chatHistory,
+    setChatHistory,
+    sendLiveChatMessage,
+  } = useChatState({
+    addSystemLog,
+    setContacts,
+  });
 
-  const clearSystemLogs = () => setSystemLogs([]);
+  const {
+    campaigns,
+    setCampaigns,
+    sendBroadcast,
+    deleteCampaign,
+  } = useCampaignState({
+    addSystemLog,
+    lockSync,
+    unlockSync,
+  });
 
-  const submitMetaTemplate = async (newTmpl: { 
-    name: string; 
-    category: string; 
-    body: string; 
-    buttons: string[]; 
-    mediaType: string; 
-    organizationId: string; 
-  }) => {
-    try {
-      addSystemLog("crm", `Submitting template "${newTmpl.name}" for Meta approval...`);
-      const res = await fetch("/api/whatsapp/create-template", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newTmpl),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        addSystemLog("crm", `Template approval submission failed: ${err.error}`);
-        return;
-      }
-
-      const data = await res.json();
-      setTemplates((prev) => [...prev, data.template]);
-      addSystemLog("crm", `Template "${data.template.name}" submitted successfully! Status: ${data.template.metaStatus}`);
-    } catch (err: unknown) {
-      addSystemLog("crm", `Template creation error: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
-    }
-  };
-
-  const deleteTemplate = async (id: string) => {
-    lockSync();
-    setTemplates((prev) => prev.filter((t) => t.id !== id));
-    try {
-      addSystemLog("crm", `Permanently deleting template ID ${id} from WappFlow and Meta...`);
-      const res = await fetch(`/api/whatsapp/delete-template/${id}`, {
-        method: "DELETE",
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        addSystemLog("crm", `Failed to delete template ID ${id} completely: ${err.error}`);
-      } else {
-        addSystemLog("crm", `Successfully deleted template ID ${id} from WappFlow and Meta.`);
-      }
-    } catch (err: unknown) {
-      addSystemLog("crm", `Error deleting template ID ${id}: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
-    } finally {
-      unlockSync();
-    }
-  };
-
-  const syncLockedRef = useRef(false);
-
-  const lockSync = useCallback(() => {
-    syncLockedRef.current = true;
-  }, []);
-
-  const unlockSync = useCallback(() => {
-    setTimeout(() => {
-      syncLockedRef.current = false;
-    }, 1500);
-  }, []);
+  const {
+    templates,
+    setTemplates,
+    submitMetaTemplate,
+    deleteTemplate,
+  } = useTemplateState({
+    addSystemLog,
+    lockSync,
+    unlockSync,
+  });
 
   const initializeWorkspace = useCallback((data: {
     organization: Organization | null;
@@ -286,7 +120,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } else {
       setActiveContactId(null);
     }
-  }, []);
+  }, [
+    syncLockedRef,
+    setOrganization,
+    setContacts,
+    setCampaigns,
+    setTemplates,
+    setChatHistory,
+    setChatbotNodes,
+    setIntegrations,
+    setSystemLogs,
+    setMembers,
+    setActiveContactId,
+  ]);
 
   const refreshWorkspace = useCallback(async (orgId: string) => {
     try {
@@ -299,246 +145,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.error("Refresh Workspace Error", err);
     }
   }, [initializeWorkspace]);
-
-  // Actions
-  const addContact = (newContact: Omit<Contact, "id">) => {
-    const id = `c-${Date.now()}`;
-    const contact: Contact = {
-      ...newContact,
-      id,
-      unreadCount: 0,
-    };
-    setContacts((prev) => [contact, ...prev]);
-    // Pre-populate empty chat history
-    setChatHistory((prev) => ({ ...prev, [id]: [] }));
-    addSystemLog("crm", `Added new contact: ${contact.name} (${contact.phone})`);
-    return contact;
-  };
-
-  const updateContact = async (id: string, updates: Partial<Contact>) => {
-    lockSync();
-    setContacts((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
-    );
-    if (updates.tags) {
-      addSystemLog("crm", `Updated tags for contact ID ${id}`);
-    }
-    try {
-      const res = await fetch(`/api/contact/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
-      if (!res.ok) {
-        addSystemLog("crm", `Failed to save contact updates for ID ${id} to sandbox database.`);
-      }
-    } catch (err: unknown) {
-      addSystemLog("crm", `Error updating contact ID ${id}: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
-    } finally {
-      unlockSync();
-    }
-  };
-
-  const deleteContact = async (id: string) => {
-    lockSync();
-    setContacts((prev) => prev.filter((c) => c.id !== id));
-    if (activeContactId === id) setActiveContactId(null);
-    try {
-      const res = await fetch(`/api/contact/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        addSystemLog("crm", `Failed to delete contact ID ${id} from sandbox database.`);
-      } else {
-        addSystemLog("crm", `Permanently deleted contact ID ${id}`);
-      }
-    } catch (err: unknown) {
-      addSystemLog("crm", `Error permanently deleting contact ID ${id}: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
-    } finally {
-      unlockSync();
-    }
-  };
-
-  const sendLiveChatMessage = (contactId: string, text: string, sender: "user" | "agent" | "system" = "agent", buttons?: string[]) => {
-    const time = getCurrentTime();
-    const newMsg: Message = {
-      id: `msg-${Date.now()}-${Math.random()}`,
-      sender,
-      text,
-      timestamp: time,
-      status: sender === "agent" ? "sent" : undefined,
-      buttons,
-    };
-
-    setChatHistory((prev) => {
-      const current = prev[contactId] || [];
-      return {
-        ...prev,
-        [contactId]: [...current, newMsg],
-      };
-    });
-
-    // Update last message in contact list
-    setContacts((prev) =>
-      prev.map((c) => {
-        if (c.id === contactId) {
-          const count = sender === "user" ? (c.unreadCount || 0) + 1 : c.unreadCount;
-          return {
-            ...c,
-            lastMessage: text.length > 35 ? text.substring(0, 32) + "..." : text,
-            lastMessageTime: time,
-            unreadCount: count,
-          };
-        }
-        return c;
-      })
-    );
-
-    // Dynamic System Logs
-    if (sender === "agent") {
-      addSystemLog("chat", `Agent sent WhatsApp message to ID ${contactId}`);
-      // Simulate delivered and read status updates
-      setTimeout(() => {
-        setChatHistory((prev) => {
-          const current = prev[contactId] || [];
-          return {
-            ...prev,
-            [contactId]: current.map((m) => (m.id === newMsg.id ? { ...m, status: "delivered" } : m)),
-          };
-        });
-      }, 1000);
-
-      setTimeout(() => {
-        setChatHistory((prev) => {
-          const current = prev[contactId] || [];
-          return {
-            ...prev,
-            [contactId]: current.map((m) => (m.id === newMsg.id ? { ...m, status: "read" } : m)),
-          };
-        });
-      }, 2500);
-    } else if (sender === "user") {
-      addSystemLog("chat", `Received WhatsApp message from ID ${contactId}`);
-    }
-  };
-
-  const sendBroadcast = async (campaignData: { 
-    name: string; 
-    targetTag: string; 
-    templateName: string; 
-    organizationId: string;
-    variables?: Array<{ key: string; type: "contact_field" | "static"; value: string }>;
-    delay?: number;
-    scheduledAt?: string;
-    excludeTag?: string;
-    mediaType?: string;
-    mediaUrl?: string;
-  }) => {
-    try {
-      const isScheduled = !!campaignData.scheduledAt;
-      addSystemLog(
-        "campaign", 
-        isScheduled 
-          ? `Scheduling broadcast '${campaignData.name}' for ${campaignData.scheduledAt}...` 
-          : `Launching broadcast '${campaignData.name}' asynchronously to CRM segment...`
-      );
-      
-      const res = await fetch("/api/whatsapp/campaign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(campaignData),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        addSystemLog("campaign", `Broadcast action failed: ${err.error}`);
-        return;
-      }
-
-      const data = await res.json();
-      setCampaigns((prev) => [data.campaign, ...prev]);
-      
-      addSystemLog(
-        "campaign", 
-        isScheduled 
-          ? `Broadcast successfully scheduled! Active date: ${new Date(campaignData.scheduledAt!).toLocaleString()}`
-          : `Broadcast launched successfully! Queueing dispatch to ${data.campaign.sent} matching leads.`
-      );
-    } catch (err: unknown) {
-      addSystemLog("campaign", `Broadcast action error: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
-    }
-  };
-
-  const deleteCampaign = async (id: string) => {
-    lockSync();
-    setCampaigns((prev) => prev.filter((c) => c.id !== id));
-    try {
-      const res = await fetch(`/api/whatsapp/campaign/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        addSystemLog("campaign", `Failed to delete campaign ID ${id} from sandbox database.`);
-      } else {
-        addSystemLog("campaign", `Permanently deleted campaign ID ${id}`);
-      }
-    } catch (err: unknown) {
-      addSystemLog("campaign", `Error permanently deleting campaign ID ${id}: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
-    } finally {
-      unlockSync();
-    }
-  };
-
-  const updateChatbotNodes = async (newNodes: ChatbotNode[], organizationId: string) => {
-    setChatbotNodes(newNodes);
-    try {
-      addSystemLog("crm", `Saving visual chatbot flow layout (${newNodes.length} nodes) to PostgreSQL...`);
-      const res = await fetch(`/api/org/${organizationId}/chatbot`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nodes: newNodes }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        addSystemLog("crm", `Failed to save chatbot flow nodes: ${err.error}`);
-      } else {
-        addSystemLog("crm", "Chatbot Builder nodes successfully persisted to PostgreSQL.");
-      }
-    } catch (err: unknown) {
-      addSystemLog("crm", `Error saving chatbot layout: ${err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Unknown error"}`);
-    }
-  };
-
-  const toggleIntegration = (id: string, config?: { apiKey?: string; webhookUrl?: string }) => {
-    setIntegrations((prev) =>
-      prev.map((it) => {
-        if (it.id === id) {
-          const nextStatus = it.status === "connected" ? "disconnected" : "connected";
-          addSystemLog("integration", `${it.name} Integration is now ${nextStatus.toUpperCase()}`);
-          return {
-            ...it,
-            status: nextStatus,
-            apiKey: config?.apiKey || it.apiKey,
-            webhookUrl: config?.webhookUrl || it.webhookUrl,
-          };
-        }
-        return it;
-      })
-    );
-  };
-
-  const dismissOnboarding = async (orgId: string) => {
-    try {
-      setOrganization((prev: Organization | null) => (prev ? { ...prev, onboardingDismissed: true } : prev));
-      await fetch(`/api/org/${orgId}/onboarding`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dismissed: true }),
-      });
-    } catch (err: unknown) {
-      console.error(err);
-    }
-  };
 
   return (
     <AppContext.Provider

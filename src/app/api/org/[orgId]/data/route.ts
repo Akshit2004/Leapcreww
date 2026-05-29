@@ -43,6 +43,7 @@ export async function GET(
         whatsappConnected: true,
         whatsappBusinessAccountId: true,
         whatsappAccessToken: true,
+        walletBalance: true, // Fetch generated walletBalance column
         onboardingDismissed: true,
       }
     });
@@ -81,22 +82,25 @@ export async function GET(
 
     // Sync templates with Meta before querying them
     const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
-    const syncConfigs: Array<{ wabaId: string; accessToken: string }> = [];
+    const syncConfigs: Array<{ wabaId: string; accessToken: string; isCustom: boolean }> = [];
     
     // Multi-tenant Sync Configuration: Exclusive isolation
     if (organization.whatsappConnected && organization.whatsappBusinessAccountId && organization.whatsappAccessToken) {
       syncConfigs.push({
         wabaId: organization.whatsappBusinessAccountId,
-        accessToken: organization.whatsappAccessToken
+        accessToken: organization.whatsappAccessToken,
+        isCustom: true
       });
     } else if (process.env.WHATSAPP_BUSINESS_ACCOUNT_ID && process.env.WHATSAPP_ACCESS_TOKEN) {
       syncConfigs.push({
         wabaId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID,
-        accessToken: process.env.WHATSAPP_ACCESS_TOKEN
+        accessToken: process.env.WHATSAPP_ACCESS_TOKEN,
+        isCustom: false
       });
     }
 
     const allMetaTemplates = new Map();
+    let hasSuccessfulSync = false;
 
     for (const config of syncConfigs) {
       try {
@@ -112,6 +116,29 @@ export async function GET(
           for (const t of metaTemplates) {
             if (t.id) allMetaTemplates.set(t.id, t);
           }
+          hasSuccessfulSync = true;
+        } else {
+          console.error(`⚠️ Failed to sync templates from Meta (Status ${metaRes.status})`);
+          if (config.isCustom && metaRes.status === 401) {
+            console.warn(`[Token Expired] Org ${orgId} access token has expired or is invalid. Disconnecting WhatsApp...`);
+            await prisma.organization.update({
+              where: { id: orgId },
+              data: { whatsappConnected: false }
+            });
+            const d = new Date();
+            const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+            await prisma.systemLog.create({
+              data: {
+                timestamp: timeStr,
+                type: "crm",
+                message: "⚠️ Your WhatsApp integration session has expired. Please re-authenticate under settings to restore synchronization.",
+                organizationId: orgId
+              }
+            });
+            if (organization) {
+              organization.whatsappConnected = false;
+            }
+          }
         }
       } catch (syncErr) {
         console.error("⚠️ Failed to sync templates from Meta:", syncErr);
@@ -120,7 +147,7 @@ export async function GET(
 
     const activeMetaIds = Array.from(allMetaTemplates.keys());
 
-    if (activeMetaIds.length > 0 || syncConfigs.length > 0) {
+    if (hasSuccessfulSync) {
       // 1. Purge all local templates for this org that are NOT in Meta's returned active list or don't have a metaId
       await prisma.template.deleteMany({
         where: {

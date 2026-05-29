@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
       data: {
         whatsappBusinessAccountId: wabaId,
         whatsappPhoneNumberId: phoneNumberId,
+        whatsappConnected: true,
       }
     });
 

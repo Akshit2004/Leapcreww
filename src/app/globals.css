@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fffbeb;
-  --foreground: #1c1917;
+  --background: #f4f6f5;
+  --foreground: #0f172a;
   
   /* WhatsApp / CRM Colors */
   --wa-green-light: #25d366;
   --wa-green: #128c7e;
   --wa-green-dark: #075e54;
-  --wa-chat-bg: #fffbeb;
+  --wa-chat-bg: #f4f6f5;
   --wa-chat-bg-dark: #0b141a;
-  --wa-bubble-sent: #ffedd5;
+  --wa-bubble-sent: #d9fdd3;
   --wa-bubble-sent-dark: #005c4b;
   --wa-bubble-received: #ffffff;
   --wa-bubble-received-dark: #202c33;
@@ -31,8 +31,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #fffbeb;
-    --foreground: #1c1917;
+    --background: #0b141a;
+    --foreground: #f4f6f5;
   }
 }
 
@@ -64,22 +64,24 @@ body {
 
 /* Glassmorphism Panels */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.08), 0 2px 8px -1px rgba(148, 163, 184, 0.04);
 }
 
 .dark .glass-panel {
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(51, 65, 85, 0.5);
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(51, 65, 85, 0.4);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
 }
 
 /* Keyframes & Animations */
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -90,7 +92,7 @@ body {
 @keyframes slideInLeft {
   from {
     opacity: 0;
-    transform: translateX(-16px);
+    transform: translateX(-20px);
   }
   to {
     opacity: 1;
@@ -105,20 +107,54 @@ body {
   }
   50% {
     opacity: 0.6;
-    transform: scale(0.96);
+    transform: scale(0.95);
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
   }
 }
 
 .animate-slide-up {
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-slide-in-left {
-  animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideInLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-pulse-soft {
-  animation: pulseSoft 2s infinite ease-in-out;
+  animation: pulseSoft 2.4s infinite ease-in-out;
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2s infinite ease-in-out;
+}
+
+/* Premium Card hover properties */
+.card-hover-premium {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-hover-premium:hover {
+  transform: translateY(-3px) scale(1.005);
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.05), 0 8px 16px -6px rgba(16, 185, 129, 0.03);
+}
+
+/* Terminal & Dot Grids */
+.terminal-grid {
+  background-image: radial-gradient(rgba(16, 185, 129, 0.04) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.canvas-dot-grid {
+  background-image: radial-gradient(rgba(100, 116, 139, 0.08) 1.2px, transparent 1.2px);
+  background-size: 20px 20px;
 }
 
 /* WhatsApp message backgrounds */
@@ -135,3 +171,15 @@ body {
 .dark .wa-bubble-received-bg {
   background-color: var(--wa-bubble-received-dark);
 }
+
+/* Custom WhatsApp chat wallpaper */
+.wa-chat-doodle {
+  background-color: #efeae2;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%23e5ddd5' fill-opacity='0.45'%3E%3Cpath d='M15 15h2v2h-2zm4 0h2v2h-2zm-8 4h2v2h-2zm0 4h2v2h-2zm8 0h2v2h-2zm-4 4h2v2h-2zm12-4h2v2h-2zm0 4h2v2h-2zm4 4h2v2h-2zm0 4h2v2h-2zm-4 4h2v2h-2zm-8 0h2v2h-2zm-4-4h2v2h-2zm0-8h2v2h-2zm8 4h2v2h-2zm-4 8h2v2h-2zm12 4h2v2h-2zm-4 4h2v2h-2zm-8 0h2v2h-2zm0-4h2v2h-2zm4-4h2v2h-2zm12-12h2v2h-2zm0 4h2v2h-2z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.dark .wa-chat-doodle {
+  background-color: #0b141a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%231f2c34' fill-opacity='0.25'%3E%3Cpath d='M15 15h2v2h-2zm4 0h2v2h-2zm-8 4h2v2h-2zm0 4h2v2h-2zm8 0h2v2h-2zm-4 4h2v2h-2zm12-4h2v2h-2zm0 4h2v2h-2zm4 4h2v2h-2zm0 4h2v2h-2zm-4 4h2v2h-2zm-8 0h2v2h-2zm-4-4h2v2h-2zm0-8h2v2h-2zm8 4h2v2h-2zm-4 8h2v2h-2zm12 4h2v2h-2zm-4 4h2v2h-2zm-8 0h2v2h-2zm0-4h2v2h-2zm4-4h2v2h-2zm12-12h2v2h-2zm0 4h2v2h-2z'/%3E%3C/g%3E%3C/svg%3E");
+}
+

@@ -167,8 +167,8 @@ export const MarketplaceTab: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-amber-50">
-        <RefreshCw className="w-6 h-6 text-orange-500 animate-spin" />
+      <div className="flex-1 flex items-center justify-center bg-slate-50">
+        <RefreshCw className="w-6 h-6 text-emerald-600 animate-spin" />
       </div>
     );
   }
@@ -177,7 +177,7 @@ export const MarketplaceTab: React.FC = () => {
     <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-orange-600 flex items-center justify-center shadow-lg shadow-orange-600/20">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/20">
             <ShoppingBag className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -189,7 +189,7 @@ export const MarketplaceTab: React.FC = () => {
           <button
             onClick={() => setActiveSection("overview")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeSection === "overview" ? "bg-orange-600 text-white shadow-md" : "bg-white text-stone-600 hover:bg-orange-50"
+              activeSection === "overview" ? "bg-emerald-600 text-white shadow-md" : "bg-white text-stone-600 hover:bg-emerald-50/50"
             }`}
           >
             Overview
@@ -197,7 +197,7 @@ export const MarketplaceTab: React.FC = () => {
           <button
             onClick={() => setActiveSection("products")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeSection === "products" ? "bg-orange-600 text-white shadow-md" : "bg-white text-stone-600 hover:bg-orange-50"
+              activeSection === "products" ? "bg-emerald-600 text-white shadow-md" : "bg-white text-stone-600 hover:bg-emerald-50/50"
             }`}
           >
             Products
@@ -205,7 +205,7 @@ export const MarketplaceTab: React.FC = () => {
           <button
             onClick={() => setActiveSection("orders")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeSection === "orders" ? "bg-orange-600 text-white shadow-md" : "bg-white text-stone-600 hover:bg-orange-50"
+              activeSection === "orders" ? "bg-emerald-600 text-white shadow-md" : "bg-white text-stone-600 hover:bg-emerald-50/50"
             }`}
           >
             Orders
@@ -216,7 +216,7 @@ export const MarketplaceTab: React.FC = () => {
       {activeSection === "overview" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard icon={Package} label="Total Products" value={stats.totalProducts} color="blue" />
-          <StatCard icon={ShoppingBag} label="Active Products" value={stats.activeProducts} color="orange" />
+          <StatCard icon={ShoppingBag} label="Active Products" value={stats.activeProducts} color="emerald" />
           <StatCard icon={Package} label="Pending Orders" value={stats.pendingOrders} color="red" />
           <StatCard icon={ExternalLink} label="Revenue (paid)" value={`₹${(stats.revenue / 100).toFixed(2)}`} color="green" />
         </div>
@@ -232,19 +232,19 @@ export const MarketplaceTab: React.FC = () => {
                 placeholder="Search products..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400"
               />
             </div>
             <button
               onClick={() => { resetForm(); setShowAddProduct(true); }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-xl text-xs font-bold hover:bg-orange-500 transition-all cursor-pointer shadow-md"
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-500 transition-all cursor-pointer shadow-md shadow-emerald-600/10"
             >
               <Plus className="w-4 h-4" /> Add Product
             </button>
           </div>
 
           {showAddProduct && (
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 border border-stone-200 space-y-4">
+            <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 border border-stone-200 space-y-4 animate-fade-in">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-stone-900">{editProduct ? "Edit Product" : "Add Product"}</h3>
                 <button type="button" onClick={resetForm} className="p-1 hover:bg-stone-100 rounded-lg cursor-pointer">
@@ -262,13 +262,13 @@ export const MarketplaceTab: React.FC = () => {
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 resize-none"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 resize-none"
                   rows={3}
                 />
               </div>
               <button
                 type="submit"
-                className="w-full py-2.5 bg-orange-600 text-white rounded-xl text-xs font-bold hover:bg-orange-500 transition-all cursor-pointer"
+                className="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-500 transition-all cursor-pointer shadow-md shadow-emerald-600/10"
               >
                 {editProduct ? "Update Product" : "Create Product"}
               </button>
@@ -308,7 +308,7 @@ export const MarketplaceTab: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => startEdit(product)} className="p-1.5 hover:bg-orange-50 rounded-lg text-stone-500 hover:text-orange-600 cursor-pointer">
+                          <button onClick={() => startEdit(product)} className="p-1.5 hover:bg-emerald-50 rounded-lg text-stone-500 hover:text-emerald-600 cursor-pointer">
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button onClick={() => deleteProduct(product.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-stone-500 hover:text-red-500 cursor-pointer">
@@ -380,7 +380,7 @@ export const MarketplaceTab: React.FC = () => {
 function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: string | number; color: string }) {
   const colors: Record<string, string> = {
     blue: "bg-blue-50 text-blue-600 border-blue-100",
-    orange: "bg-orange-50 text-orange-600 border-orange-100",
+    emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
     red: "bg-red-50 text-red-600 border-red-100",
     green: "bg-green-50 text-green-600 border-green-100",
   };
@@ -406,7 +406,7 @@ function InputField({ label, value, onChange, type = "text", required }: { label
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
-        className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+        className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
       />
     </div>
   );
@@ -417,7 +417,7 @@ function StatusBadge({ status }: { status: string }) {
     pending: "bg-yellow-50 text-yellow-700",
     confirmed: "bg-blue-50 text-blue-700",
     processing: "bg-purple-50 text-purple-700",
-    shipped: "bg-orange-50 text-orange-700",
+    shipped: "bg-sky-50 text-sky-700",
     delivered: "bg-green-50 text-green-700",
     cancelled: "bg-red-50 text-red-700",
   };

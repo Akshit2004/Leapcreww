@@ -17,7 +17,7 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { useApp, Contact, Campaign, Template } from "../context/AppContext";
+import { useApp, Contact, Campaign, Template } from "../../context/AppContext";
 
 type CopilotAction = 
   | { type: "go_to_tab"; data: { tab?: string } }
@@ -79,7 +79,7 @@ function generateSuggestions(
       id: "unread",
       title: `${unreadContacts.length} unread message${unreadContacts.length > 1 ? "s" : ""}`,
       description: `Open inbox to view pending conversations`,
-      icon: <MessageSquare className="w-4 h-4 text-orange-500" />,
+      icon: <MessageSquare className="w-4 h-4 text-emerald-600" />,
       priority: unreadContacts.length > 5 ? "high" : "medium",
       action: { type: "go_to_tab", data: { tab: "inbox" } },
     });
@@ -93,7 +93,7 @@ function generateSuggestions(
       id: "pending-templates",
       title: `${pendingTemplates.length} template${pendingTemplates.length > 1 ? "s" : ""} pending approval`,
       description: `Waiting for Meta to review`,
-      icon: <Clock className="w-4 h-4 text-amber-500" />,
+      icon: <Clock className="w-4 h-4 text-teal-600" />,
       priority: "medium",
       action: { type: "go_to_tab", data: { tab: "templates" } },
     });
@@ -385,7 +385,7 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
         id: `ai-sug-${Date.now()}-${i}`,
         title: s.title,
         description: s.description,
-        icon: <Sparkles className="w-4 h-4 text-orange-500" />,
+        icon: <Sparkles className="w-4 h-4 text-emerald-600" />,
         priority: "medium" as const,
         action: s.action,
       }));
@@ -460,7 +460,7 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-2xl shadow-xl shadow-orange-600/30 hover:bg-orange-500 transition-all duration-200 cursor-pointer group"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-600/30 hover:bg-emerald-500 transition-all duration-200 cursor-pointer group"
       >
         <Sparkles className="w-5 h-5" />
         <span className="text-sm font-semibold">AI Copilot</span>
@@ -476,15 +476,15 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
         className="fixed inset-0 bg-black/20 z-40 cursor-pointer"
       />
 
-      <aside className="fixed top-0 right-0 z-50 h-full w-[400px] max-w-[95vw] bg-white shadow-2xl border-l border-orange-200 flex flex-col select-none animate-slide-in-left">
-        <div className="shrink-0 bg-orange-600 text-white px-5 py-4 flex items-center justify-between">
+      <aside className="fixed top-0 right-0 z-50 h-full w-[400px] max-w-[95vw] bg-white shadow-2xl border-l border-emerald-200 flex flex-col select-none animate-slide-in-left">
+        <div className="shrink-0 bg-emerald-600 text-white px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
               <h2 className="font-bold text-sm">AI Copilot</h2>
-              <span className="text-[10px] text-orange-200 flex items-center gap-1.5">
+              <span className="text-[10px] text-emerald-200 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
                 Online &middot; Can execute actions
               </span>
@@ -498,11 +498,11 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar bg-amber-50/50">
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50">
           {messages.length === 1 && suggestions.length > 0 && (
             <div className="px-4 pt-4 pb-2">
               <div className="flex items-center gap-2 mb-3">
-                <Lightbulb className="w-4 h-4 text-amber-500" />
+                <Lightbulb className="w-4 h-4 text-emerald-600" />
                 <span className="text-xs font-semibold text-stone-600 uppercase tracking-wider">
                   Suggestions
                 </span>
@@ -512,18 +512,18 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
                   <button
                     key={s.id}
                     onClick={() => s.action && handleActionClick(s.action)}
-                    className="w-full flex items-start gap-3 p-3 rounded-xl bg-white border border-orange-100 hover:border-orange-300 hover:shadow-md transition-all text-left cursor-pointer group"
+                    className="w-full flex items-start gap-3 p-3 rounded-xl bg-white border border-emerald-100 hover:border-emerald-300 hover:shadow-md transition-all text-left cursor-pointer group"
                   >
                     <div className="mt-0.5 shrink-0">{s.icon}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-stone-800 group-hover:text-orange-700">
+                      <div className="text-sm font-medium text-stone-800 group-hover:text-emerald-700">
                         {s.title}
                       </div>
                       <div className="text-xs text-stone-500 mt-0.5">
                         {s.description}
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-stone-400 group-hover:text-orange-500 shrink-0 mt-0.5" />
+                    <ChevronRight className="w-4 h-4 text-stone-400 group-hover:text-emerald-500 shrink-0 mt-0.5" />
                   </button>
                 ))}
               </div>
@@ -541,8 +541,8 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
                   <div
                     className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-xs font-bold ${
                       msg.role === "user"
-                        ? "bg-orange-100 text-orange-700"
-                        : "bg-orange-600 text-white"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-emerald-600 text-white"
                     }`}
                   >
                     {msg.role === "user" ? "U" : "AI"}
@@ -550,8 +550,8 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
                   <div
                     className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
                       msg.role === "user"
-                        ? "bg-orange-600 text-white rounded-tr-md"
-                        : "bg-white border border-orange-100 text-stone-700 rounded-tl-md shadow-sm"
+                        ? "bg-emerald-600 text-white rounded-tr-md"
+                        : "bg-white border border-emerald-100 text-stone-700 rounded-tl-md shadow-sm"
                     }`}
                   >
                     {msg.content}
@@ -565,10 +565,10 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
                         key={s.id}
                         onClick={() => s.action && handleActionClick(s.action)}
                         disabled={executingAction !== null}
-                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white border border-orange-100 hover:border-orange-300 hover:bg-orange-50/50 transition-all text-left cursor-pointer group disabled:opacity-50"
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white border border-emerald-100 hover:border-emerald-300 hover:bg-emerald-50/20 transition-all text-left cursor-pointer group disabled:opacity-50"
                       >
-                        <Sparkles className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                        <span className="text-xs text-stone-700 group-hover:text-orange-700 flex-1">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span className="text-xs text-stone-700 group-hover:text-emerald-700 flex-1">
                           {s.title}
                         </span>
                         <ChevronRight className="w-3.5 h-3.5 text-stone-400 shrink-0" />
@@ -581,12 +581,12 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
 
             {isLoading && (
               <div className="flex gap-3">
-                <div className="w-7 h-7 rounded-full bg-orange-600 flex items-center justify-center shrink-0">
+                <div className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
                   <Bot className="w-3.5 h-3.5 text-white" />
                 </div>
-                <div className="bg-white border border-orange-100 rounded-2xl rounded-tl-md px-4 py-3 shadow-sm">
+                <div className="bg-white border border-emerald-100 rounded-2xl rounded-tl-md px-4 py-3 shadow-sm">
                   <div className="flex items-center gap-2">
-                    <Loader className="w-4 h-4 text-orange-500 animate-spin" />
+                    <Loader className="w-4 h-4 text-emerald-500 animate-spin" />
                     <span className="text-sm text-stone-500">
                       {executingAction ? `Executing: ${executingAction}...` : "Thinking..."}
                     </span>
@@ -599,7 +599,7 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-orange-100 bg-white p-4">
+        <div className="shrink-0 border-t border-emerald-100 bg-white p-4">
           <div className="flex items-center gap-2">
             <input
               ref={inputRef}
@@ -608,13 +608,13 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask me to do something..."
-              className="flex-1 px-4 py-2.5 bg-amber-50 border border-orange-200 rounded-xl text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all"
+              className="flex-1 px-4 py-2.5 bg-slate-50 border border-emerald-200 rounded-xl text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
               disabled={isLoading}
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || isLoading}
-              className="p-2.5 rounded-xl bg-orange-600 text-white hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shrink-0"
+              className="p-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shrink-0"
             >
               <Send className="w-4 h-4" />
             </button>
