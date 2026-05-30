@@ -1,6 +1,8 @@
 import { prisma } from "./prisma";
 import * as crypto from "crypto";
 
+// ─── Types ──────────────────────────────────────────────────────────────────
+
 export interface WhatsAppMessage {
   to: string;
   text?: string;
@@ -43,7 +45,20 @@ export interface WhatsAppWebhookPayload {
   }[];
 }
 
-export async function getWhatsAppConfig(orgId?: string): Promise<{
+export interface WhatsAppResponseData {
+  messages?: Array<{ id: string }>;
+}
+
+// ─── Config ─────────────────────────────────────────────────────────────────
+
+const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
+
+/**
+ * Get WhatsApp configuration for an organization.
+ * Uses the platform-level System User Token (from env) combined with
+ * the tenant's WABA ID and Phone Number ID (from database).
+ */
+export async function getWhatsAppConfig(orgId: string): Promise<{
   phoneNumberId: string;
   accessToken: string;
   businessAccountId: string;
@@ -51,24 +66,126 @@ export async function getWhatsAppConfig(orgId?: string): Promise<{
   verifyToken: string;
   appSecret: string;
 } | null> {
-  // Always return null to force secure local sandbox simulation mode
-  return null;
-}
+  const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
+  if (!systemToken) {
+    console.warn("[WhatsApp] WHATSAPP_SYSTEM_USER_TOKEN not configured");
+    return null;
+  }
 
-export interface WhatsAppResponseData {
-  messages?: Array<{ id: string }>;
-}
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: {
+      whatsappBusinessAccountId: true,
+      whatsappPhoneNumberId: true,
+      whatsappConnected: true,
+    },
+  });
 
-export async function sendWhatsAppMessage(
-  message: WhatsAppMessage,
-  orgId?: string
-): Promise<{ ok: boolean; data?: WhatsAppResponseData; error?: string }> {
-  // Direct Sandbox bypass - always run in local simulation/sandbox mode
-  return { 
-    ok: false, 
-    error: "Local Sandbox Mode active. Messages are recorded locally and routed to the Team Inbox." 
+  if (!org || !org.whatsappConnected || !org.whatsappBusinessAccountId || !org.whatsappPhoneNumberId) {
+    return null;
+  }
+
+  return {
+    phoneNumberId: org.whatsappPhoneNumberId,
+    accessToken: systemToken,
+    businessAccountId: org.whatsappBusinessAccountId,
+    apiVersion: WHATSAPP_API_VERSION,
+    verifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "wappflow_verify_2026",
+    appSecret: process.env.WHATSAPP_APP_SECRET || "",
   };
 }
+
+// ─── Send Message ───────────────────────────────────────────────────────────
+
+/**
+ * Send a WhatsApp message using the platform System User Token.
+ * Routes to the correct phone number via the org's stored phoneNumberId.
+ */
+export async function sendWhatsAppMessage(
+  message: WhatsAppMessage,
+  orgId: string
+): Promise<{ ok: boolean; data?: WhatsAppResponseData; error?: string }> {
+  const config = await getWhatsAppConfig(orgId);
+
+  if (!config) {
+    return {
+      ok: false,
+      error: "WhatsApp not configured for this organization. Complete Embedded Signup first.",
+    };
+  }
+
+  const { phoneNumberId, accessToken, apiVersion } = config;
+  const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
+
+  // Build the request body based on message type
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body: Record<string, any> = {
+    messaging_product: "whatsapp",
+    to: message.to,
+  };
+
+  if (message.template) {
+    // Template message
+    body.type = "template";
+    body.template = message.template;
+  } else if (message.image) {
+    // Image message
+    body.type = "image";
+    body.image = message.image;
+  } else if (message.video) {
+    // Video message
+    body.type = "video";
+    body.video = message.video;
+  } else if (message.document) {
+    // Document message
+    body.type = "document";
+    body.document = message.document;
+  } else if (message.buttons && message.buttons.length > 0) {
+    // Interactive button message
+    body.type = "interactive";
+    body.interactive = {
+      type: "button",
+      body: { text: message.text || "" },
+      action: {
+        buttons: message.buttons.map((btn) => ({
+          type: btn.type,
+          reply: btn.reply,
+        })),
+      },
+    };
+  } else {
+    // Plain text message
+    body.type = "text";
+    body.text = { body: message.text || "" };
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMsg = data.error?.message || `HTTP ${response.status}`;
+      console.error(`[WhatsApp API Error] ${errorMsg}`, data.error);
+      return { ok: false, error: errorMsg };
+    }
+
+    return { ok: true, data };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error("[WhatsApp API Exception]", errorMsg);
+    return { ok: false, error: errorMsg };
+  }
+}
+
+// ─── Webhook Verification ───────────────────────────────────────────────────
 
 export function verifyWebhook(
   mode: string | null,

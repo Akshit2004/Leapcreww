@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { getWhatsAppConfig } from "@/lib/whatsapp";
+
+const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
 
 export async function DELETE(
   request: NextRequest,
@@ -29,38 +30,40 @@ export async function DELETE(
       return NextResponse.json({ error: "Template not found" }, { status: 404 });
     }
 
-    // 2. Perform Meta Graph API Deletion if it is a real template and config exists
+    // 2. Perform Meta Graph API Deletion if it is a real template
     const isMock = template.metaId?.startsWith("mock-meta-") || !template.metaId;
     
     if (!isMock) {
-      const config = await getWhatsAppConfig(template.organizationId);
+      const org = await prisma.organization.findUnique({
+        where: { id: template.organizationId },
+        select: { whatsappBusinessAccountId: true },
+      });
 
-      if (config && config.businessAccountId) {
-        const { accessToken, apiVersion, businessAccountId: wabaId } = config;
-        const url = `https://graph.facebook.com/${apiVersion}/${wabaId}/message_templates?name=${template.name}`;
+      const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
+      const wabaId = org?.whatsappBusinessAccountId;
+
+      if (systemToken && wabaId) {
+        const url = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${wabaId}/message_templates?name=${template.name}`;
         
         try {
-          console.log(`[Meta API Deletion] Sending delete request for template name '${template.name}' to WABA ${wabaId}...`);
+          console.log(`[Meta API] Deleting template '${template.name}' from WABA ${wabaId}...`);
           const metaRes = await fetch(url, {
             method: "DELETE",
             headers: {
-              "Authorization": `Bearer ${accessToken}`
+              "Authorization": `Bearer ${systemToken}`
             }
           });
 
           const metaData = await metaRes.json();
           if (metaRes.ok) {
-            console.log(`[Meta API Deletion Success] Deleted template '${template.name}' from WABA ${wabaId}`);
+            console.log(`[Meta API] Deleted template '${template.name}' from WABA ${wabaId}`);
           } else {
-            // Log warning but proceed with local deletion so we don't trap the user
-            console.warn(`[Meta API Deletion Warning] Meta returned error during deletion:`, metaData.error?.message);
+            console.warn(`[Meta API] Deletion warning:`, metaData.error?.message);
           }
         } catch (apiErr) {
-          console.error(`[Meta API Deletion Exception] Failed to reach Meta Graph API:`, apiErr);
+          console.error(`[Meta API Exception] Failed to reach Graph API:`, apiErr);
         }
       }
-    } else {
-      console.log(`[Sandbox Mock Deletion] Bypassing Meta Graph API delete call for mock template '${template.name}'`);
     }
 
     // 3. Delete from local PostgreSQL database

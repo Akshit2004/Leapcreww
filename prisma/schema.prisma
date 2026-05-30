@@ -25,14 +25,11 @@ model Organization {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  // WhatsApp Business credentials (per-org after Embedded Signup)
+  // WhatsApp Business identifiers (per-org, stored after Embedded Signup)
   whatsappBusinessAccountId String?
-  whatsappPhoneNumberId    String?
-  metaBusinessId           String?
-  wabaScopedUserId         String?
-  whatsappConnected        Boolean    @default(false)
-  whatsappAccessToken      String?
-  whatsappAuthMethod       String     @default("embedded_signup")
+  whatsappPhoneNumberId     String?
+  metaBusinessId            String?
+  whatsappConnected         Boolean    @default(false)
 
   // Wallet & SaaS credits
   walletBalance            Float      @default(0.0)

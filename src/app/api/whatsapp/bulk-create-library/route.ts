@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { getWhatsAppConfig } from "@/lib/whatsapp";
+
+const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
 
 const LIBRARY_TEMPLATES = [
   {
@@ -54,20 +55,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing organizationId" }, { status: 400 });
     }
 
-    const config = await getWhatsAppConfig(organizationId);
-    if (!config) {
-      return NextResponse.json({ error: "WhatsApp API not configured" }, { status: 400 });
-    }
+    // Get org's WABA ID and use System User Token
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { whatsappBusinessAccountId: true, whatsappConnected: true },
+    });
 
-    const { accessToken, apiVersion, businessAccountId: wabaId } = config;
-    if (!wabaId) {
-      return NextResponse.json({ error: "No WhatsApp Business Account linked to this organization" }, { status: 400 });
+    const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
+    const wabaId = org?.whatsappBusinessAccountId;
+
+    if (!systemToken || !wabaId || !org?.whatsappConnected) {
+      return NextResponse.json({ error: "WhatsApp not configured. Complete Embedded Signup first." }, { status: 400 });
     }
 
     // First fetch all existing templates from Meta to check for name conflicts
-    const listUrl = `https://graph.facebook.com/${apiVersion}/${wabaId}/message_templates?limit=250`;
+    const listUrl = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${wabaId}/message_templates?limit=250`;
     const listRes = await fetch(listUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${systemToken}` },
     });
     const listData = await listRes.json();
     const existingMetaTemplates: Record<string, string> = {};
@@ -81,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     for (const tpl of LIBRARY_TEMPLATES) {
       try {
-        // If template already exists in Meta, skip creation (it already went through)
+        // If template already exists in Meta, skip creation
         if (existingMetaTemplates[tpl.name]) {
           const metaId = existingMetaTemplates[tpl.name];
           const existing = await prisma.template.findFirst({
@@ -140,11 +144,11 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        const createUrl = `https://graph.facebook.com/${apiVersion}/${wabaId}/message_templates`;
+        const createUrl = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${wabaId}/message_templates`;
         const metaRes = await fetch(createUrl, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${systemToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({

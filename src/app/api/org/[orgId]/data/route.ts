@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/route";
 import { prisma } from "../../../../../lib/prisma";
 
+const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ orgId: string }> }
@@ -42,9 +44,9 @@ export async function GET(
         slug: true,
         whatsappConnected: true,
         whatsappBusinessAccountId: true,
-        whatsappAccessToken: true,
-        whatsappAuthMethod: true,
-        walletBalance: true, // Fetch generated walletBalance column
+        whatsappPhoneNumberId: true,
+        metaBusinessId: true,
+        walletBalance: true,
         onboardingDismissed: true,
       }
     });
@@ -81,40 +83,18 @@ export async function GET(
       orderBy: { createdAt: "desc" },
     });
 
-    // Sync templates with Meta before querying them
-    const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
-    const syncConfigs: Array<{ wabaId: string; accessToken: string; isCustom: boolean }> = [];
-    
+    // ─── Template Sync with Meta (System User Token) ──────────────────────
     const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
-    const developerWabaId = process.env.DEVELOPER_WABA_ID || process.env.WHATSAPP_DEVELOPER_WABA_ID;
-
-    // 1. Sync Customer's WABA templates (using customer's own access token)
-    if (organization.whatsappConnected && organization.whatsappBusinessAccountId && organization.whatsappAccessToken) {
-      syncConfigs.push({
-        wabaId: organization.whatsappBusinessAccountId,
-        accessToken: organization.whatsappAccessToken,
-        isCustom: true
-      });
-    }
-
-    // 2. Sync Shared Developer templates (using developer's shared system token and WABA ID)
-    if (systemToken && developerWabaId) {
-      syncConfigs.push({
-        wabaId: developerWabaId,
-        accessToken: systemToken,
-        isCustom: false
-      });
-    }
-
     const allMetaTemplates = new Map();
     let hasSuccessfulSync = false;
 
-    for (const config of syncConfigs) {
+    // Sync templates from the tenant's connected WABA using System User Token
+    if (systemToken && organization.whatsappConnected && organization.whatsappBusinessAccountId) {
       try {
         const metaRes = await fetch(
-          `https://graph.facebook.com/${apiVersion}/${config.wabaId}/message_templates?limit=250`,
+          `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${organization.whatsappBusinessAccountId}/message_templates?limit=250`,
           {
-            headers: { Authorization: `Bearer ${config.accessToken}` },
+            headers: { Authorization: `Bearer ${systemToken}` },
           }
         );
         if (metaRes.ok) {
@@ -135,7 +115,7 @@ export async function GET(
     const activeMetaIds = Array.from(allMetaTemplates.keys());
 
     if (hasSuccessfulSync) {
-      // 1. Purge all local templates for this org that are NOT in Meta's returned active list or don't have a metaId
+      // 1. Purge all local templates for this org that are NOT in Meta's returned active list
       await prisma.template.deleteMany({
         where: {
           organizationId: orgId,
@@ -197,7 +177,6 @@ export async function GET(
         });
 
         if (existingTemplates.length > 0) {
-          // Update the first one and delete any duplicates to keep DB clean
           const primary = existingTemplates[0];
           await prisma.template.update({
             where: { id: primary.id },
@@ -219,7 +198,6 @@ export async function GET(
             });
           }
         } else {
-          // Create new record
           await prisma.template.create({
             data: {
               organizationId: orgId,
@@ -270,7 +248,6 @@ export async function GET(
     // 3. Assemble relational Message rows into dynamic ChatHistory map structure
     const chatHistory: Record<string, unknown[]> = {};
     
-    // Initialize contact buckets
     contacts.forEach((c) => {
       chatHistory[c.id] = [];
     });

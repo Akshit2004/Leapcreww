@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
         whatsappConnected: true,
         whatsappBusinessAccountId: true,
         whatsappPhoneNumberId: true,
-        whatsappAuthMethod: true,
+        metaBusinessId: true,
       },
     });
 
@@ -32,10 +32,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      connected: true,
-      businessAccountId: "sandbox-waba-999",
-      phoneNumberId: "+1 (555) 0199",
-      authMethod: "sandbox",
+      connected: org.whatsappConnected,
+      businessAccountId: org.whatsappBusinessAccountId,
+      phoneNumberId: org.whatsappPhoneNumberId,
+      businessId: org.metaBusinessId,
     });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });

@@ -22,8 +22,18 @@ export async function POST(request: NextRequest) {
         whatsappPhoneNumberId: null,
         metaBusinessId: null,
         whatsappConnected: false,
-        whatsappAccessToken: null,
-        whatsappAuthMethod: "embedded_signup",
+      },
+    });
+
+    // Log the disconnection
+    const d = new Date();
+    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    await prisma.systemLog.create({
+      data: {
+        timestamp: timeStr,
+        type: "crm",
+        message: "WhatsApp Business Account disconnected from workspace.",
+        organizationId: orgId,
       },
     });
 

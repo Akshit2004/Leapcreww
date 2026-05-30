@@ -3,6 +3,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 
+const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
+
+/**
+ * GET /api/whatsapp/portfolio?orgId=xxx
+ * 
+ * Returns the org's connected WABA and its phone numbers.
+ * Uses the System User Token to query Graph API.
+ * The tenant only sees their own connected WABA — not all WABAs in the platform.
+ */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,8 +27,7 @@ export async function GET(request: NextRequest) {
         metaBusinessId: true,
         whatsappBusinessAccountId: true,
         whatsappPhoneNumberId: true,
-        whatsappAccessToken: true,
-        whatsappAuthMethod: true,
+        whatsappConnected: true,
       }
     });
 
@@ -27,47 +35,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
     }
 
-
-
-    const token = org.whatsappAccessToken;
+    const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
     const portfolios: { wabaId: string; name: string; phoneNumbers: unknown[] }[] = [];
 
-    if (token) {
-      const wabaIds = new Set<string>();
+    // Only fetch portfolio data if org has a connected WABA and system token is available
+    if (systemToken && org.whatsappBusinessAccountId) {
+      try {
+        const [wabaRes, phoneRes] = await Promise.all([
+          fetch(
+            `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${org.whatsappBusinessAccountId}?fields=id,name`,
+            { headers: { Authorization: `Bearer ${systemToken}` } }
+          ),
+          fetch(
+            `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${org.whatsappBusinessAccountId}/phone_numbers?fields=id,display_phone_number,quality_rating,verified_name`,
+            { headers: { Authorization: `Bearer ${systemToken}` } }
+          ),
+        ]);
 
-      // 1. Fetch assigned WABAs directly from the customer's token
-      const assignedRes = await fetch(
-        `https://graph.facebook.com/v21.0/me/whatsapp_business_accounts?fields=id,name&access_token=${token}`
-      );
-      if (assignedRes.ok) {
-        const assignedData = await assignedRes.json();
-        for (const w of assignedData.data || []) {
-          wabaIds.add(w.id);
+        if (wabaRes.ok) {
+          const wabaData = await wabaRes.json();
+          const phoneNumbers = phoneRes.ok ? (await phoneRes.json()).data ?? [] : [];
+          portfolios.push({
+            wabaId: wabaData.id,
+            name: wabaData.name || `WABA (${wabaData.id})`,
+            phoneNumbers,
+          });
         }
+      } catch (fetchErr) {
+        console.error("[Portfolio] Failed to fetch WABA data:", fetchErr);
       }
-      // 2. Always include the currently stored WABA
-      if (org.whatsappBusinessAccountId) {
-        wabaIds.add(org.whatsappBusinessAccountId);
-      }
-
-      // Fetch details + phone numbers for each WABA
-      await Promise.all(
-        Array.from(wabaIds).map(async (wabaId) => {
-          const [wabaRes, phoneRes] = await Promise.all([
-            fetch(`https://graph.facebook.com/v21.0/${wabaId}?fields=id,name&access_token=${token}`),
-            fetch(`https://graph.facebook.com/v21.0/${wabaId}/phone_numbers?fields=id,display_phone_number,quality_rating&access_token=${token}`)
-          ]);
-          if (wabaRes.ok) {
-            const wabaData = await wabaRes.json();
-            const phoneNumbers = phoneRes.ok ? (await phoneRes.json()).data ?? [] : [];
-            portfolios.push({
-              wabaId: wabaData.id,
-              name: wabaData.name || `WABA (${wabaData.id})`,
-              phoneNumbers,
-            });
-          }
-        })
-      );
     }
 
     return NextResponse.json({
@@ -80,7 +76,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-
+/**
+ * POST /api/whatsapp/portfolio
+ * 
+ * Switch active WABA and phone number for this org.
+ * Used during onboarding when tenant selects their WABA/phone from Embedded Signup.
+ */
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);

@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { prisma } from "../../../../lib/prisma";
 
+const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -28,57 +30,34 @@ export async function GET(request: NextRequest) {
     let dbStatus = template.metaStatus;
     let metaData = null;
 
-    // Sandbox Mock Template Auto-Approval Simulator
+    // Sandbox Mock Template Auto-Approval Simulator (for local testing)
     if (template.metaId.startsWith("mock-meta-")) {
       const ageMs = Date.now() - new Date(template.createdAt).getTime();
-      // Auto-approve after 12 seconds in WappFlow Sandbox
       if (ageMs > 12000) {
         dbStatus = "approved";
-        console.log(`[Sandbox Approval Simulator] Auto-approving template '${template.name}' (${template.id}) after simulated compliance audit.`);
       } else {
         dbStatus = "pending";
       }
       metaData = { status: dbStatus.toUpperCase(), simulated: true };
     } else {
-      // Real Meta API verification
-      const org = await prisma.organization.findUnique({
-        where: { id: template.organizationId },
-        select: { whatsappAccessToken: true }
-      });
-
-      const accessToken = org?.whatsappAccessToken;
-      const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
+      // Real Meta API verification using System User Token
       const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
 
-      if (!accessToken && !systemToken) {
-        return NextResponse.json({ error: "WhatsApp API not configured" }, { status: 500 });
+      if (!systemToken) {
+        return NextResponse.json({ error: "WhatsApp System User Token not configured" }, { status: 500 });
       }
 
-      // Query template status from Meta
-      let metaRes = await fetch(
-        `https://graph.facebook.com/${apiVersion}/${template.metaId}?fields=status`,
+      // Query template status from Meta using System User Token
+      const metaRes = await fetch(
+        `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${template.metaId}?fields=status`,
         {
-          headers: { Authorization: `Bearer ${accessToken || systemToken}` },
+          headers: { Authorization: `Bearer ${systemToken}` },
         }
       );
-
-      // If it fails and we have a system token, retry with system user token (e.g. for developer shared templates)
-      if (!metaRes.ok && accessToken && systemToken) {
-        const retryRes = await fetch(
-          `https://graph.facebook.com/${apiVersion}/${template.metaId}?fields=status`,
-          {
-            headers: { Authorization: `Bearer ${systemToken}` },
-          }
-        );
-        if (retryRes.ok) {
-          metaRes = retryRes;
-        }
-      }
 
       metaData = await metaRes.json();
 
       if (!metaRes.ok) {
-        // Meta API error — return current DB status instead of failing
         console.warn(`[Template Status] Meta API error for ${template.metaId}:`, metaData.error?.message);
         return NextResponse.json({ metaStatus: dbStatus, metaData: null, metaError: metaData.error?.message });
       }
@@ -94,7 +73,6 @@ export async function GET(request: NextRequest) {
         data: { metaStatus: dbStatus },
       });
 
-      // Log the approval inside System Logs
       const d = new Date();
       const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
       await prisma.systemLog.create({
