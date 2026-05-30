@@ -42,6 +42,8 @@ export async function GET(
         slug: true,
         whatsappConnected: true,
         whatsappBusinessAccountId: true,
+        whatsappAccessToken: true,
+        whatsappAuthMethod: true,
         walletBalance: true, // Fetch generated walletBalance column
         onboardingDismissed: true,
       }
@@ -84,11 +86,23 @@ export async function GET(
     const syncConfigs: Array<{ wabaId: string; accessToken: string; isCustom: boolean }> = [];
     
     const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
-    if (organization.whatsappConnected && organization.whatsappBusinessAccountId && systemToken) {
+    const developerWabaId = process.env.DEVELOPER_WABA_ID || process.env.WHATSAPP_DEVELOPER_WABA_ID;
+
+    // 1. Sync Customer's WABA templates (using customer's own access token)
+    if (organization.whatsappConnected && organization.whatsappBusinessAccountId && organization.whatsappAccessToken) {
       syncConfigs.push({
         wabaId: organization.whatsappBusinessAccountId,
-        accessToken: systemToken,
+        accessToken: organization.whatsappAccessToken,
         isCustom: true
+      });
+    }
+
+    // 2. Sync Shared Developer templates (using developer's shared system token and WABA ID)
+    if (systemToken && developerWabaId) {
+      syncConfigs.push({
+        wabaId: developerWabaId,
+        accessToken: systemToken,
+        isCustom: false
       });
     }
 

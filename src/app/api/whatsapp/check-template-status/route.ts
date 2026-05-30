@@ -41,19 +41,39 @@ export async function GET(request: NextRequest) {
       metaData = { status: dbStatus.toUpperCase(), simulated: true };
     } else {
       // Real Meta API verification
-      const accessToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
-      const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
+      const org = await prisma.organization.findUnique({
+        where: { id: template.organizationId },
+        select: { whatsappAccessToken: true }
+      });
 
-      if (!accessToken) {
+      const accessToken = org?.whatsappAccessToken;
+      const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
+      const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
+
+      if (!accessToken && !systemToken) {
         return NextResponse.json({ error: "WhatsApp API not configured" }, { status: 500 });
       }
 
-      const metaRes = await fetch(
+      // Query template status from Meta
+      let metaRes = await fetch(
         `https://graph.facebook.com/${apiVersion}/${template.metaId}?fields=status`,
         {
-          headers: { Authorization: `Bearer ${accessToken}` },
+          headers: { Authorization: `Bearer ${accessToken || systemToken}` },
         }
       );
+
+      // If it fails and we have a system token, retry with system user token (e.g. for developer shared templates)
+      if (!metaRes.ok && accessToken && systemToken) {
+        const retryRes = await fetch(
+          `https://graph.facebook.com/${apiVersion}/${template.metaId}?fields=status`,
+          {
+            headers: { Authorization: `Bearer ${systemToken}` },
+          }
+        );
+        if (retryRes.ok) {
+          metaRes = retryRes;
+        }
+      }
 
       metaData = await metaRes.json();
 

@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
         whatsappPhoneNumberId: null,
         metaBusinessId: null,
         whatsappConnected: false,
+        whatsappAccessToken: null,
+        whatsappAuthMethod: "embedded_signup",
       },
     });
 

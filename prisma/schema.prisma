@@ -3,7 +3,8 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 model User {
@@ -30,6 +31,8 @@ model Organization {
   metaBusinessId           String?
   wabaScopedUserId         String?
   whatsappConnected        Boolean    @default(false)
+  whatsappAccessToken      String?
+  whatsappAuthMethod       String     @default("embedded_signup")
 
   // Wallet & SaaS credits
   walletBalance            Float      @default(0.0)

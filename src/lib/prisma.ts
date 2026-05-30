@@ -5,16 +5,12 @@ import { Pool } from "pg";
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
 const createPrismaClient = () => {
-  const url = new URL(process.env.DATABASE_URL!);
+  const connectionString = process.env.DATABASE_URL!;
   const pool = new Pool({
-    host: url.hostname,
-    port: parseInt(url.port || "6543"),
-    database: url.pathname.slice(1),
-    user: url.username,
-    password: decodeURIComponent(url.password),
-    max: 5,
+    connectionString,
+    max: 3,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 5000,
     ssl: { rejectUnauthorized: false },
   });
   const adapter = new PrismaPg(pool);

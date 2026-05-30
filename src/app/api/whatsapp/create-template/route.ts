@@ -124,11 +124,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Sandbox Mock Fallback if Meta API is absent/failed
+    // Sandbox Mock Fallback if Meta API is absent/failed (Instantly auto-approved for Sandbox)
     if (!metaId) {
       metaId = `mock-meta-${Date.now()}`;
-      metaStatus = "pending";
-      console.log(`[Sandbox Mock] Local template scheduled: Mock ID ${metaId}`);
+      metaStatus = "approved";
+      console.log(`[Sandbox Mock] Local template auto-approved: Mock ID ${metaId}`);
     }
 
     // Save in Prisma DB

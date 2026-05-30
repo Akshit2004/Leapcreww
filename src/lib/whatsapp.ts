@@ -43,47 +43,17 @@ export interface WhatsAppWebhookPayload {
   }[];
 }
 
-export async function getWhatsAppConfig(orgId?: string) {
-  const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
-  const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
-  const verifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "wappflow_verify_2026";
-  const appSecret = process.env.WHATSAPP_APP_SECRET;
-
-  if (!systemToken || !appSecret) {
-    return null;
-  }
-
-  if (!orgId) {
-    return null;
-  }
-
-  try {
-    const org = await prisma.organization.findUnique({
-      where: { id: orgId },
-      select: {
-        whatsappConnected: true,
-        whatsappPhoneNumberId: true,
-        whatsappBusinessAccountId: true,
-      },
-    });
-
-    if (org?.whatsappConnected && org.whatsappPhoneNumberId) {
-      return {
-        phoneNumberId: org.whatsappPhoneNumberId,
-        accessToken: systemToken,
-        businessAccountId: org.whatsappBusinessAccountId || "",
-        apiVersion,
-        verifyToken,
-        appSecret,
-      };
-    }
-  } catch {
-    return null;
-  }
-
+export async function getWhatsAppConfig(orgId?: string): Promise<{
+  phoneNumberId: string;
+  accessToken: string;
+  businessAccountId: string;
+  apiVersion: string;
+  verifyToken: string;
+  appSecret: string;
+} | null> {
+  // Always return null to force secure local sandbox simulation mode
   return null;
 }
-
 
 export interface WhatsAppResponseData {
   messages?: Array<{ id: string }>;
@@ -93,62 +63,11 @@ export async function sendWhatsAppMessage(
   message: WhatsAppMessage,
   orgId?: string
 ): Promise<{ ok: boolean; data?: WhatsAppResponseData; error?: string }> {
-  const config = await getWhatsAppConfig(orgId);
-  if (!config) {
-    return { ok: false, error: "WhatsApp API not configured. Connect a WhatsApp Business number first." };
-  }
-
-  const { phoneNumberId, accessToken, apiVersion } = config;
-
-  const body: Record<string, unknown> = {
-    messaging_product: "whatsapp",
-    recipient_type: "individual",
-    to: message.to,
+  // Direct Sandbox bypass - always run in local simulation/sandbox mode
+  return { 
+    ok: false, 
+    error: "Local Sandbox Mode active. Messages are recorded locally and routed to the Team Inbox." 
   };
-
-  if (message.buttons) {
-    body.type = "interactive";
-    body.interactive = {
-      type: "button",
-      body: { text: message.text || "" },
-      action: { buttons: message.buttons },
-    };
-  } else if (message.text) {
-    body.type = "text";
-    body.text = { preview_url: true, body: message.text };
-  } else if (message.template) {
-    body.type = "template";
-    body.template = message.template;
-  } else if (message.image) {
-    body.type = "image";
-    body.image = message.image;
-  } else if (message.video) {
-    body.type = "video";
-    body.video = message.video;
-  } else if (message.document) {
-    body.type = "document";
-    body.document = message.document;
-  }
-
-  try {
-    const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      return { ok: false, data, error: data.error?.message || "WhatsApp API request failed" };
-    }
-    return { ok: true, data };
-  } catch (err: unknown) {
-    return { ok: false, error: err instanceof Error ? (err instanceof Error ? err.message : String(err)) : "Network error sending WhatsApp message" };
-  }
 }
 
 export function verifyWebhook(

@@ -53,11 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { contacts } = useApp();
   const { data: session } = useSession();
 
-  const [waConnected, setWaConnected] = useState(false);
-  const [waPhoneNumberId, setWaPhoneNumberId] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [connectError, setConnectError] = useState("");
-  const [hasSystemAccess, setHasSystemAccess] = useState<boolean | null>(null);
+  const [waConnected, setWaConnected] = useState(true);
 
   const [isHovered, setIsHovered] = useState(false);
   const isExpanded = isHovered;
@@ -88,105 +84,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
-  // ─── API Effects ────────────────────────────────────────────────
-  useEffect(() => {
-    const fetchStatus = async () => {
-      if (!orgId) return;
-      try {
-        const res = await fetch(`/api/whatsapp/status?orgId=${orgId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setWaConnected(data.connected);
-          setWaPhoneNumberId(data.phoneNumberId || null);
-        }
-        const accessRes = await fetch(`/api/whatsapp/partner-invite?orgId=${orgId}`);
-        if (accessRes.ok) {
-          const accessData = await accessRes.json();
-          setHasSystemAccess(accessData.hasAccess);
-        }
-      } catch {}
-    };
-    fetchStatus();
-  }, [orgId]);
+  // ─── API Effects (Sandbox Mode Permanently Active) ──────────────
 
-  useEffect(() => {
-    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
-    if (!appId || typeof window === "undefined") return;
-    if (window.FB) {
-      window.FB.init({ appId, cookie: true, xfbml: true, version: "v21.0" });
-      return;
-    }
-    window.fbAsyncInit = function () {
-      window.FB?.init({ appId, cookie: true, xfbml: true, version: "v21.0" });
-      window.FB?.AppEvents.logPageView();
-    };
-    ((d, s, id) => {
-      const fjs = d.getElementsByTagName(s)[0];
-      if (d.getElementById(id)) return;
-      const script = d.createElement(s) as HTMLScriptElement;
-      script.id = id;
-      script.src = "https://connect.facebook.net/en_US/sdk.js";
-      fjs?.parentNode?.insertBefore(script, fjs);
-    })(document, "script", "facebook-jssdk");
-  }, []);
-
-  // ─── WhatsApp Handlers ──────────────────────────────────────────
-  const handleConnectWhatsApp = () => {
-    setConnectError("");
-    if (typeof window !== "undefined" && window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
-      setConnectError("HTTPS required. Deploy to Vercel or use a HTTPS proxy for local dev.");
-      return;
-    }
-    if (!window.FB) {
-      setConnectError("Facebook SDK not loaded. Please refresh.");
-      return;
-    }
-    setConnecting(true);
-    window.FB.login((response) => {
-      if (response.authResponse) {
-        const token = response.authResponse.accessToken;
-        fetch("/api/whatsapp/connect", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fbToken: token, orgId }),
-        })
-          .then((res) => res.json())
-          .then(async (data) => {
-            if (data.error) { setConnectError(data.error); }
-            else {
-              setWaConnected(true);
-              setWaPhoneNumberId(data.phoneNumberId);
-              // Check system user access after connect
-              const accessRes = await fetch(`/api/whatsapp/partner-invite?orgId=${orgId}`);
-              if (accessRes.ok) {
-                const accessData = await accessRes.json();
-                setHasSystemAccess(accessData.hasAccess);
-              }
-            }
-          })
-          .catch(() => setConnectError("Network error. Try again."))
-          .finally(() => setConnecting(false));
-      } else {
-        setConnectError("Facebook login cancelled or failed.");
-        setConnecting(false);
-      }
-    }, {
-      scope: "whatsapp_business_management,whatsapp_business_messaging,business_management",
-    });
-  };
-
-  const handleDisconnect = async () => {
-    try {
-      await fetch("/api/whatsapp/disconnect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId }),
-      });
-      setWaConnected(false);
-      setWaPhoneNumberId(null);
-      setHasSystemAccess(null);
-    } catch {}
-  };
+  // ─── WhatsApp Sandbox Active (No Meta SDK script load) ──────────
 
   return (
     <>
@@ -290,91 +190,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        {/* WhatsApp Connection Status */}
-        <div className="px-4 pt-3 pb-2 shrink-0 bg-white border-t border-stone-200 relative z-10">
-          <div
-            data-stagger-pos="0.85"
-            className="transition-all duration-300 overflow-hidden w-full"
-          >
-            {waConnected ? (
-              <div>
-                <div className="flex items-center gap-2.5 p-2 border border-stone-200 bg-[#fafaf9] transition-all duration-300">
-                  <div className="relative shrink-0">
-                    <div className="w-8 h-8 bg-wa-green text-white flex items-center justify-center">
-                       <CheckCircle2 className="w-4.5 h-4.5" />
-                     </div>
-                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-wa-green border border-white rounded-full" />
-                  </div>
-                  <div
-                    data-stagger-pos="0.88"
-                    className={`flex-1 min-w-[130px] transition-all duration-300 ${
-                      isExpanded ? "opacity-100 translate-x-0" : "lg:opacity-0 lg:-translate-x-4 lg:pointer-events-none"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] font-bold text-stone-900 leading-none">WhatsApp Live</p>
-                        <p className="text-[9px] text-stone-500 font-bold mt-1 leading-none uppercase">
-                          {waPhoneNumberId ? `ID: ${waPhoneNumberId.slice(0, 10)}…` : "Linked"}
-                        </p>
-                      </div>
-                      <button
-                        onClick={handleDisconnect}
-                        className="p-1 rounded-none text-stone-400 hover:text-stone-900 hover:bg-stone-200/50 transition-all duration-200 cursor-pointer"
-                        title="Disconnect WhatsApp"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                {hasSystemAccess === false && (
-                  <div className="flex items-center gap-1.5 px-2 py-1.5 bg-amber-50 border-x border-b border-amber-200">
-                    <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
-                    <span className="text-[8px] font-bold text-amber-700 uppercase leading-tight">
-                      System User not configured
-                    </span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2 p-2 border border-stone-200 bg-white transition-all duration-300">
-                <div className="flex items-center gap-2.5">
-                  <div className="relative shrink-0">
-                    <div className="w-8 h-8 bg-stone-100 text-stone-500 flex items-center justify-center border border-stone-200">
-                      <Smartphone className="w-4.5 h-4.5" />
-                    </div>
-                  </div>
-                  <div
-                    data-stagger-pos="0.88"
-                    className={`flex-1 min-w-[130px] transition-all duration-300 ${
-                      isExpanded ? "opacity-100 translate-x-0" : "lg:opacity-0 lg:-translate-x-4 lg:pointer-events-none"
-                    }`}
-                  >
-                    {connectError && (
-                      <p className="text-[8.5px] text-stone-600 font-bold flex items-center gap-1 mb-1 leading-tight uppercase">
-                        <AlertCircle className="w-3 h-3 shrink-0" />
-                        {connectError}
-                      </p>
-                    )}
-                    <button
-                      onClick={handleConnectWhatsApp}
-                      disabled={connecting}
-                      className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[9px] font-bold bg-wa-green text-white hover:bg-white hover:text-wa-green border border-wa-green transition-all duration-200 cursor-pointer rounded-none uppercase tracking-wider"
-                    >
-                      {connecting ? (
-                        <Loader className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Smartphone className="w-3 h-3" />
-                      )}
-                      {connecting ? "Linking…" : "Connect WABA"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* Bottom Profile / Signout */}
         <div className="p-4 border-t border-stone-200 bg-white shrink-0 relative z-10">
