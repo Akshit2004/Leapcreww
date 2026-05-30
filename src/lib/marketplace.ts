@@ -362,7 +362,7 @@ export async function handleMarketplaceMessage(
       await sendWhatsAppMessage({
         to: formatPhoneNumber(phone),
         text: `✅ Payment verified! Your order *${latestOrder.orderId}* is confirmed.\n\nReply *ORDERS* to check status anytime.`,
-      });
+      }, orgId);
     } else {
       let linkStr = "";
       if (latestOrder.razorpayOrderId && latestOrder.razorpayOrderId.startsWith("plink_")) {
@@ -383,7 +383,7 @@ export async function handleMarketplaceMessage(
         to: formatPhoneNumber(phone),
         text: `⚠️ Your payment for order *${latestOrder.orderId}* has not been cleared yet.${linkStr}\n\nOnce paid, please reply *CONFIRM* again.`,
         buttons: linkStr ? [{ type: "reply", reply: { id: "confirm_order", title: "✅ Paid" } }] : undefined
-      });
+      }, orgId);
     }
     return true;
   }

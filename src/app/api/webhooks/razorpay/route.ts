@@ -70,7 +70,7 @@ Thank you for your order *${order.orderId}*!
 
 We'll notify you when it ships. Reply *ORDERS* to check status anytime.`;
 
-      await sendWhatsAppMessage({ to: cleanPhone, text });
+      await sendWhatsAppMessage({ to: cleanPhone, text }, order.organizationId);
     }
 
     if (event === "payment.failed" || event === "payment_link.cancelled") {
@@ -92,7 +92,7 @@ We'll notify you when it ships. Reply *ORDERS* to check status anytime.`;
           await sendWhatsAppMessage({
             to: cleanPhone,
             text: "❌ *Payment Failed*\n\nYour payment didn't go through. Please try again or use a different payment method.\n\nReply *CHECKOUT* to retry.",
-          });
+          }, order.organizationId);
         }
       }
     }
