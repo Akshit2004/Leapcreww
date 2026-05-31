@@ -598,8 +598,8 @@ export const CampaignsTab: React.FC = () => {
                   {/* Template Body Live Preview with variables compiled */}
                   {activeTemplate && (
                     <div className="bg-stone-50 p-4 rounded-none border border-stone-200 space-y-3">
-                      <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
-                        <Eye className="w-3.5 h-3.5 text-stone-500" />
+                      <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-600 flex items-center gap-1.5">
+                        <Eye className="w-3.5 h-3.5 text-stone-600" />
                         Interactive Mapped Preview
                       </h5>
                       <div className="bg-white border border-stone-200 rounded-none p-3.5 text-xs text-stone-700 leading-relaxed max-w-[95%]">
@@ -654,7 +654,7 @@ export const CampaignsTab: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Immediate vs Scheduled Run Mode */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase text-stone-400">Launch Timeline</label>
+                    <label className="text-[10px] font-bold uppercase text-stone-600">Launch Timeline</label>
                     <div className="flex gap-2 bg-white p-1 rounded-none border border-stone-200">
                       <button
                         type="button"
@@ -679,7 +679,7 @@ export const CampaignsTab: React.FC = () => {
 
                   {/* Delay Spacing Parameter */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase text-stone-400 flex justify-between">
+                    <label className="text-[10px] font-bold uppercase text-stone-600 flex justify-between">
                       <span>Anti-Spam Spacing Delay</span>
                       <span className="text-stone-900 font-bold">{sendDelay}s / msg</span>
                     </label>
@@ -699,7 +699,7 @@ export const CampaignsTab: React.FC = () => {
                 {runMode === "scheduled" && (
                   <div className="grid grid-cols-2 gap-3 pt-2 animate-slide-up">
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold uppercase text-stone-400">Target Date</label>
+                      <label className="text-[9px] font-bold uppercase text-stone-600">Target Date</label>
                       <input
                         type="date"
                         required
@@ -709,7 +709,7 @@ export const CampaignsTab: React.FC = () => {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-bold uppercase text-stone-400">Target Time</label>
+                      <label className="text-[9px] font-bold uppercase text-stone-600">Target Time</label>
                       <input
                         type="time"
                         required
