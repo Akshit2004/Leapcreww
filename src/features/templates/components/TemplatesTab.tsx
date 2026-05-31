@@ -17,7 +17,9 @@ import {
   Trash2,
   CheckCircle,
   HelpCircle,
-  ThumbsUp
+  ThumbsUp,
+  Globe,
+  GlobeOff
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
@@ -332,6 +334,26 @@ export const TemplatesTab: React.FC = () => {
                 <span className="text-[10px] text-stone-400 font-bold select-none">{t.id.slice(0, 13)}</span>
                 <div className="flex items-center gap-2">
                   {getCategoryBadge(t.category)}
+                  {t.isShared && (
+                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-stone-400 border border-stone-200 px-1.5 py-0.5" title="Shared with all orgs">
+                      <Globe className="w-3 h-3" />
+                      Shared
+                    </span>
+                  )}
+                  <button
+                    onClick={async () => {
+                      await fetch("/api/whatsapp/toggle-share", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ templateId: t.id, isShared: !t.isShared }),
+                      });
+                      window.location.reload();
+                    }}
+                    className="p-1 rounded-none text-stone-400 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer border border-transparent"
+                    title={t.isShared ? "Remove from shared" : "Share with all orgs"}
+                  >
+                    {t.isShared ? <GlobeOff className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
+                  </button>
                   <button
                     onClick={async () => {
                       if (confirm("Are you sure you want to permanently delete this template from WappFlow and Meta Business Portal?")) {

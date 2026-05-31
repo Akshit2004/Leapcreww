@@ -219,10 +219,22 @@ export async function GET(
       orderBy: { createdAt: "desc" },
       select: {
         id: true, name: true, body: true, category: true,
-        buttons: true, mediaType: true, metaStatus: true, metaId: true,
+        buttons: true, mediaType: true, metaStatus: true, metaId: true, isShared: true,
         organizationId: true, createdAt: true,
       },
     });
+
+    const sharedTemplates = await prisma.template.findMany({
+      where: { isShared: true, organizationId: { not: orgId } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true, name: true, body: true, category: true,
+        buttons: true, mediaType: true, metaStatus: true, metaId: true, isShared: true,
+        organizationId: true, createdAt: true,
+      },
+    });
+
+    const allTemplates = [...templates, ...sharedTemplates];
 
     const chatbotNodes = await prisma.chatbotNode.findMany({
       where: { organizationId: orgId },
@@ -277,7 +289,7 @@ export async function GET(
       organization,
       contacts,
       campaigns,
-      templates,
+      templates: allTemplates,
       chatbotNodes,
       integrations,
       systemLogs,

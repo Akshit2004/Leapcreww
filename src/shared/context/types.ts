@@ -63,6 +63,7 @@ export interface Template {
   mediaType?: "none" | "image" | "video" | "document";
   metaStatus?: "pending" | "approved" | "rejected";
   metaId?: string;
+  isShared?: boolean;
 }
 
 export interface ChatbotNode {
