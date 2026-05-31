@@ -242,12 +242,12 @@ export default function PrivacyPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono text-[#FAF7F2]/80">
               <div>
-                <span className="text-[#FAF7F2]/45 uppercase text-[9px] tracking-wider block">Security Escalation</span>
-                <span className="font-semibold text-white">security@wappflow.app</span>
+                <span className="text-[#FAF7F2]/45 uppercase text-[9px] tracking-wider block">Contact</span>
+                <span className="font-semibold text-white">smritix.ai.1@gmail.com</span>
               </div>
               <div>
                 <span className="text-[#FAF7F2]/45 uppercase text-[9px] tracking-wider block">Meta Compliance Inquiries</span>
-                <span className="font-semibold text-white">compliance@wappflow.app</span>
+                <span className="font-semibold text-white">smritix.ai.1@gmail.com</span>
               </div>
             </div>
           </div>
