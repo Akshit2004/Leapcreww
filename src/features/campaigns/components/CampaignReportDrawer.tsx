@@ -72,7 +72,7 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
       case "Scheduled":
         return "text-stone-600 bg-stone-50 border-stone-200";
       default:
-        return "text-stone-500 bg-stone-50 border-stone-200";
+        return "text-stone-600 bg-stone-50 border-stone-200";
     }
   };
 
@@ -93,7 +93,7 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
               <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-none border ${getStatusColor(campaign.status)}`}>
                 {campaign.status}
               </span>
-              <span className="text-[10px] text-stone-505">Template: {campaign.templateName}</span>
+              <span className="text-[10px] text-stone-600">Template: {campaign.templateName}</span>
               <span className="text-[10px] text-stone-500 flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 {campaign.date}
@@ -130,7 +130,7 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
             <div className="bg-white p-4 rounded-none border border-stone-200 shadow-none relative overflow-hidden">
               <span className="text-[9px] uppercase tracking-wider font-bold text-stone-400 block">Reads</span>
               <span className="text-xl font-extrabold text-stone-900 mt-1 block">{read}</span>
-              <span className="text-[10px] text-stone-850 font-bold mt-1 block">{readRate}% Open Rate</span>
+              <span className="text-[10px] text-stone-800 font-bold mt-1 block">{readRate}% Open Rate</span>
               <div className="absolute right-3 bottom-3 text-stone-100"><Activity className="w-8 h-8" /></div>
             </div>
 
@@ -346,7 +346,7 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
                   <div className="space-y-2">
                     {campaignLogs.map((log) => (
                       <div key={log.id} className="p-3 bg-white border border-stone-200 rounded-none text-xs select-text flex items-start gap-2.5">
-                        <span className="text-[10px] text-stone-500 font-bold bg-stone-50 px-2 py-0.5 border border-stone-200 shrink-0">
+                        <span className="text-[10px] text-stone-600 font-bold bg-stone-50 px-2 py-0.5 border border-stone-200 shrink-0">
                           {log.timestamp}
                         </span>
                         <div className="text-stone-700 leading-relaxed flex-1">

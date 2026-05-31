@@ -147,7 +147,7 @@ export const InboxTab: React.FC = () => {
       return <Check className="w-3.5 h-3.5 text-stone-400" />;
     }
     if (status === "delivered") {
-      return <CheckCheck className="w-3.5 h-3.5 text-stone-450" />;
+      return <CheckCheck className="w-3.5 h-3.5 text-stone-500" />;
     }
     if (status === "read") {
       return <CheckCheck className="w-3.5 h-3.5 text-stone-900" />;
@@ -236,7 +236,7 @@ export const InboxTab: React.FC = () => {
                         {c.source.includes("Shopify") ? "Shopify" : c.source.includes("Woo") ? "Woo" : "Ad"}
                       </span>
                       {c.tags.slice(0, 1).map((t, idx) => (
-                        <span key={idx} className="text-[9px] font-bold bg-stone-900/10 text-stone-850 px-2 py-0.5 border border-stone-200 leading-none truncate max-w-[80px] rounded-none uppercase tracking-wider">
+                        <span key={idx} className="text-[9px] font-bold bg-stone-900/10 text-stone-800 px-2 py-0.5 border border-stone-200 leading-none truncate max-w-[80px] rounded-none uppercase tracking-wider">
                           {t}
                         </span>
                       ))}
@@ -306,7 +306,7 @@ export const InboxTab: React.FC = () => {
 
                 <span className="hidden sm:inline-flex text-[9px] px-3 py-1.5 rounded-none bg-stone-50 text-stone-500 font-bold items-center gap-1.5 shrink-0 border border-stone-200 uppercase tracking-wider">
                   <Laptop className="w-3.5 h-3.5 text-stone-400" />
-                  Agent: <span className="font-bold text-stone-850">{activeContact.assignedAgent}</span>
+                  Agent: <span className="font-bold text-stone-800">{activeContact.assignedAgent}</span>
                 </span>
                 
                 {/* Profile panel toggle button */}
@@ -391,7 +391,7 @@ export const InboxTab: React.FC = () => {
                         unlockSync();
                       }
                     }}
-                    className="bg-stone-950 hover:bg-stone-850 text-white border border-stone-950 font-bold text-[9px] tracking-wider uppercase px-4 py-2 rounded-none transition-all cursor-pointer shrink-0"
+                    className="bg-stone-950 hover:bg-stone-800 text-white border border-stone-950 font-bold text-[9px] tracking-wider uppercase px-4 py-2 rounded-none transition-all cursor-pointer shrink-0"
                   >
                     Simulate Inbound
                   </button>
@@ -409,7 +409,7 @@ export const InboxTab: React.FC = () => {
             {/* Live Message History Scroll */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar relative bg-[#fafaf9]">
               {activeChat.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center text-xs text-stone-400 font-bold uppercase tracking-wider gap-2.5 relative z-10">
+                <div className="h-full flex flex-col items-center justify-center text-center text-xs text-stone-600 font-bold uppercase tracking-wider gap-2.5 relative z-10">
                   <Bot className="w-9 h-9 text-stone-950" />
                   <p className="max-w-xs leading-relaxed">Live support channel is operational. Send an outbound support message or trigger template payload below.</p>
                 </div>
@@ -553,7 +553,7 @@ export const InboxTab: React.FC = () => {
 
             {/* CRM Info Fields */}
             <div className="space-y-4">
-              <h4 className="text-[9px] font-bold uppercase tracking-wider text-stone-450">Lead Metadata</h4>
+              <h4 className="text-[9px] font-bold uppercase tracking-wider text-stone-500">Lead Metadata</h4>
               <div className="space-y-3 text-[10px] font-bold text-stone-600 select-text uppercase tracking-wider">
                 <div className="flex items-center gap-3">
                   <Phone className="w-4 h-4 text-stone-400 shrink-0" />
@@ -572,7 +572,7 @@ export const InboxTab: React.FC = () => {
 
             {/* Agent Assignment */}
             <div className="space-y-2 select-none">
-              <h4 className="text-[9px] font-bold uppercase tracking-wider text-stone-450">Assigned Agent</h4>
+              <h4 className="text-[9px] font-bold uppercase tracking-wider text-stone-500">Assigned Agent</h4>
               <select
                 value={activeContact.assignedAgent}
                 onChange={handleAgentChange}
@@ -588,7 +588,7 @@ export const InboxTab: React.FC = () => {
 
             {/* Custom Tags Manager */}
             <div className="space-y-4 pt-2">
-              <h4 className="text-[9px] font-bold uppercase tracking-wider text-stone-450 flex items-center gap-2 select-none">
+              <h4 className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-2 select-none">
                 <Tag className="w-3.5 h-3.5" />
                 Segmentation Tags
               </h4>
@@ -596,19 +596,19 @@ export const InboxTab: React.FC = () => {
               {/* Tag pills */}
               <div className="flex flex-wrap gap-1.5 select-none">
                 {activeContact.tags.length === 0 ? (
-                  <span className="text-[10px] text-stone-450 font-bold uppercase tracking-wider">No active segment tags.</span>
+                  <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">No active segment tags.</span>
                 ) : (
                   activeContact.tags.map((t, idx) => (
                     <span 
                       key={idx} 
-                      className="text-[9px] font-bold bg-stone-100 text-stone-850 pl-2.5 pr-1.5 py-1.5 flex items-center gap-1.5 border border-stone-200 rounded-none uppercase tracking-wider"
+                      className="text-[9px] font-bold bg-stone-100 text-stone-800 pl-2.5 pr-1.5 py-1.5 flex items-center gap-1.5 border border-stone-200 rounded-none uppercase tracking-wider"
                     >
                       <span>{t}</span>
                       <button 
                         onClick={() => handleRemoveTag(t)}
                         className="hover:bg-stone-200 p-0.5 rounded-none cursor-pointer transition-colors"
                       >
-                        <X className="w-2.5 h-2.5 text-stone-450" />
+                        <X className="w-2.5 h-2.5 text-stone-500" />
                       </button>
                     </span>
                   ))

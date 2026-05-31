@@ -301,7 +301,7 @@ export const MarketplaceTab: React.FC = () => {
                             <CheckCircle2 className="w-3 h-3" /> Active
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-stone-400 bg-stone-50 px-2 py-0.5 border border-stone-200 rounded-none uppercase">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-stone-600 bg-stone-50 px-2 py-0.5 border border-stone-200 rounded-none uppercase">
                             Inactive
                           </span>
                         )}
@@ -320,7 +320,7 @@ export const MarketplaceTab: React.FC = () => {
                   ))}
                   {filteredProducts.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-stone-450 text-xs uppercase">No products found</td>
+                      <td colSpan={6} className="text-center py-8 text-stone-500 text-xs uppercase">No products found</td>
                     </tr>
                   )}
                 </tbody>
@@ -365,7 +365,7 @@ export const MarketplaceTab: React.FC = () => {
                 ))}
                 {orders.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-stone-450 text-xs uppercase">No orders yet</td>
+                    <td colSpan={7} className="text-center py-8 text-stone-500 text-xs uppercase">No orders yet</td>
                   </tr>
                 )}
               </tbody>

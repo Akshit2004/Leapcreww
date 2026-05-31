@@ -207,8 +207,8 @@ export const CampaignsTab: React.FC = () => {
         );
       default:
         return (
-          <span className="text-[10px] font-bold text-stone-500 bg-stone-50 px-2.5 py-1 rounded-none border border-stone-200 flex items-center gap-1.5 self-start uppercase">
-            <Clock className="w-3.5 h-3.5 text-stone-400" />
+          <span className="text-[10px] font-bold text-stone-600 bg-stone-50 px-2.5 py-1 rounded-none border border-stone-200 flex items-center gap-1.5 self-start uppercase">
+            <Clock className="w-3.5 h-3.5 text-stone-500" />
             {status}
           </span>
         );
@@ -362,7 +362,7 @@ export const CampaignsTab: React.FC = () => {
                         setSelectedCampaignId(camp.id);
                         setReportDrawerOpen(true);
                       }}
-                      className="text-[10px] font-bold text-stone-905 bg-stone-100 border border-stone-300 hover:bg-stone-200 px-3 py-1.5 rounded-none flex items-center gap-1 transition-all cursor-pointer"
+                      className="text-[10px] font-bold text-stone-900 bg-stone-100 border border-stone-300 hover:bg-stone-200 px-3 py-1.5 rounded-none flex items-center gap-1 transition-all cursor-pointer"
                     >
                       <BarChart4 className="w-3.5 h-3.5" />
                       View Analytics
@@ -444,7 +444,7 @@ export const CampaignsTab: React.FC = () => {
 
               {/* Tag Targeting */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-505 flex justify-between">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600 flex justify-between">
                   <span>Target Audience segment</span>
                   <span className="text-[10px] text-stone-500 font-normal normal-case">Match: {targetAudienceSize} leads</span>
                 </label>
@@ -604,7 +604,7 @@ export const CampaignsTab: React.FC = () => {
                       </h5>
                       <div className="bg-white border border-stone-200 rounded-none p-3.5 text-xs text-stone-700 leading-relaxed max-w-[95%]">
                         {activeTemplate.mediaType && activeTemplate.mediaType !== "none" && (
-                          <div className="mb-2 px-2.5 py-1 rounded-none bg-stone-150 text-[10px] text-stone-800 font-bold uppercase inline-flex items-center gap-1.5 select-none leading-none border border-stone-300">
+                          <div className="mb-2 px-2.5 py-1 rounded-none bg-stone-100 text-[10px] text-stone-800 font-bold uppercase inline-flex items-center gap-1.5 select-none leading-none border border-stone-300">
                             <span>{activeTemplate.mediaType} Media Header</span>
                           </div>
                         )}
@@ -637,7 +637,7 @@ export const CampaignsTab: React.FC = () => {
                       onChange={(e) => setSessionText(e.target.value)}
                       className="w-full bg-white border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900 resize-none"
                     />
-                    <div className="flex items-start gap-2 bg-stone-50 border border-stone-250 rounded-none p-3 text-[10px] text-stone-700 leading-relaxed font-semibold">
+                    <div className="flex items-start gap-2 bg-stone-50 border border-stone-200 rounded-none p-3 text-[10px] text-stone-700 leading-relaxed font-semibold">
                       <span>📱 Only contacts who messaged in the last 24h will receive this. No Meta template approval needed.</span>
                     </div>
                   </div>

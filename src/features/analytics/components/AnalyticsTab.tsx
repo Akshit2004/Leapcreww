@@ -52,7 +52,7 @@ const RadialGauge: React.FC<{ value: number; label: string; color: string; icon:
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-lg font-bold text-stone-905 tracking-tight">{value}%</span>
+          <span className="text-lg font-bold text-stone-900 tracking-tight">{value}%</span>
         </div>
       </div>
       <div className="flex items-center gap-2 text-[10px] font-bold text-stone-500 uppercase tracking-widest">
@@ -81,7 +81,7 @@ const StatCard: React.FC<{
             (trend >= 0 ? (
               <TrendingUp className="w-3.5 h-3.5 text-stone-900" />
             ) : (
-              <TrendingDown className="w-3.5 h-3.5 text-stone-450" />
+              <TrendingDown className="w-3.5 h-3.5 text-stone-500" />
             ))}
           {subtitle}
         </span>
@@ -363,7 +363,7 @@ export const AnalyticsTab: React.FC = () => {
           </div>
           <button
             onClick={() => setFunnelMode(funnelMode === "absolute" ? "percentage" : "absolute")}
-            className="text-[9px] font-bold text-stone-900 bg-stone-100 hover:bg-stone-200 px-3 py-1.5 rounded-none border border-stone-250/20 uppercase tracking-widest transition-all cursor-pointer"
+            className="text-[9px] font-bold text-stone-900 bg-stone-100 hover:bg-stone-200 px-3 py-1.5 rounded-none border border-stone-200/20 uppercase tracking-widest transition-all cursor-pointer"
           >
             {funnelMode === "absolute" ? "Show %" : "Show #"}
           </button>
@@ -403,7 +403,7 @@ export const AnalyticsTab: React.FC = () => {
         </h3>
         <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Messages dispatched per campaign day ledger</p>
         {timelineData.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-stone-450 text-xs font-bold uppercase tracking-widest">
+          <div className="h-48 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
             NO ACTIVE CAMPAIGN RECORDS DISCOVERED IN THIS PERIOD
           </div>
         ) : (
@@ -412,14 +412,14 @@ export const AnalyticsTab: React.FC = () => {
               const heightPct = (d.sent / maxTimelineSent) * 100;
               return (
                 <div key={d.date} className="flex flex-col items-center gap-1.5 min-w-[36px] group flex-1">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-bold text-stone-900 bg-white border border-stone-250 px-2 py-1 uppercase whitespace-nowrap pointer-events-none tracking-widest">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-bold text-stone-900 bg-white border border-stone-200 px-2 py-1 uppercase whitespace-nowrap pointer-events-none tracking-widest">
                     {fmt(d.sent)} sent
                   </div>
                   <div
                     className={`w-full rounded-none transition-all duration-500 ${statusColor(d.status)}`}
                     style={{ height: `${Math.max(heightPct, 4)}%` }}
                   />
-                  <span className="text-[9px] text-stone-405 font-bold uppercase whitespace-nowrap tracking-wider">
+                  <span className="text-[9px] text-stone-500 font-bold uppercase whitespace-nowrap tracking-wider">
                     {d.date.slice(5)}
                   </span>
                 </div>
@@ -427,7 +427,7 @@ export const AnalyticsTab: React.FC = () => {
             })}
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 pt-4 border-t border-stone-100 text-[9px] text-stone-450 font-bold uppercase tracking-widest">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 pt-4 border-t border-stone-100 text-[9px] text-stone-500 font-bold uppercase tracking-widest">
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-stone-950" /> Completed</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-stone-600" /> Active</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-stone-300" /> Scheduled</span>
@@ -452,12 +452,12 @@ export const AnalyticsTab: React.FC = () => {
               />
               <div className="absolute inset-3 bg-white rounded-full flex flex-col items-center justify-center border border-stone-200">
                 <span className="text-lg font-bold text-stone-950">{contacts.length}</span>
-                <span className="text-[8px] text-stone-450 font-bold uppercase tracking-widest">Total CRM</span>
+                <span className="text-[8px] text-stone-500 font-bold uppercase tracking-widest">Total CRM</span>
               </div>
             </div>
             <div className="flex-1 space-y-2.5 max-h-36 overflow-y-auto w-full custom-scrollbar">
               {sourceData.map((s) => (
-                <div key={s.source} className="flex items-center justify-between text-xs text-stone-705 border-b border-stone-50 pb-1">
+                <div key={s.source} className="flex items-center justify-between text-xs text-stone-700 border-b border-stone-50 pb-1">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 shrink-0" style={{ backgroundColor: s.color }} />
                     <span className="font-semibold text-stone-800 uppercase text-[10px] tracking-wider truncate max-w-[120px]">{s.source}</span>
@@ -480,7 +480,7 @@ export const AnalyticsTab: React.FC = () => {
           </h3>
           <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Active crm taxonomy segments</p>
           {tagCloud.length === 0 ? (
-            <div className="h-32 flex items-center justify-center text-stone-455 text-xs font-bold uppercase tracking-widest">
+            <div className="h-32 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
               NO CRM TAXONOMY TAGS SPECIFIED YET
             </div>
           ) : (
@@ -494,7 +494,7 @@ export const AnalyticsTab: React.FC = () => {
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-900 text-[10px] font-bold uppercase tracking-wider transition-all"
                     style={{ opacity }}
                   >
-                    <Tag className="w-3 h-3 text-stone-450" />
+                    <Tag className="w-3 h-3 text-stone-500" />
                     {t.tag}
                     <span className="text-stone-400 ml-0.5">×{t.count}</span>
                   </span>
@@ -513,7 +513,7 @@ export const AnalyticsTab: React.FC = () => {
         </h3>
         <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Waba payload delivery rate analysis index</p>
         {templatePerf.length === 0 ? (
-          <div className="h-32 flex items-center justify-center text-stone-450 text-xs font-bold uppercase tracking-widest">
+          <div className="h-32 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
             NO META APPROVED MESSAGE PAYLOADS CURRENTLY ON RECORD
           </div>
         ) : (

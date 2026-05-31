@@ -136,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto custom-scrollbar relative z-10">
           <div
             data-stagger-pos="0.12"
-            className={`text-[9px] font-black text-stone-400 tracking-wider uppercase px-2 mb-3 transition-all duration-300 ${
+            className={`text-[9px] font-black text-stone-600 tracking-wider uppercase px-2 mb-3 transition-all duration-300 ${
               isExpanded ? "opacity-100" : "lg:opacity-0 lg:pointer-events-none lg:mb-0"
             }`}
           >
@@ -157,13 +157,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className={`w-full flex items-center justify-between px-3.5 py-3 transition-all duration-250 group relative cursor-pointer rounded-none border border-transparent ${
                   isActive
                     ? "bg-wa-green text-white font-bold"
-                    : "hover:bg-stone-100 text-stone-550 hover:text-stone-950"
+                    : "hover:bg-stone-100 text-stone-600 hover:text-stone-950"
                 } ${isExpanded ? "" : "lg:px-2.5"}`}
                 title={!isExpanded ? item.label : undefined}
               >
                 <div className="flex items-center gap-3 overflow-hidden">
                   <Icon className={`w-5 h-5 transition-all duration-300 shrink-0 ${
-                    isActive ? "text-white scale-105" : "text-stone-400 group-hover:text-stone-900"
+                    isActive ? "text-white scale-105" : "text-stone-500 group-hover:text-stone-900"
                   }`} />
                   <span className={`text-xs font-semibold transition-all duration-300 min-w-[120px] text-left ${
                     isExpanded ? "opacity-100 translate-x-0" : "lg:opacity-0 lg:-translate-x-4 lg:pointer-events-none"

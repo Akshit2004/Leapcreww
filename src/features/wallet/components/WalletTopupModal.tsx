@@ -45,7 +45,7 @@ export const WalletTopupModal: React.FC<WalletTopupModalProps> = ({
             </div>
             <div>
               <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">Top Up Wallet Credits</h3>
-              <p className="text-[10px] text-stone-505 font-semibold leading-none mt-1">WappFlow Secure Payment Gateway</p>
+              <p className="text-[10px] text-stone-600 font-semibold leading-none mt-1">WappFlow Secure Payment Gateway</p>
             </div>
           </div>
           <button 

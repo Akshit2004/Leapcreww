@@ -53,7 +53,7 @@ export const ChecklistWizard: React.FC<ChecklistWizardProps> = ({
             <span className="font-bold text-sm text-slate-800">1. Connect Meta</span>
             {fbConnected ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
           </div>
-          <p className="text-[11px] text-stone-550 font-medium">Link your WhatsApp Business Account (WABA).</p>
+          <p className="text-[11px] text-stone-600 font-medium">Link your WhatsApp Business Account (WABA).</p>
         </button>
         
         <button
@@ -64,7 +64,7 @@ export const ChecklistWizard: React.FC<ChecklistWizardProps> = ({
             <span className="font-bold text-sm text-slate-800">2. Sync Templates</span>
             {templatesApproved ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
           </div>
-          <p className="text-[11px] text-stone-550 font-medium">Get approval from Meta on your custom templates.</p>
+          <p className="text-[11px] text-stone-600 font-medium">Get approval from Meta on your custom templates.</p>
         </button>
         
         <button
@@ -75,7 +75,7 @@ export const ChecklistWizard: React.FC<ChecklistWizardProps> = ({
             <span className="font-bold text-sm text-slate-800">3. Import Contacts</span>
             {contactsImported ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
           </div>
-          <p className="text-[11px] text-stone-550 font-medium">Upload contact lists via CSV or database syncing.</p>
+          <p className="text-[11px] text-stone-600 font-medium">Upload contact lists via CSV or database syncing.</p>
         </button>
         
         <button
@@ -86,7 +86,7 @@ export const ChecklistWizard: React.FC<ChecklistWizardProps> = ({
             <span className="font-bold text-sm text-slate-800">4. Send Campaign</span>
             {campaignSent ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
           </div>
-          <p className="text-[11px] text-stone-550 font-medium">Launch your very first broad-scale test campaign!</p>
+          <p className="text-[11px] text-stone-600 font-medium">Launch your very first broad-scale test campaign!</p>
         </button>
       </div>
     </div>

@@ -68,7 +68,7 @@ export const FlowJournalStream: React.FC<FlowJournalStreamProps> = ({
 
         {/* Flat Minimalist Search Bar */}
         <div className="relative">
-          <Search className="w-3.5 h-3.5 text-stone-450 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-3.5 h-3.5 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="FILTER LOG ENTRIES..."

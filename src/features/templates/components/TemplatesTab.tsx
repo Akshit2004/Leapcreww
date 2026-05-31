@@ -313,7 +313,7 @@ export const TemplatesTab: React.FC = () => {
           {searchTerm && (
             <button
               onClick={() => setSearchTerm("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-450 hover:text-stone-900 focus:outline-none"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-900 focus:outline-none"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -387,7 +387,7 @@ export const TemplatesTab: React.FC = () => {
             {/* Quick reply buttons footer */}
             {t.buttons && t.buttons.length > 0 ? (
               <div className="bg-stone-50 border-t border-stone-200 p-3.5 space-y-2 select-none shrink-0 rounded-none">
-                <div className="text-[9px] uppercase tracking-wider font-bold text-stone-505 flex items-center gap-1">
+                <div className="text-[9px] uppercase tracking-wider font-bold text-stone-600 flex items-center gap-1">
                   <MousePointerClick className="w-3 h-3 text-stone-500" />
                   Interactive Buttons
                 </div>
@@ -410,7 +410,7 @@ export const TemplatesTab: React.FC = () => {
                 {t.metaStatus === "approved" && (
                   <div className="text-[10px] text-stone-900 font-bold flex items-center gap-1 select-none">
                     Ready to Broadcast
-                    <ArrowRight className="w-3.5 h-3.5 text-stone-905" />
+                    <ArrowRight className="w-3.5 h-3.5 text-stone-900" />
                   </div>
                 )}
               </div>
@@ -444,7 +444,7 @@ export const TemplatesTab: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Template Name */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-stone-505">Template Name</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Template Name</label>
                   <input
                     type="text"
                     required
@@ -458,7 +458,7 @@ export const TemplatesTab: React.FC = () => {
 
                 {/* Category Selection */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-stone-505">Compliance Category</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Compliance Category</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
@@ -473,7 +473,7 @@ export const TemplatesTab: React.FC = () => {
 
               {/* Media Header Selector */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-505">Optional Media Header</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Optional Media Header</label>
                 <div className="flex gap-2">
                   {["none", "image", "video", "document"].map((type) => (
                     <button
@@ -483,7 +483,7 @@ export const TemplatesTab: React.FC = () => {
                       className={`flex-1 py-2 text-center text-xs font-bold rounded-none border capitalize cursor-pointer transition-all ${
                         mediaType === type 
                           ? "bg-stone-950 text-white border-stone-950" 
-                          : "bg-white border-stone-200 text-stone-505 hover:bg-stone-100"
+                          : "bg-white border-stone-200 text-stone-600 hover:bg-stone-100"
                       }`}
                     >
                       {type}
@@ -494,7 +494,7 @@ export const TemplatesTab: React.FC = () => {
 
               {/* Template Body Copy Textarea */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-505 flex justify-between">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600 flex justify-between">
                   <span>Template Text body</span>
                   <span className="text-[9px] text-stone-400">{bodyText.length} / 1024 characters</span>
                 </label>
@@ -510,13 +510,13 @@ export const TemplatesTab: React.FC = () => {
 
               {/* Buttons Builder */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-505">Meta Call-To-Action Quick Replies</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Meta Call-To-Action Quick Replies</label>
                 
                 <div className="flex flex-wrap gap-1.5">
                   {buttonsList.map((btn, index) => (
                     <span 
                       key={index} 
-                      className="text-[10px] font-bold bg-stone-100 text-stone-850 pl-3 pr-1 py-1 rounded-none border border-stone-300 flex items-center gap-1.5"
+                      className="text-[10px] font-bold bg-stone-100 text-stone-800 pl-3 pr-1 py-1 rounded-none border border-stone-300 flex items-center gap-1.5"
                     >
                       <span>{btn}</span>
                       <button 
@@ -580,7 +580,7 @@ export const TemplatesTab: React.FC = () => {
                 {clientWarnings.length > 0 && (
                   <div className="space-y-1.5">
                     {clientWarnings.map((w, idx) => (
-                      <div key={idx} className="text-[10px] text-stone-905 font-semibold flex items-start gap-1.5 bg-white p-2 rounded-none border border-stone-300">
+                      <div key={idx} className="text-[10px] text-stone-900 font-semibold flex items-start gap-1.5 bg-white p-2 rounded-none border border-stone-300">
                         <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-stone-900" />
                         <span>{w}</span>
                       </div>
@@ -633,7 +633,7 @@ export const TemplatesTab: React.FC = () => {
                 {/* Actions AI Optimizer */}
                 <div className="flex items-center justify-between gap-4 pt-1.5">
                   <div className="text-[9px] text-stone-500 flex items-center gap-1 leading-none select-none">
-                    <HelpCircle className="w-3.5 h-3.5 text-stone-405" />
+                    <HelpCircle className="w-3.5 h-3.5 text-stone-500" />
                     Our AI compiler verifies copy structures to promise zero meta reject rates.
                   </div>
 
