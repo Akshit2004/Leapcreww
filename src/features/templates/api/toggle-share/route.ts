@@ -25,6 +25,17 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Template not found" }, { status: 404 });
     }
 
+    interface CustomSessionUser { id: string }
+    const userId = (session.user as unknown as CustomSessionUser).id;
+
+    const membership = await prisma.membership.findUnique({
+      where: { userId_organizationId: { userId, organizationId: template.organizationId } },
+    });
+
+    if (!membership) {
+      return NextResponse.json({ error: "Forbidden — you don't own this template" }, { status: 403 });
+    }
+
     await prisma.template.update({
       where: { id: templateId },
       data: { isShared },

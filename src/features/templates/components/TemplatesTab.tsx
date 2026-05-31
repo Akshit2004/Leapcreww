@@ -205,7 +205,7 @@ export const TemplatesTab: React.FC = () => {
   }, [templates, addSystemLog]);
 
   const getStatusBadge = (status?: string) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case "approved":
         return (
           <span className="bg-stone-900 text-white border border-stone-950 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-none flex items-center gap-1">
@@ -340,20 +340,22 @@ export const TemplatesTab: React.FC = () => {
                       Shared
                     </span>
                   )}
-                  <button
-                    onClick={async () => {
-                      await fetch("/api/whatsapp/toggle-share", {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ templateId: t.id, isShared: !t.isShared }),
-                      });
-                      window.location.reload();
-                    }}
-                    className="p-1 rounded-none text-stone-400 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer border border-transparent"
-                    title={t.isShared ? "Remove from shared" : "Share with all orgs"}
-                  >
-                    {t.isShared ? <GlobeOff className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
-                  </button>
+                  {t.organizationId === orgId && (
+                    <button
+                      onClick={async () => {
+                        await fetch("/api/whatsapp/toggle-share", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ templateId: t.id, isShared: !t.isShared }),
+                        });
+                        window.location.reload();
+                      }}
+                      className="p-1 rounded-none text-stone-400 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer border border-transparent"
+                      title={t.isShared ? "Remove from shared" : "Share with all orgs"}
+                    >
+                      {t.isShared ? <GlobeOff className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
                   <button
                     onClick={async () => {
                       if (confirm("Are you sure you want to permanently delete this template from WappFlow and Meta Business Portal?")) {

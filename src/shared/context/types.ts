@@ -64,6 +64,7 @@ export interface Template {
   metaStatus?: "pending" | "approved" | "rejected";
   metaId?: string;
   isShared?: boolean;
+  organizationId?: string;
 }
 
 export interface ChatbotNode {
