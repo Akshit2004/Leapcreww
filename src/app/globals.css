@@ -44,6 +44,14 @@ body {
   overflow-x: hidden;
 }
 
+/* Ensure input, select, and textarea texts are visible (dark color) since they have light backgrounds across the app */
+input, select, textarea {
+  color: #0f172a;
+}
+input::placeholder, textarea::placeholder {
+  color: #78716c;
+}
+
 /* Custom Slim Scrollbars */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;

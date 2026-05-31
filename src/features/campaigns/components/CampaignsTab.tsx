@@ -408,7 +408,7 @@ export const CampaignsTab: React.FC = () => {
                   placeholder="e.g. Black Friday discount drop"
                   value={campaignName}
                   onChange={(e) => setCampaignName(e.target.value)}
-                  className="w-full bg-white border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900"
+                  className="w-full bg-white text-stone-900 placeholder:text-stone-400 border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900"
                 />
               </div>
 
@@ -451,7 +451,7 @@ export const CampaignsTab: React.FC = () => {
                 <select
                   value={targetTag}
                   onChange={(e) => setTargetTag(e.target.value)}
-                  className="w-full bg-white border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
+                  className="w-full bg-white text-stone-900 border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
                 >
                   <option value="all">All Contacts</option>
                   {allUniqueTags.map((tag) => (
@@ -474,7 +474,7 @@ export const CampaignsTab: React.FC = () => {
                 <select
                   value={excludeTag}
                   onChange={(e) => setExcludeTag(e.target.value)}
-                  className="w-full bg-white border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
+                  className="w-full bg-white text-stone-900 border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
                 >
                   <option value="None">-- No Exclusion --</option>
                   {allUniqueTags.map((tag) => (
@@ -491,7 +491,7 @@ export const CampaignsTab: React.FC = () => {
                     <select
                       value={templateName}
                       onChange={(e) => setTemplateName(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
+                      className="w-full bg-white text-stone-900 border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
                     >
                       {templates.map((t) => (
                         <option key={t.id} value={t.name}>{t.name} ({t.category})</option>
@@ -510,7 +510,7 @@ export const CampaignsTab: React.FC = () => {
                         placeholder={`https://example.com/media.${activeTemplate.mediaType === 'image' ? 'jpg' : 'mp4'}`}
                         value={mediaUrl}
                         onChange={(e) => setMediaUrl(e.target.value)}
-                        className="w-full bg-white border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900"
+                        className="w-full bg-white text-stone-900 placeholder:text-stone-400 border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900"
                       />
                     </div>
                   )}
@@ -549,7 +549,7 @@ export const CampaignsTab: React.FC = () => {
                                       }
                                     }));
                                   }}
-                                  className="w-full bg-white border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none"
+                                  className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none"
                                 >
                                   <option value="contact_field">CRM Contact Field</option>
                                   <option value="static">Static Custom Text</option>
@@ -566,7 +566,7 @@ export const CampaignsTab: React.FC = () => {
                                         [variable]: { type: "contact_field", value: e.target.value }
                                       }));
                                     }}
-                                    className="w-full bg-white border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none"
+                                    className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none"
                                   >
                                     <option value="name">Contact Name (name)</option>
                                     <option value="email">Contact Email (email)</option>
@@ -584,7 +584,7 @@ export const CampaignsTab: React.FC = () => {
                                         [variable]: { type: "static", value: e.target.value }
                                       }));
                                     }}
-                                    className="w-full bg-white border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none"
+                                    className="w-full bg-white text-stone-900 placeholder:text-stone-400 border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none"
                                   />
                                 )}
                               </div>
@@ -635,7 +635,7 @@ export const CampaignsTab: React.FC = () => {
                       placeholder="Write your message here — no template needed. Only contacts active in the last 24 hours will receive it."
                       value={sessionText}
                       onChange={(e) => setSessionText(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900 resize-none"
+                      className="w-full bg-white text-stone-900 placeholder:text-stone-400 border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900 resize-none"
                     />
                     <div className="flex items-start gap-2 bg-stone-50 border border-stone-200 rounded-none p-3 text-[10px] text-stone-700 leading-relaxed font-semibold">
                       <span>📱 Only contacts who messaged in the last 24h will receive this. No Meta template approval needed.</span>
@@ -705,7 +705,7 @@ export const CampaignsTab: React.FC = () => {
                         required
                         value={scheduledDate}
                         onChange={(e) => setScheduledDate(e.target.value)}
-                        className="w-full bg-white border border-stone-200 rounded-none p-2 text-xs focus:outline-none focus:border-stone-900"
+                        className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-2 text-xs focus:outline-none focus:border-stone-900"
                       />
                     </div>
                     <div className="space-y-1">
@@ -715,7 +715,7 @@ export const CampaignsTab: React.FC = () => {
                         required
                         value={scheduledTime}
                         onChange={(e) => setScheduledTime(e.target.value)}
-                        className="w-full bg-white border border-stone-200 rounded-none p-2 text-xs focus:outline-none focus:border-stone-900"
+                        className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-2 text-xs focus:outline-none focus:border-stone-900"
                       />
                     </div>
                   </div>
