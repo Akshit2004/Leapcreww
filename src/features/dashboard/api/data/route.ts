@@ -188,6 +188,7 @@ export async function GET(
               mediaType: mediaType,
               metaStatus: statusFormatted,
               metaId: t.id,
+              isShared: primary.isShared,
             }
           });
 
