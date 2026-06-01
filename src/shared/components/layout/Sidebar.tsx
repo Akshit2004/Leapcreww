@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Settings,
   BarChart3,
+  Users,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useApp } from "../../context/AppContext";
@@ -77,6 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "analytics", label: "Analytics", icon: BarChart3 },
     { id: "inbox", label: "Team Inbox", icon: MessageSquare, badge: totalUnread > 0 ? totalUnread : undefined },
+    { id: "customers", label: "Customers", icon: Users },
     { id: "campaigns", label: "Campaigns", icon: Megaphone },
     { id: "templates", label: "Templates", icon: FileText },
     { id: "chatbot", label: "Bot Builder", icon: Cpu },

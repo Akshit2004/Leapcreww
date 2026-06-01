@@ -7,6 +7,7 @@ import { useApp } from "@/shared/context/AppContext";
 import { Sidebar } from "@/shared/components/layout/Sidebar";
 import { OverviewTab } from "@/features/dashboard/components/OverviewTab";
 import { InboxTab } from "@/features/inbox/components/InboxTab";
+import { CustomersTab } from "../customers/components/CustomersTab";
 import { CampaignsTab } from "@/features/campaigns/components/CampaignsTab";
 import { TemplatesTab } from "@/features/templates/components/TemplatesTab";
 import { ChatbotTab } from "@/features/chatbot/components/ChatbotTab";
@@ -78,6 +79,8 @@ export default function TenantDashboard() {
         return <AnalyticsTab />;
       case "inbox":
         return <InboxTab />;
+      case "customers":
+        return <CustomersTab />;
       case "campaigns":
         return <CampaignsTab />;
       case "templates":
