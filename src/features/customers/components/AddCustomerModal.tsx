@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { UserPlus, X } from "lucide-react";
 import { Contact } from "@/shared/context/types";
 
@@ -19,7 +19,9 @@ export const AddCustomerModal: React.FC<AddCustomerModalProps> = ({
   const [tags, setTags] = useState("");
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
 
-  useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       setName("");
       setPhone("");
@@ -27,7 +29,7 @@ export const AddCustomerModal: React.FC<AddCustomerModalProps> = ({
       setTags("");
       setStatus("Active");
     }
-  }, [isOpen]);
+  }
 
   if (!isOpen) return null;
 

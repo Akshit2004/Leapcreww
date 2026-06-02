@@ -58,20 +58,22 @@ export const CampaignsTab: React.FC = () => {
 
   // Auto-initialize template choice and variables
   useEffect(() => {
-    let mounted = true;
+    let timer: any;
     if (!templateName && templates.length > 0) {
-      setTimeout(() => {
-        if (mounted) setTemplateName(templates[0].name);
+      timer = setTimeout(() => {
+        setTemplateName(templates[0].name);
       }, 0);
     }
-    return () => { mounted = false; };
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [templates, templateName]);
 
   const activeTemplate = templates.find((t) => t.name === templateName);
 
   // Scan and parse variables from active template body
   useEffect(() => {
-    let mounted = true;
+    let timer: any;
     const t = templates.find((x) => x.name === templateName);
     const initialMapping: Record<string, { type: "contact_field" | "static"; value: string }> = {};
     if (t?.body) {
@@ -82,10 +84,12 @@ export const CampaignsTab: React.FC = () => {
         });
       }
     }
-    setTimeout(() => {
-      if (mounted) setVariablesMapping(initialMapping);
+    timer = setTimeout(() => {
+      setVariablesMapping(initialMapping);
     }, 0);
-    return () => { mounted = false; };
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [templateName, templates]);
 
   // Calculate target audience size in real-time

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, getSession } from "next-auth/react";
 import { 
   Bot, ArrowRight, KeyRound, Mail, AlertCircle, Loader, CheckCircle, 
-  MessageSquare, Copy, Phone, Building, User, Lock
+  MessageSquare, Copy, Building, User, Lock
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -51,6 +51,21 @@ function LoginContent() {
   const [obLoading, setObLoading] = useState(false);
   const [obLogs, setObLogs] = useState<string[]>([]);
 
+  const initiateWhatsAppSession = async () => {
+    try {
+      const res = await fetch("/api/whatsapp-auth/initiate", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setAttemptId(data.attemptId);
+        setVerificationCode(data.code);
+        setWaUrl(data.waUrl);
+        setExpiresIn(300);
+      }
+    } catch (err) {
+      console.error("Failed to initiate WhatsApp session:", err);
+    }
+  };
+
   // Handle standard URL queries (e.g. error, registered)
   useEffect(() => {
     const errorParam = searchParams.get("error");
@@ -58,21 +73,29 @@ function LoginContent() {
     
     if (errorParam) {
       if (errorParam === "CredentialsSignin") {
-        setErrorMsg("Incorrect email address or password.");
+        setTimeout(() => {
+          setErrorMsg("Incorrect email address or password.");
+        }, 0);
       } else {
-        setErrorMsg("An authentication error occurred. Please try again.");
+        setTimeout(() => {
+          setErrorMsg("An authentication error occurred. Please try again.");
+        }, 0);
       }
     } else if (registeredParam === "true") {
-      setSuccessMsg("Account created! Log in below with your email and password.");
+      setTimeout(() => {
+        setSuccessMsg("Account created! Log in below with your email and password.");
+      }, 0);
     }
   }, [searchParams]);
 
   // Initiate WhatsApp Verification Session automatically on load/tab switch
   useEffect(() => {
     if (activeTab === "whatsapp" && !attemptId) {
-      initiateWhatsAppSession();
+      setTimeout(() => {
+        initiateWhatsAppSession();
+      }, 0);
     }
-  }, [activeTab]);
+  }, [activeTab, attemptId]);
 
   // Countdown timer for active QR attempt
   useEffect(() => {
@@ -161,22 +184,7 @@ function LoginContent() {
       isSubscribed = false;
       clearInterval(pollInterval);
     };
-  }, [attemptId, activeTab, showOnboarding]);
-
-  const initiateWhatsAppSession = async () => {
-    try {
-      const res = await fetch("/api/whatsapp-auth/initiate", { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        setAttemptId(data.attemptId);
-        setVerificationCode(data.code);
-        setWaUrl(data.waUrl);
-        setExpiresIn(300);
-      }
-    } catch (err) {
-      console.error("Failed to initiate WhatsApp session:", err);
-    }
-  };
+  }, [attemptId, activeTab, showOnboarding, router]);
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -524,11 +532,6 @@ function LoginContent() {
               
               <div className="flex flex-col items-center justify-center space-y-3">
                 <div className="relative p-3 bg-white border border-stone-200 rounded-2xl shadow-inner flex items-center justify-center">
-                  <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                    <span className="w-1 h-1 rounded-full bg-emerald-600 animate-ping" />
-                    <span className="text-[8px] font-bold text-emerald-800 tracking-wider font-mono">LIVE</span>
-                  </div>
-
                   {attemptId ? (
                     <div className="relative">
                       <QRCodeSVG
@@ -552,7 +555,7 @@ function LoginContent() {
                   )}
                 </div>
 
-                <div className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-stone-500 bg-stone-100 px-2.5 py-0.5 rounded-full">
+                <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-stone-400">
                   Expires in {formatTime(expiresIn)}
                 </div>
               </div>

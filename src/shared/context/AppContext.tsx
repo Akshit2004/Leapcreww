@@ -25,6 +25,7 @@ export * from "./types";
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const lastSyncTimeRef = React.useRef<number>(0);
   const {
     organization,
     setOrganization,
@@ -140,6 +141,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (res.ok) {
         const data = await res.json();
         initializeWorkspace(data);
+
+        // Throttled Background Template Sync (Max once per 60 seconds)
+        const now = Date.now();
+        if (now - lastSyncTimeRef.current > 60000) {
+          lastSyncTimeRef.current = now;
+          fetch(`/api/org/${orgId}/templates/sync`, { method: "POST" })
+            .then(async (syncRes) => {
+              if (syncRes.ok) {
+                const syncData = await syncRes.json();
+                if (syncData.success && syncData.count > 0) {
+                  // Fetch updated templates state
+                  const freshRes = await fetch(`/api/org/${orgId}/data`);
+                  if (freshRes.ok) {
+                    initializeWorkspace(await freshRes.json());
+                  }
+                }
+              }
+            })
+            .catch((err) => console.error("⚠️ Background template sync failed:", err));
+        }
       }
     } catch (err) {
       console.error("Refresh Workspace Error", err);

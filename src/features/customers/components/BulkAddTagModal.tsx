@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Tag, X } from "lucide-react";
 
 interface BulkAddTagModalProps {
@@ -16,11 +16,13 @@ export const BulkAddTagModal: React.FC<BulkAddTagModalProps> = ({
 }) => {
   const [tagValue, setTagValue] = useState("");
 
-  useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       setTagValue("");
     }
-  }, [isOpen]);
+  }
 
   if (!isOpen) return null;
 
