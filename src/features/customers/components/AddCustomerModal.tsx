@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { UserPlus, X } from "lucide-react";
 import { Contact } from "@/shared/context/types";
 
@@ -19,9 +19,11 @@ export const AddCustomerModal: React.FC<AddCustomerModalProps> = ({
   const [tags, setTags] = useState("");
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
 
-  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  if (isOpen !== prevIsOpen) {
-    setPrevIsOpen(isOpen);
+  const prevIsOpenRef = useRef(isOpen);
+
+  // Detect isOpen changes synchronously in render, before component returns
+  if (isOpen !== prevIsOpenRef.current) {
+    prevIsOpenRef.current = isOpen;
     if (isOpen) {
       setName("");
       setPhone("");

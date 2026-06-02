@@ -13,6 +13,7 @@ import { TemplatesTab } from "@/features/templates/components/TemplatesTab";
 import { ChatbotTab } from "@/features/chatbot/components/ChatbotTab";
 import { MarketplaceTab } from "@/features/marketplace/components/MarketplaceTab";
 import { SettingsTab } from "@/features/settings/components/SettingsTab";
+import { IntegrationsTab } from "@/features/integrations/components/IntegrationsTab";
 import { AnalyticsTab } from "@/features/analytics/components/AnalyticsTab";
 import { AICopilotSidebar } from "@/features/ai/components/AICopilotSidebar";
 import { Loader, AlertCircle, Bot, Menu } from "lucide-react";
@@ -90,6 +91,8 @@ export default function TenantDashboard() {
         return <ChatbotTab />;
       case "marketplace":
         return <MarketplaceTab />;
+      case "integrations":
+        return <IntegrationsTab />;
       case "settings":
         return <SettingsTab />;
       default:

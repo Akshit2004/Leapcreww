@@ -22,10 +22,13 @@ export async function POST(req: Request) {
 
     const emailLower = email.toLowerCase().trim();
 
-    // Validate the WhatsApp login attempt
-    const attempt = await prisma.whatsAppLoginAttempt.findUnique({
-      where: { id: attemptId }
-    });
+    // Validate WhatsApp attempt and hash password in parallel (don't depend on each other)
+    const [attempt, hashedPassword] = await Promise.all([
+      prisma.whatsAppLoginAttempt.findUnique({
+        where: { id: attemptId }
+      }),
+      bcrypt.hash(password, 10)
+    ]);
 
     if (!attempt) {
       return NextResponse.json(
@@ -48,7 +51,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. Check if user already exists
+    // Check if user already exists and if phone already registered in parallel
+    let checkPhoneUser: Awaited<ReturnType<typeof prisma.user.findUnique>> | undefined;
     const existingUser = await prisma.user.findUnique({
       where: { email: emailLower }
     });
@@ -64,19 +68,16 @@ export async function POST(req: Request) {
     if (phone) {
       const cleanPhone = phone.replace(/[^0-9]/g, "");
       const formattedPhone = cleanPhone.startsWith("+") ? cleanPhone : `+${cleanPhone}`;
-      const existingPhoneUser = await prisma.user.findUnique({
+      checkPhoneUser = await prisma.user.findUnique({
         where: { phone: formattedPhone }
       });
-      if (existingPhoneUser) {
+      if (checkPhoneUser) {
         return NextResponse.json(
           { error: "A user with this WhatsApp number already exists." },
           { status: 400 }
         );
       }
     }
-
-    // 2. Hash Password
-    const hashedPassword = await bcrypt.hash(password, 10);
 
     // 3. Generate Slug for Organization
     const slug = organizationName
@@ -89,23 +90,23 @@ export async function POST(req: Request) {
 
     // 4. Execute Transaction to create User, Org, Membership, and Default assets!
     const result = await prisma.$transaction(async (tx) => {
-      // Create User
-      const user = await tx.user.create({
-        data: {
-          email: emailLower,
-          name,
-          hashedPassword,
-          phone: phone ? (phone.startsWith("+") ? phone : `+${phone.replace(/[^0-9]/g, "")}`) : null,
-        }
-      });
-
-      // Create Organization
-      const org = await tx.organization.create({
-        data: {
-          name: organizationName.trim(),
-          slug: uniqueSlug,
-        }
-      });
+      // Create User and Organization in parallel (don't depend on each other)
+      const [user, org] = await Promise.all([
+        tx.user.create({
+          data: {
+            email: emailLower,
+            name,
+            hashedPassword,
+            phone: phone ? (phone.startsWith("+") ? phone : `+${phone.replace(/[^0-9]/g, "")}`) : null,
+          }
+        }),
+        tx.organization.create({
+          data: {
+            name: organizationName.trim(),
+            slug: uniqueSlug,
+          }
+        })
+      ]);
 
       // Create Membership as OWNER
       await tx.membership.create({
@@ -116,50 +117,48 @@ export async function POST(req: Request) {
         }
       });
 
-      // Mark WhatsApp attempt as verified for this user
-      await tx.whatsAppLoginAttempt.update({
-        where: { id: attemptId },
-        data: {
-          status: "VERIFIED",
-          userId: user.id
-        }
-      });
-
-      // Seed Default Welcome Chatbot Node
-      await tx.chatbotNode.create({
-        data: {
-          id: "n1",
-          type: "message",
-          title: "Welcome Message",
-          content: "Hello! Welcome to our store. How can we help you today?",
-          options: ["Support", "Sales"],
-          organizationId: org.id,
-        }
-      });
-
-      // Seed Default Templates
-      await tx.template.createMany({
-        data: [
-          {
-            name: "welcome_verification",
-            body: "Welcome! Your verification code is {{1}}.",
-            category: "Authentication",
-            buttons: [],
-            mediaType: "none",
-            metaStatus: "approved",
-            organizationId: org.id,
-          },
-          {
-            name: "special_offer",
-            body: "Hi {{1}}, we have a special offer for you! Reply YES to claim.",
-            category: "Marketing",
-            buttons: ["YES", "NO"],
-            mediaType: "none",
-            metaStatus: "approved",
+      // Mark WhatsApp attempt, create default chatbot node, and create templates in parallel (don't depend on each other)
+      await Promise.all([
+        tx.whatsAppLoginAttempt.update({
+          where: { id: attemptId },
+          data: {
+            status: "VERIFIED",
+            userId: user.id
+          }
+        }),
+        tx.chatbotNode.create({
+          data: {
+            id: "n1",
+            type: "message",
+            title: "Welcome Message",
+            content: "Hello! Welcome to our store. How can we help you today?",
+            options: ["Support", "Sales"],
             organizationId: org.id,
           }
-        ]
-      });
+        }),
+        tx.template.createMany({
+          data: [
+            {
+              name: "welcome_verification",
+              body: "Welcome! Your verification code is {{1}}.",
+              category: "Authentication",
+              buttons: [],
+              mediaType: "none",
+              metaStatus: "approved",
+              organizationId: org.id,
+            },
+            {
+              name: "special_offer",
+              body: "Hi {{1}}, we have a special offer for you! Reply YES to claim.",
+              category: "Marketing",
+              buttons: ["YES", "NO"],
+              mediaType: "none",
+              metaStatus: "approved",
+              organizationId: org.id,
+            }
+          ]
+        })
+      ]);
 
       return { user, org };
     });

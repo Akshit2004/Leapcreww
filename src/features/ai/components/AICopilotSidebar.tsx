@@ -186,7 +186,7 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [executingAction, setExecutingAction] = useState<string | null>(null);
-  const [initialAnalysis, setInitialAnalysis] = useState(false);
+  const initialAnalysisRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -202,7 +202,7 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
 
   useEffect(() => {
     let mounted = true;
-    if (isOpen && !initialAnalysis && contacts.length > 0) {
+    if (isOpen && !initialAnalysisRef.current && contacts.length > 0) {
       const greetings = [
         {
           role: "assistant" as "user" | "assistant",
@@ -212,11 +212,11 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
       setTimeout(() => {
         if (!mounted) return;
         setMessages(greetings);
-        setInitialAnalysis(true);
+        initialAnalysisRef.current = true;
       }, 0);
     }
     return () => { mounted = false; };
-  }, [isOpen, contacts, campaigns, messages, initialAnalysis]);
+  }, [isOpen, contacts, campaigns, messages]);
 
   const getContext = useCallback(() => {
     return {

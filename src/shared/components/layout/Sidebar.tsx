@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { 
-  LayoutDashboard, 
-  MessageSquare, 
-  Megaphone, 
-  FileText, 
-  Bot, 
-  Cpu, 
+  LayoutDashboard,
+  MessageSquare,
+  Megaphone,
+  FileText,
+  Bot,
+  Cpu,
   LogOut,
   X,
   ShoppingBag,
@@ -19,6 +19,7 @@ import {
   BarChart3,
   Users,
   Sparkles,
+  Plug,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useApp } from "../../context/AppContext";
@@ -86,6 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "templates", label: "Templates", icon: FileText },
     { id: "chatbot", label: "Bot Builder", icon: Cpu, hideOnMobile: true },
     { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
+    { id: "integrations", label: "Integrations", icon: Plug },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 

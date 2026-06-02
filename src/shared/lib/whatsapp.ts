@@ -102,7 +102,7 @@ export async function getWhatsAppConfig(orgId: string): Promise<{
     accessToken: systemToken,
     businessAccountId: org.whatsappBusinessAccountId,
     apiVersion: WHATSAPP_API_VERSION,
-    verifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "wappflow_verify_2026",
+    verifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "",
     appSecret: process.env.WHATSAPP_APP_SECRET || "",
   };
 }
@@ -216,7 +216,12 @@ export function verifyWebhook(
   token: string | null,
   challenge: string | null
 ): { verified: boolean; challenge?: string } {
-  const expectedToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "wappflow_verify_2026";
+  const expectedToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+
+  if (!expectedToken) {
+    console.error("WHATSAPP_WEBHOOK_VERIFY_TOKEN is not configured");
+    return { verified: false };
+  }
 
   if (mode === "subscribe" && token === expectedToken && challenge) {
     return { verified: true, challenge };

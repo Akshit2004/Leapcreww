@@ -13,16 +13,17 @@ export async function GET(req: NextRequest) {
   const where: { organizationId: string; isActive: boolean; category?: string } = { organizationId: orgId, isActive: true };
   if (category) where.category = category;
 
-  const products = await prisma.product.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-  });
-
-  const categories = await prisma.product.findMany({
-    where: { organizationId: orgId, isActive: true },
-    select: { category: true },
-    distinct: ["category"],
-  });
+  const [products, categories] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.product.findMany({
+      where: { organizationId: orgId, isActive: true },
+      select: { category: true },
+      distinct: ["category"],
+    }),
+  ]);
 
   return NextResponse.json({
     products,
