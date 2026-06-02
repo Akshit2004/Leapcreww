@@ -29,7 +29,7 @@ export const ChecklistWizard: React.FC<ChecklistWizardProps> = ({
   if (!showChecklist) return null;
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm relative overflow-hidden animate-slide-up select-none">
+    <div className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-6 shadow-sm relative overflow-hidden animate-slide-up select-none">
       <button 
         onClick={() => dismissOnboarding(organizationId)}
         className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all cursor-pointer z-10"

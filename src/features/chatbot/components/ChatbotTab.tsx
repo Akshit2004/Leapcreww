@@ -182,7 +182,7 @@ export const ChatbotTab: React.FC = () => {
   }, []);
 
   // Touch gesture handlers for mobile: two-finger pan and pinch-zoom
-  const calculateDistance = (touches: TouchList) => {
+  const calculateDistance = (touches: any) => {
     if (touches.length < 2) return 0;
     const dx = touches[0].clientX - touches[1].clientX;
     const dy = touches[0].clientY - touches[1].clientY;
@@ -701,7 +701,18 @@ export const ChatbotTab: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative select-none bg-[#fafaf9]">
-      {/* AI Generating Loading Overlay */}
+      {/* MOBILE FALLBACK */}
+      <div className="lg:hidden flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
+        <Cpu className="w-12 h-12 text-stone-300" />
+        <h2 className="text-lg font-bold text-stone-900 uppercase">Desktop Only</h2>
+        <p className="text-xs text-stone-500 max-w-xs leading-relaxed">
+          The Visual Bot Builder canvas requires a larger screen. Please switch to a desktop device to architect your conversational flows.
+        </p>
+      </div>
+
+      {/* DESKTOP BUILDER */}
+      <div className="hidden lg:flex flex-col h-full overflow-hidden">
+        {/* AI Generating Loading Overlay */}
       {isAiLoading && (
         <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-white border border-stone-300 rounded-none p-8 max-w-sm shadow-xl flex flex-col items-center text-center space-y-5 animate-pulse-soft">
@@ -1387,6 +1398,7 @@ export const ChatbotTab: React.FC = () => {
           animation: dash 5s linear infinite;
         }
       `}</style>
+      </div>
     </div>
   );
 };

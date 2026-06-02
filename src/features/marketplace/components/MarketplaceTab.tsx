@@ -204,10 +204,11 @@ export const MarketplaceTab: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9]">
-      <div className="flex items-center justify-between border-b border-stone-200 pb-6">
+    <div className="flex-1 overflow-y-auto p-4 pb-12 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9]">
+      {/* Dynamic Header Layout */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center justify-between border-b border-stone-200 pb-6 select-none">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-none bg-stone-950 flex items-center justify-center border border-stone-950">
+          <div className="w-10 h-10 rounded-none bg-stone-950 flex items-center justify-center border border-stone-950 shrink-0">
             <ShoppingBag className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -215,10 +216,10 @@ export const MarketplaceTab: React.FC = () => {
             <p className="text-xs text-stone-500">Manage products and orders</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-3 w-full lg:flex lg:w-auto gap-1">
           <button
             onClick={() => setActiveSection("overview")}
-            className={`px-4 py-2 rounded-none text-xs font-bold border transition-all cursor-pointer ${
+            className={`px-4 py-2.5 rounded-none text-[10px] sm:text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer text-center ${
               activeSection === "overview" ? "bg-stone-950 text-white border-stone-950" : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"
             }`}
           >
@@ -226,7 +227,7 @@ export const MarketplaceTab: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveSection("products")}
-            className={`px-4 py-2 rounded-none text-xs font-bold border transition-all cursor-pointer ${
+            className={`px-4 py-2.5 rounded-none text-[10px] sm:text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer text-center ${
               activeSection === "products" ? "bg-stone-950 text-white border-stone-950" : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"
             }`}
           >
@@ -234,7 +235,7 @@ export const MarketplaceTab: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveSection("orders")}
-            className={`px-4 py-2 rounded-none text-xs font-bold border transition-all cursor-pointer ${
+            className={`px-4 py-2.5 rounded-none text-[10px] sm:text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer text-center ${
               activeSection === "orders" ? "bg-stone-950 text-white border-stone-950" : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"
             }`}
           >
@@ -246,13 +247,13 @@ export const MarketplaceTab: React.FC = () => {
       {activeSection === "overview" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard icon={Package} label="Total Products" value={stats.totalProducts} color="stone" />
-            <StatCard icon={ShoppingBag} label="Active Products" value={stats.activeProducts} color="stone" />
-            <StatCard icon={Package} label="Pending Orders" value={stats.pendingOrders} color="stone" />
-            <StatCard icon={ExternalLink} label="Revenue (paid)" value={`₹${(stats.revenue / 100).toFixed(2)}`} color="stone" />
+            <StatCard icon={Package} label="Total Products" value={stats.totalProducts} />
+            <StatCard icon={ShoppingBag} label="Active Products" value={stats.activeProducts} />
+            <StatCard icon={Package} label="Pending Orders" value={stats.pendingOrders} />
+            <StatCard icon={ExternalLink} label="Revenue (paid)" value={`₹${(stats.revenue / 100).toFixed(2)}`} />
           </div>
 
-          <div className="bg-white rounded-none p-6 border border-stone-200 animate-fade-in flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="bg-white rounded-none p-5 sm:p-8 border border-stone-200 hover:border-stone-400 transition-colors duration-300 animate-fade-in flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className={`inline-block w-2 h-2 rounded-full transition-all duration-300 ${organization?.marketplaceBotEnabled ? "bg-stone-900 animate-pulse" : "bg-stone-300"}`} />
@@ -286,23 +287,23 @@ export const MarketplaceTab: React.FC = () => {
       )}
 
       {activeSection === "products" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="relative flex-1 max-w-xs">
+        <div className="space-y-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
+            <div className="relative w-full sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
               <input
                 type="text"
                 placeholder="Search products..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 rounded-none bg-white border border-stone-200 text-sm focus:outline-none focus:border-stone-900"
+                className="w-full pl-9 pr-4 py-2.5 rounded-none bg-white border border-stone-200 text-sm focus:outline-none focus:border-stone-900 focus:ring-1 focus:ring-stone-900"
               />
             </div>
             <button
               onClick={() => { resetForm(); setShowAddProduct(true); }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-stone-950 text-white rounded-none border border-stone-950 text-xs font-bold hover:bg-stone-900 transition-all cursor-pointer"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-stone-950 text-white rounded-none border border-stone-950 text-xs font-bold hover:bg-stone-900 transition-all cursor-pointer uppercase tracking-wider"
             >
-              <Plus className="w-4 h-4" /> ADD PRODUCT
+              <Plus className="w-4 h-4" /> Add Product
             </button>
           </div>
 
@@ -338,7 +339,8 @@ export const MarketplaceTab: React.FC = () => {
             </form>
           )}
 
-          <div className="bg-white rounded-none border border-stone-200 overflow-hidden">
+          {/* Desktop Table Catalog View */}
+          <div className="hidden lg:block bg-white rounded-none border border-stone-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -390,49 +392,154 @@ export const MarketplaceTab: React.FC = () => {
               </table>
             </div>
           </div>
+
+          {/* Mobile Product Card Catalog View */}
+          <div className="grid grid-cols-1 gap-4 lg:hidden">
+            {filteredProducts.map((product) => (
+              <div key={product.id} className="bg-white border border-stone-200 p-5 hover:border-stone-400 transition-colors duration-300 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">{product.category}</span>
+                  {product.isActive ? (
+                    <span className="inline-flex items-center gap-1 text-[8px] font-bold text-stone-900 bg-stone-100 px-2 py-0.5 border border-stone-300 rounded-none uppercase">
+                      <CheckCircle2 className="w-2.5 h-2.5" /> Active
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[8px] font-bold text-stone-500 bg-stone-50 px-2 py-0.5 border border-stone-200 rounded-none uppercase">
+                      Inactive
+                    </span>
+                  )}
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-bold text-stone-900 leading-snug">{product.name}</h4>
+                  <p className="text-xs text-stone-500 mt-1 line-clamp-2">{product.description || "No description provided."}</p>
+                </div>
+
+                <div className="flex items-baseline justify-between border-t border-stone-100 pt-4">
+                  <div>
+                    <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block">Price</span>
+                    <span className="text-base font-light text-stone-950">₹{(product.price / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block">Stock</span>
+                    <span className="text-xs font-bold text-stone-700">{product.stock} units</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 border-t border-stone-100 pt-4">
+                  <button
+                    onClick={() => startEdit(product)}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-stone-50 border border-stone-200 hover:border-stone-950 hover:bg-white text-stone-950 text-[10px] font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" /> Edit
+                  </button>
+                  <button
+                    onClick={() => deleteProduct(product.id)}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-white border border-stone-200 hover:border-red-600 hover:bg-red-50 hover:text-red-600 text-stone-500 text-[10px] font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+            {filteredProducts.length === 0 && (
+              <div className="bg-white border border-stone-200 p-8 text-center text-stone-500 text-xs uppercase">
+                No products found
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {activeSection === "orders" && (
-        <div className="bg-white rounded-none border border-stone-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-stone-50 text-stone-600 text-xs font-semibold uppercase tracking-wider border-b border-stone-200">
-                  <th className="text-left px-4 py-3">Order ID</th>
-                  <th className="text-left px-4 py-3">Items</th>
-                  <th className="text-right px-4 py-3">Total</th>
-                  <th className="text-center px-4 py-3">Status</th>
-                  <th className="text-center px-4 py-3">Payment</th>
-                  <th className="text-left px-4 py-3">Phone</th>
-                  <th className="text-left px-4 py-3">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <tr key={order.id} className="border-t border-stone-200 hover:bg-stone-50/50">
-                    <td className="px-4 py-3 text-xs font-bold text-stone-900">{order.orderId}</td>
-                    <td className="px-4 py-3 text-stone-500">
-                      {order.items?.map((i) => `${i.name} x${i.quantity}`).join(", ") || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right">₹{(order.total / 100).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <StatusBadge status={order.status} />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <PaymentBadge status={order.paymentStatus} />
-                    </td>
-                    <td className="px-4 py-3 text-stone-500 text-xs">{order.phone}</td>
-                    <td className="px-4 py-3 text-stone-400 text-xs">{new Date(order.createdAt).toLocaleDateString()}</td>
+        <div className="space-y-4">
+          {/* Desktop Table Orders Ledger View */}
+          <div className="hidden lg:block bg-white rounded-none border border-stone-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-stone-50 text-stone-600 text-xs font-semibold uppercase tracking-wider border-b border-stone-200">
+                    <th className="text-left px-4 py-3">Order ID</th>
+                    <th className="text-left px-4 py-3">Items</th>
+                    <th className="text-right px-4 py-3">Total</th>
+                    <th className="text-center px-4 py-3">Status</th>
+                    <th className="text-center px-4 py-3">Payment</th>
+                    <th className="text-left px-4 py-3">Phone</th>
+                    <th className="text-left px-4 py-3">Date</th>
                   </tr>
-                ))}
-                {orders.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="text-center py-8 text-stone-500 text-xs uppercase">No orders yet</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {orders.map((order) => (
+                    <tr key={order.id} className="border-t border-stone-200 hover:bg-stone-50/50">
+                      <td className="px-4 py-3 text-xs font-bold text-stone-900">{order.orderId}</td>
+                      <td className="px-4 py-3 text-stone-500">
+                        {order.items?.map((i) => `${i.name} x${i.quantity}`).join(", ") || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right">₹{(order.total / 100).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <StatusBadge status={order.status} />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <PaymentBadge status={order.paymentStatus} />
+                      </td>
+                      <td className="px-4 py-3 text-stone-500 text-xs">{order.phone}</td>
+                      <td className="px-4 py-3 text-stone-400 text-xs">{new Date(order.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                  {orders.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="text-center py-8 text-stone-500 text-xs uppercase">No orders yet</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Orders Card Ledger View */}
+          <div className="grid grid-cols-1 gap-4 lg:hidden">
+            {orders.map((order) => (
+              <div key={order.id} className="bg-white border border-stone-200 p-5 hover:border-stone-400 transition-colors duration-300 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-bold text-stone-950 tracking-tight">{order.orderId}</span>
+                  <span className="text-[9px] text-stone-400 font-bold uppercase">{new Date(order.createdAt).toLocaleDateString()}</span>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest block">Ordered Items</span>
+                  <p className="text-xs text-stone-800 font-semibold leading-relaxed">
+                    {order.items?.map((i) => `${i.name} ×${i.quantity}`).join(", ") || "—"}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 border-t border-stone-100 pt-4">
+                  <div>
+                    <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Fulfillment</span>
+                    <StatusBadge status={order.status} />
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Payment</span>
+                    <PaymentBadge status={order.paymentStatus} />
+                  </div>
+                </div>
+
+                <div className="flex items-baseline justify-between border-t border-stone-100 pt-4">
+                  <div>
+                    <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block">Contact Phone</span>
+                    <span className="text-xs font-mono font-bold text-stone-700">{order.phone}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block">Total Amt</span>
+                    <span className="text-base font-light text-stone-950">₹{(order.total / 100).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {orders.length === 0 && (
+              <div className="bg-white border border-stone-200 p-8 text-center text-stone-500 text-xs uppercase">
+                No orders yet
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -440,16 +547,14 @@ export const MarketplaceTab: React.FC = () => {
   );
 };
 
-function StatCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | number; color: string }) {
+function StatCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | number }) {
   return (
-    <div className="bg-white rounded-none p-5 border border-stone-200 flex items-center gap-4 shadow-none">
-      <div className="w-12 h-12 rounded-none flex items-center justify-center border bg-stone-100 text-stone-900 border-stone-300">
-        <Icon className="w-6 h-6" />
+    <div className="bg-white border border-stone-200 p-5 hover:border-stone-400 transition-colors duration-300 select-none flex flex-col justify-between h-28">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest leading-none">{label}</span>
+        <Icon className="w-4 h-4 text-stone-400" />
       </div>
-      <div>
-        <p className="text-xs text-stone-500 font-bold uppercase">{label}</p>
-        <p className="text-xl font-extrabold text-stone-900 mt-0.5">{value}</p>
-      </div>
+      <span className="text-2xl font-light text-stone-950 tracking-tight">{value}</span>
     </div>
   );
 }
@@ -463,7 +568,7 @@ function InputField({ label, value, onChange, type = "text", required }: { label
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
-        className="w-full px-3 py-2 rounded-none border border-stone-200 text-sm focus:outline-none focus:border-stone-900 transition-all"
+        className="w-full px-3 py-2 rounded-none border border-stone-200 text-sm focus:outline-none focus:border-stone-900 transition-all focus:ring-1 focus:ring-stone-900"
       />
     </div>
   );

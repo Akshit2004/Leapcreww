@@ -156,7 +156,7 @@ export const InboxTab: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex h-full overflow-hidden animate-slide-up relative bg-[#fafaf9] min-h-screen">
+    <div className="flex-1 flex h-full overflow-hidden animate-slide-up relative bg-[#fafaf9]">
       {/* 1. Left Contact List Pane */}
       <div className={`w-full md:w-80 border-r border-stone-200 flex flex-col h-full bg-white shrink-0 ${
         activeContactId ? "hidden md:flex" : "flex"

@@ -304,7 +304,7 @@ export const AnalyticsTab: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 sm:p-8 custom-scrollbar space-y-8 bg-[#fafaf9] min-h-screen">
+    <div className="flex-1 overflow-y-auto p-6 pb-12 sm:p-8 custom-scrollbar space-y-8 bg-[#fafaf9]">
       {/* ─── Header ─── */}
       <div className="flex flex-col md:flex-row md:items-baseline justify-between gap-4 pb-6 border-b border-stone-200 select-none">
         <div>

@@ -5,7 +5,7 @@ import { prisma } from "@/shared/lib/prisma";
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { orgId: string } }
+  { params }: { params: Promise<{ orgId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -15,7 +15,7 @@ export async function DELETE(
 
     interface CustomSessionUser { id: string }
     const userId = (session.user as unknown as CustomSessionUser).id;
-    const { orgId } = params;
+    const { orgId } = await params;
 
     const membership = await prisma.membership.findUnique({
       where: {

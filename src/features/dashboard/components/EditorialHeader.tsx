@@ -31,7 +31,7 @@ export const EditorialHeader: React.FC<EditorialHeaderProps> = ({
   }).toUpperCase();
 
   return (
-    <header className="border-b border-stone-200 pb-8 space-y-6 select-none bg-[#fafaf9] p-6 rounded-none">
+    <header className="border-b border-stone-200 pb-6 sm:pb-8 space-y-4 sm:space-y-6 select-none bg-[#fafaf9] p-4 sm:p-6 rounded-none">
       {/* Editorial Meta Banner */}
       <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-stone-500 uppercase tracking-widest border-b border-stone-200/60 pb-3">
         <div>
@@ -49,7 +49,7 @@ export const EditorialHeader: React.FC<EditorialHeaderProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Left/Center Column: Workspace Info */}
         <div className="lg:col-span-2 space-y-3">
-          <h1 className="text-4xl font-light tracking-tight text-stone-950">
+          <h1 className="text-3xl sm:text-4xl font-light tracking-tight text-stone-950 leading-tight">
             {organization?.name || "Workspace Journal"}
           </h1>
           <p className="text-stone-500 max-w-2xl text-sm leading-relaxed">

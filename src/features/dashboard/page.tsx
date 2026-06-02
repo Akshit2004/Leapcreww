@@ -168,10 +168,6 @@ export default function TenantDashboard() {
               <span className="font-extrabold text-sm tracking-tight text-slate-900">WappFlow</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-wa-green-light animate-pulse-soft" />
-            <span className="text-[9px] font-extrabold text-wa-green-dark bg-wa-green/10 px-2 py-1 rounded-lg border border-wa-green/20 uppercase tracking-wide">SaaS Sandbox</span>
-          </div>
         </header>
 
         {renderActiveTab()}

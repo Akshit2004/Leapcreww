@@ -44,7 +44,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
   const showChecklist = !!(organization && !organization.onboardingDismissed && !allStepsDone);
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 sm:p-8 custom-scrollbar space-y-8 bg-[#fafaf9] min-h-screen">
+    <div className="flex-1 overflow-y-auto p-4 pb-12 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 bg-[#fafaf9]">
       {/* 1. Elegant Editorial Header & Wallet Dock */}
       <EditorialHeader 
         organization={organization}
@@ -67,7 +67,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
       )}
 
       {/* 3. Main Editorial Asymmetric Two-Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 sm:gap-8 items-start">
         {/* Left Column (3/5): Workspace Timeline Log */}
         <div className="lg:col-span-3">
           {/* Chronological Activity Stream Ledger */}
@@ -79,9 +79,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
         </div>
 
         {/* Right Column (2/5): Minimalist Pricing Calculator and Metadata Sheet */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-6 sm:space-y-8">
           {/* Flat Workspace Metadata Ledger */}
-          <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300 select-none">
+          <div className="bg-white border border-stone-200 p-5 sm:p-8 hover:border-stone-400 transition-colors duration-300 select-none">
             <div className="pb-6 border-b border-stone-100">
               <h3 className="text-lg font-light text-stone-900">
                 Workspace Metadata
@@ -91,7 +91,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
               </p>
             </div>
 
-            <div className="py-6 space-y-6">
+            <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
               {/* Stat 1: Contacts */}
               <div className="flex items-start justify-between gap-4 border-b border-stone-50 pb-5">
                 <div className="space-y-1">
