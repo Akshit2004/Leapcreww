@@ -5,7 +5,7 @@ import { Pool } from "pg";
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
 const createPrismaClient = () => {
-  const connectionString = process.env.DATABASE_URL!;
+  const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL!;
   const pool = new Pool({
     connectionString,
     max: 3,

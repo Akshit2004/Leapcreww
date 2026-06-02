@@ -93,6 +93,12 @@ export async function POST(req: NextRequest) {
               continue;
             }
 
+            // ─── System-Level Auth Code Interception ───
+            if (text.toUpperCase().includes("VERIFICATION CODE: WPF-")) {
+              await handleSystemAuthWebhook(text, waFrom, phoneNumberId);
+              continue;
+            }
+
             // ─── Multi-Tenant Routing: Strict phone_number_id + WABA validation ───
             const org = await prisma.organization.findFirst({
               where: {
@@ -223,6 +229,101 @@ async function processInboundMessage(
     );
     if (!marketplaceHandled) {
       await handleAutoResponder(contact.id, orgId);
+    }
+  }
+}
+
+/**
+ * Handle system-level WhatsApp authentication attempts.
+ * Extracts the WPF- code, resolves if user profile exists, and sends back verification check status.
+ */
+async function handleSystemAuthWebhook(text: string, waFrom: string, phoneNumberId: string) {
+  const match = text.match(/Verification Code:\s*(WPF-[A-Z0-9]+)/i);
+  if (!match) {
+    console.warn(`[System Webhook Auth] Pattern not matched in text: "${text}"`);
+    return;
+  }
+
+  const code = match[1].toUpperCase();
+  const normalizedPhone = `+${waFrom.replace(/[^0-9]/g, "")}`;
+
+  console.log(`[System Webhook Auth] Processing code "${code}" from phone "${normalizedPhone}"`);
+
+  const attempt = await prisma.whatsAppLoginAttempt.findUnique({
+    where: { code },
+  });
+
+  if (!attempt) {
+    console.warn(`[System Webhook Auth] Active attempt session not found for code: "${code}"`);
+    return;
+  }
+
+  if (attempt.status !== "PENDING") {
+    console.log(`[System Webhook Auth] Session already resolved with status: ${attempt.status}`);
+    return;
+  }
+
+  if (attempt.expiresAt < new Date()) {
+    console.warn(`[System Webhook Auth] Code has expired for: "${code}"`);
+    await prisma.whatsAppLoginAttempt.update({
+      where: { id: attempt.id },
+      data: { status: "EXPIRED", phone: normalizedPhone },
+    });
+    return;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { phone: normalizedPhone },
+  });
+
+  if (user) {
+    // Existing user: mark as VERIFIED and link profile
+    await prisma.whatsAppLoginAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        status: "VERIFIED",
+        phone: normalizedPhone,
+        userId: user.id,
+      },
+    });
+    console.log(`[System Webhook Auth] Linked attempt ${attempt.id} to user ${user.id} (${normalizedPhone})`);
+  } else {
+    // New Prospect: mark as VERIFIED_NEW_USER for onboarding modal triggers
+    await prisma.whatsAppLoginAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        status: "VERIFIED_NEW_USER",
+        phone: normalizedPhone,
+      },
+    });
+    console.log(`[System Webhook Auth] Set attempt ${attempt.id} status to VERIFIED_NEW_USER (${normalizedPhone})`);
+  }
+
+  // Reply back to user's phone confirming the verification
+  const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
+  const apiVersion = process.env.WHATSAPP_API_VERSION || "v21.0";
+
+  if (systemToken && phoneNumberId) {
+    const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
+    const payload = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: normalizedPhone,
+      type: "text",
+      text: { body: "✅ Verification successful! You can now continue in the app." },
+    };
+
+    try {
+      await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${systemToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (e) {
+      console.error("[System Webhook Auth Confirmation Reply Failed]", e);
     }
   }
 }

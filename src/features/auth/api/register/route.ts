@@ -4,7 +4,7 @@ import { prisma } from "../../../../shared/lib/prisma";
 
 export async function POST(req: Request) {
   try {
-    const { email, password, name, organizationName } = await req.json();
+    const { email, password, name, organizationName, phone, attemptId } = await req.json();
 
     if (!email || !password || !name || !organizationName) {
       return NextResponse.json(
@@ -13,7 +13,40 @@ export async function POST(req: Request) {
       );
     }
 
+    if (!attemptId) {
+      return NextResponse.json(
+        { error: "Missing WhatsApp verification attempt ID." },
+        { status: 400 }
+      );
+    }
+
     const emailLower = email.toLowerCase().trim();
+
+    // Validate the WhatsApp login attempt
+    const attempt = await prisma.whatsAppLoginAttempt.findUnique({
+      where: { id: attemptId }
+    });
+
+    if (!attempt) {
+      return NextResponse.json(
+        { error: "WhatsApp verification session not found." },
+        { status: 400 }
+      );
+    }
+
+    if (attempt.status !== "VERIFIED_NEW_USER") {
+      return NextResponse.json(
+        { error: "WhatsApp verification has not been completed for this session." },
+        { status: 400 }
+      );
+    }
+
+    if (attempt.expiresAt < new Date()) {
+      return NextResponse.json(
+        { error: "WhatsApp verification session has expired. Please scan the QR code again." },
+        { status: 400 }
+      );
+    }
 
     // 1. Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -25,6 +58,21 @@ export async function POST(req: Request) {
         { error: "A user with this email address already exists." },
         { status: 400 }
       );
+    }
+
+    // Check if phone already registered
+    if (phone) {
+      const cleanPhone = phone.replace(/[^0-9]/g, "");
+      const formattedPhone = cleanPhone.startsWith("+") ? cleanPhone : `+${cleanPhone}`;
+      const existingPhoneUser = await prisma.user.findUnique({
+        where: { phone: formattedPhone }
+      });
+      if (existingPhoneUser) {
+        return NextResponse.json(
+          { error: "A user with this WhatsApp number already exists." },
+          { status: 400 }
+        );
+      }
     }
 
     // 2. Hash Password
@@ -47,6 +95,7 @@ export async function POST(req: Request) {
           email: emailLower,
           name,
           hashedPassword,
+          phone: phone ? (phone.startsWith("+") ? phone : `+${phone.replace(/[^0-9]/g, "")}`) : null,
         }
       });
 
@@ -64,6 +113,15 @@ export async function POST(req: Request) {
           userId: user.id,
           organizationId: org.id,
           role: "OWNER"
+        }
+      });
+
+      // Mark WhatsApp attempt as verified for this user
+      await tx.whatsAppLoginAttempt.update({
+        where: { id: attemptId },
+        data: {
+          status: "VERIFIED",
+          userId: user.id
         }
       });
 
