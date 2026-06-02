@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
-  Plug,
   ChevronDown,
   ChevronUp,
   RefreshCw,
@@ -17,8 +16,6 @@ import {
   ShoppingBag,
   Eye,
   EyeOff,
-  ArrowRight,
-  Clock,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -35,12 +32,7 @@ interface StoredIntegration {
   webhookUrl: string | null;
 }
 
-interface ActivityEntry {
-  id: number;
-  time: string;
-  message: string;
-  type: "success" | "error" | "info";
-}
+
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -58,7 +50,7 @@ const WEBHOOK_TOPICS = [
   { topic: "checkouts/create", label: "Abandoned cart started" },
 ];
 
-type IntegrationId = "shopify" | "woocommerce" | "zapier" | "gsheets";
+type IntegrationId = "shopify";
 
 interface IntegrationMeta {
   id: IntegrationId;
@@ -66,7 +58,7 @@ interface IntegrationMeta {
   tagline: string;
   description: string;
   icon: React.ReactNode;
-  badge: "live" | "beta" | "soon";
+  badge: "live";
   accentColor: string;
 }
 
@@ -83,39 +75,30 @@ const INTEGRATIONS: IntegrationMeta[] = [
   },
 ];
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
 
-let _logId = 0;
-function makeLogId() {
-  return ++_logId;
-}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function IntegrationsTab() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const orgId = params.orgId as string;
 
-  const [selected, setSelected] = useState<IntegrationId>("shopify");
+  const [selected] = useState<IntegrationId>("shopify");
   const [integration, setIntegration] = useState<StoredIntegration | null>(null);
   const [shopDomain, setShopDomain] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [activity, setActivity] = useState<ActivityEntry[]>([]);
-
-  const addActivity = useCallback((message: string, type: ActivityEntry["type"] = "info") => {
-    const now = new Date();
-    const time = `${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes()
-    ).padStart(2, "0")}`;
-    setActivity((prev) => [{ id: makeLogId(), time, message, type }, ...prev].slice(0, 20));
-  }, []);
+  const [successBanner, setSuccessBanner] = useState<string | null>(null);
+  const [warningBanner, setWarningBanner] = useState<string | null>(null);
 
   const fetchIntegration = useCallback(async () => {
     const res = await fetch(`/api/org/${orgId}/integrations`);
@@ -132,7 +115,29 @@ export function IntegrationsTab() {
 
   useEffect(() => {
     fetchIntegration();
-  }, [fetchIntegration]);
+
+    const isSuccess = searchParams.get("success") === "true";
+    const warningMsg = searchParams.get("warning");
+    const errorMsg = searchParams.get("error");
+
+    if (isSuccess) {
+      setSuccessBanner("Shopify connected successfully! Programmatic webhooks have been registered.");
+      router.replace(`/org/${orgId}`);
+    }
+
+    if (warningMsg) {
+      const decoded = decodeURIComponent(warningMsg);
+      if (!decoded.toLowerCase().includes("localhost")) {
+        setWarningBanner(decoded);
+      }
+      router.replace(`/org/${orgId}`);
+    }
+
+    if (errorMsg) {
+      setError(decodeURIComponent(errorMsg));
+      router.replace(`/org/${orgId}`);
+    }
+  }, [orgId, searchParams, fetchIntegration, router]);
 
   const isConnected = integration?.status === "connected";
 
@@ -141,18 +146,24 @@ export function IntegrationsTab() {
       ? `${window.location.origin}/api/webhooks/shopify`
       : "/api/webhooks/shopify";
 
-  const isLocalhost =
-    typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  // 1-Click OAuth Connect
+  function handleOAuthConnect() {
+    if (!shopDomain) {
+      setError("Please enter your Shopify Store Address.");
+      return;
+    }
+    setError("");
+    window.location.href = `/api/shopify/auth?shop=${encodeURIComponent(shopDomain)}&orgId=${orgId}`;
+  }
 
+  // Developer Mode Manual Credentials Connect
   async function handleConnect() {
     if (!shopDomain || !accessToken) {
-      setError("Store domain and access token are both required.");
+      setError("Store domain and access token are both required in Developer Mode.");
       return;
     }
     setError("");
     setConnecting(true);
-    addActivity("Verifying credentials with Shopify API…", "info");
     try {
       const res = await fetch(`/api/org/${orgId}/integrations`, {
         method: "POST",
@@ -162,21 +173,14 @@ export function IntegrationsTab() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Connection failed.");
-        addActivity(data.error ?? "Connection failed.", "error");
       } else {
-        addActivity(`Connected to "${data.shopName}".`, "success");
-        if (data.webhooksRegistered?.length) {
-          addActivity(
-            `${data.webhooksRegistered.length} webhook topic(s) registered.`,
-            "success"
-          );
+        if (data.webhookWarning && !data.webhookWarning.toLowerCase().includes("localhost")) {
+          setWarningBanner(data.webhookWarning);
         }
-        if (data.webhookWarning) addActivity(data.webhookWarning, "info");
         await fetchIntegration();
       }
     } catch {
       setError("Network error — check your connection and try again.");
-      addActivity("Network error.", "error");
     } finally {
       setConnecting(false);
     }
@@ -193,9 +197,9 @@ export function IntegrationsTab() {
       setIntegration(null);
       setShopDomain("");
       setAccessToken("");
-      addActivity("Store disconnected.", "info");
+      setSuccessBanner(null);
+      setWarningBanner(null);
     } catch {
-      addActivity("Error disconnecting.", "error");
     } finally {
       setDisconnecting(false);
     }
@@ -203,17 +207,16 @@ export function IntegrationsTab() {
 
   async function handleSync() {
     setSyncing(true);
-    addActivity("Fetching catalog from Shopify…", "info");
     try {
       const res = await fetch(`/api/webhooks/shopify?action=sync&orgId=${orgId}`);
       const data = await res.json();
       if (res.ok) {
-        addActivity(`${data.synced} product(s) imported into WappFlow.`, "success");
+        // sync success
       } else {
-        addActivity(data.error ?? "Sync failed.", "error");
+        setError(data.error ?? "Sync failed.");
       }
     } catch {
-      addActivity("Network error during sync.", "error");
+      setError("Network error during sync.");
     } finally {
       setSyncing(false);
     }
@@ -229,7 +232,7 @@ export function IntegrationsTab() {
 
   return (
     <div className="flex h-full overflow-hidden bg-[#fafaf9]">
-      {/* ── Left: Integration List ─────────────────────────────────────────── */}
+      {/* ── Left: Integration List (Shopify Only) ─────────────────────────── */}
       <aside className="w-72 shrink-0 flex flex-col border-r border-stone-200 bg-white h-full hidden lg:flex">
         <div className="px-5 pt-6 pb-4 border-b border-stone-100">
           <p className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400 mb-1">
@@ -247,9 +250,8 @@ export function IntegrationsTab() {
             return (
               <button
                 key={intg.id}
-                onClick={() => setSelected(intg.id)}
-                disabled={intg.badge === "soon"}
-                className={`w-full text-left px-3 py-3.5 mb-1 transition-all duration-150 border flex items-center gap-3 group cursor-pointer disabled:cursor-not-allowed ${
+                onClick={() => {}}
+                className={`w-full text-left px-3 py-3.5 mb-1 transition-all duration-150 border flex items-center gap-3 group ${
                   active
                     ? "bg-stone-950 border-stone-950 text-white"
                     : "border-transparent hover:border-stone-200 hover:bg-stone-50 text-stone-600"
@@ -282,9 +284,7 @@ export function IntegrationsTab() {
                           ? "bg-[#96bf48]/10 text-[#96bf48]"
                           : active
                           ? "bg-white/10 text-white/70"
-                          : intg.badge === "live"
-                          ? "bg-stone-100 text-stone-500"
-                          : "bg-stone-50 text-stone-400"
+                          : "bg-stone-100 text-stone-500"
                       }`}
                     >
                       {shopifyConnected && !active ? "On" : intg.badge}
@@ -327,28 +327,21 @@ export function IntegrationsTab() {
             <div>
               <div className="flex items-center gap-3">
                 <h2 className="text-base font-black text-stone-950 tracking-tight">{meta.name}</h2>
-                {meta.id === "shopify" && (
-                  <span
-                    className={`text-[8px] font-black tracking-widest uppercase px-2 py-0.5 border ${
-                      isConnected
-                        ? "border-[#96bf48]/30 text-[#96bf48] bg-[#96bf48]/5"
-                        : "border-stone-200 text-stone-400 bg-stone-50"
-                    }`}
-                  >
-                    {isConnected ? "Connected" : "Not connected"}
-                  </span>
-                )}
-                {meta.badge !== "live" && (
-                  <span className="text-[8px] font-black tracking-widest uppercase px-2 py-0.5 border border-stone-200 text-stone-400 bg-stone-50">
-                    {meta.badge}
-                  </span>
-                )}
+                <span
+                  className={`text-[8px] font-black tracking-widest uppercase px-2 py-0.5 border ${
+                    isConnected
+                      ? "border-[#96bf48]/30 text-[#96bf48] bg-[#96bf48]/5"
+                      : "border-stone-200 text-stone-400 bg-stone-50"
+                  }`}
+                >
+                  {isConnected ? "Connected" : "Not connected"}
+                </span>
               </div>
               <p className="text-[10px] text-stone-500 font-medium mt-0.5">{meta.tagline}</p>
             </div>
           </div>
 
-          {meta.id === "shopify" && isConnected && (
+          {isConnected && (
             <div className="flex items-center gap-1.5 text-[9px] font-bold text-stone-400">
               <div className="w-1.5 h-1.5 rounded-full bg-[#96bf48] animate-pulse" />
               Live sync active
@@ -357,56 +350,76 @@ export function IntegrationsTab() {
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {/* ── Shopify Detail ── */}
-          {meta.id === "shopify" && (
-            <div className="p-8 space-y-8 max-w-3xl">
-              {/* Description */}
-              <p className="text-sm text-stone-600 leading-relaxed font-medium border-l-2 border-stone-200 pl-4">
-                {meta.description}
-              </p>
+          <div className="p-8 space-y-8 max-w-3xl">
+            {/* Description */}
+            <p className="text-sm text-stone-600 leading-relaxed font-medium border-l-2 border-stone-200 pl-4">
+              {meta.description}
+            </p>
 
-              {/* Error */}
-              {error && (
-                <div className="flex items-start gap-3 px-4 py-3 border border-red-200 bg-red-50">
-                  <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                  <p className="text-xs text-red-700 font-medium leading-relaxed">{error}</p>
-                </div>
-              )}
+            {/* Success Banner */}
+            {successBanner && (
+              <div className="flex items-start gap-2.5 px-4 py-3 border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-semibold leading-relaxed">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div>{successBanner}</div>
+              </div>
+            )}
 
-              {/* ── Section: Credentials ── */}
-              <section className="space-y-4">
-                <h3 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
-                  Store Credentials
-                </h3>
+            {/* Warning Banner */}
+            {warningBanner && (
+              <div className="flex items-start gap-2.5 px-4 py-3 border border-amber-200 bg-amber-50 text-amber-800 text-xs font-semibold leading-relaxed">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>{warningBanner}</div>
+              </div>
+            )}
 
-                <div className="space-y-3">
-                  {/* Domain */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-stone-600 mb-1.5">
-                      Store Domain
-                    </label>
-                    <div className="flex items-stretch border border-stone-200 bg-white focus-within:border-stone-400 transition-colors">
-                      <span className="flex items-center px-3 text-[10px] text-stone-400 font-medium border-r border-stone-200 bg-stone-50 shrink-0">
-                        https://
-                      </span>
-                      <input
-                        type="text"
-                        value={shopDomain}
-                        onChange={(e) => {
-                          setShopDomain(e.target.value);
-                          setError("");
-                        }}
-                        placeholder="yourstore.myshopify.com"
-                        disabled={isConnected}
-                        className="flex-1 px-3 py-2.5 text-xs text-stone-900 bg-transparent outline-none placeholder:text-stone-300 disabled:text-stone-400 disabled:bg-stone-50"
-                      />
-                    </div>
+            {/* Error Message */}
+            {error && (
+              <div className="flex items-start gap-3 px-4 py-3 border border-red-200 bg-red-50">
+                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-700 font-medium leading-relaxed">{error}</p>
+              </div>
+            )}
+
+            {/* ── Section: Credentials & Connection ── */}
+            <section className="space-y-4">
+              <h3 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
+                Store Connection
+              </h3>
+
+              <div className="space-y-3">
+                {/* 1. Store Address URL Input */}
+                <div>
+                  <label className="block text-[10px] font-bold text-stone-600 mb-1.5">
+                    Shopify Store Domain
+                  </label>
+                  <div className="flex items-stretch border border-stone-200 bg-white focus-within:border-stone-400 transition-colors">
+                    <span className="flex items-center px-3 text-[10px] text-stone-400 font-medium border-r border-stone-200 bg-stone-50 shrink-0">
+                      https://
+                    </span>
+                    <input
+                      type="text"
+                      value={shopDomain}
+                      onChange={(e) => {
+                        setShopDomain(e.target.value);
+                        setError("");
+                      }}
+                      placeholder="yourstore.myshopify.com"
+                      disabled={isConnected}
+                      className="flex-1 px-3 py-2.5 text-xs text-stone-900 bg-transparent outline-none placeholder:text-stone-300 disabled:text-stone-400 disabled:bg-stone-50"
+                    />
                   </div>
+                  {!isConnected && !manualMode && (
+                    <p className="text-[9px] text-stone-400 mt-1.5 font-medium italic leading-relaxed">
+                      Type your store domain (e.g. yourstore.myshopify.com) and click connect below.
+                    </p>
+                  )}
+                </div>
 
-                  {/* Token */}
-                  <div>
+                {/* 2. Admin API Access Token (Only shown in manual developer mode) */}
+                {manualMode && !isConnected && (
+                  <div className="animate-fade-in">
                     <label className="block text-[10px] font-bold text-stone-600 mb-1.5">
-                      Admin API Access Token
+                      Admin API Access Token (Developer Mode)
                     </label>
                     <div className="flex items-stretch border border-stone-200 bg-white focus-within:border-stone-400 transition-colors">
                       <input
@@ -417,8 +430,7 @@ export function IntegrationsTab() {
                           setError("");
                         }}
                         placeholder="shpat_••••••••••••••••••••••••"
-                        disabled={isConnected}
-                        className="flex-1 px-3 py-2.5 text-xs font-mono text-stone-900 bg-transparent outline-none placeholder:text-stone-300 disabled:text-stone-400 disabled:bg-stone-50"
+                        className="flex-1 px-3 py-2.5 text-xs font-mono text-stone-900 bg-transparent outline-none placeholder:text-stone-300"
                       />
                       <button
                         type="button"
@@ -429,12 +441,26 @@ export function IntegrationsTab() {
                       </button>
                     </div>
                   </div>
-                </div>
+                )}
+              </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-3 pt-1">
-                  {!isConnected ? (
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 pt-1">
+                {!isConnected ? (
+                  !manualMode ? (
+                    // 1-Click Install Button (Default)
                     <button
+                      type="button"
+                      onClick={handleOAuthConnect}
+                      className="flex items-center gap-2.5 px-5 py-2.5 bg-[#96bf48] text-white text-[9px] font-black tracking-widest uppercase border border-[#96bf48] hover:bg-[#7ea33e] hover:border-[#7ea33e] transition-colors cursor-pointer"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      Connect via Shopify (1-Click Install)
+                    </button>
+                  ) : (
+                    // Developer Mode Manual Install Button
+                    <button
+                      type="button"
                       onClick={handleConnect}
                       disabled={connecting}
                       className="flex items-center gap-2 px-5 py-2.5 bg-stone-950 text-white text-[9px] font-black tracking-widest uppercase hover:bg-stone-800 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
@@ -444,246 +470,162 @@ export function IntegrationsTab() {
                       ) : (
                         <Link2 className="w-3.5 h-3.5" />
                       )}
-                      {connecting ? "Connecting…" : "Connect Store"}
+                      {connecting ? "Connecting…" : "Connect Store (Developer)"}
                     </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={handleSync}
-                        disabled={syncing}
-                        className="flex items-center gap-2 px-5 py-2.5 text-white text-[9px] font-black tracking-widest uppercase transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                        style={{ backgroundColor: "#96bf48" }}
-                      >
-                        {syncing ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-3.5 h-3.5" />
-                        )}
-                        {syncing ? "Syncing…" : "Sync Catalog Now"}
-                      </button>
-                      <button
-                        onClick={handleDisconnect}
-                        disabled={disconnecting}
-                        className="flex items-center gap-2 px-4 py-2.5 text-stone-500 border border-stone-200 text-[9px] font-black tracking-widest uppercase hover:text-red-600 hover:border-red-200 transition-colors disabled:opacity-50 cursor-pointer"
-                      >
-                        {disconnecting ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Link2Off className="w-3.5 h-3.5" />
-                        )}
-                        Disconnect
-                      </button>
-                    </>
-                  )}
-                </div>
-              </section>
-
-              {/* ── Section: How to get your token ── */}
-              {!isConnected && (
-                <section>
-                  <button
-                    onClick={() => setGuideOpen((v) => !v)}
-                    className="flex items-center gap-2 text-[9px] font-black tracking-widest uppercase text-stone-500 hover:text-stone-900 transition-colors cursor-pointer"
-                  >
-                    {guideOpen ? (
-                      <ChevronUp className="w-3.5 h-3.5" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    )}
-                    How to get your Admin API Token
-                  </button>
-
-                  {guideOpen && (
-                    <div className="mt-4 border border-stone-200 bg-white divide-y divide-stone-100">
-                      {GUIDE_STEPS.map((text, i) => (
-                        <div key={i} className="flex items-start gap-4 px-5 py-4">
-                          <div className="w-6 h-6 shrink-0 bg-stone-950 text-white flex items-center justify-center text-[9px] font-black">
-                            {i + 1}
-                          </div>
-                          <p className="text-xs text-stone-600 font-medium leading-relaxed pt-0.5">
-                            {text}
-                          </p>
-                        </div>
-                      ))}
-                      <div className="px-5 py-3 bg-stone-50">
-                        <a
-                          href="https://help.shopify.com/en/manual/apps/app-types/custom-apps"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-[9px] font-black tracking-wide uppercase text-stone-500 hover:text-stone-900 transition-colors"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          Shopify Custom Apps Docs
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                </section>
-              )}
-
-              {/* ── Section: Webhooks ── */}
-              <section className="space-y-4">
-                <h3 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
-                  Webhook Configuration
-                </h3>
-
-                {/* Receiver URL */}
-                <div>
-                  <label className="block text-[10px] font-bold text-stone-600 mb-1.5">
-                    WappFlow Receiver URL
-                  </label>
-                  <div className="flex items-stretch border border-stone-200 bg-stone-50">
-                    <input
-                      readOnly
-                      value={webhookReceiver}
-                      className="flex-1 px-3 py-2.5 text-[10px] font-mono text-stone-500 bg-transparent outline-none select-all"
-                    />
+                  )
+                ) : (
+                  // Connected State Actions
+                  <>
                     <button
-                      onClick={copyWebhook}
-                      className="flex items-center gap-1.5 px-3 border-l border-stone-200 text-[9px] font-bold text-stone-400 hover:text-stone-700 transition-colors cursor-pointer shrink-0"
+                      type="button"
+                      onClick={handleSync}
+                      disabled={syncing}
+                      className="flex items-center gap-2 px-5 py-2.5 text-white text-[9px] font-black tracking-widest uppercase transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                      style={{ backgroundColor: "#96bf48" }}
                     >
-                      <Copy className="w-3.5 h-3.5" />
-                      {copied ? "Copied" : "Copy"}
+                      {syncing ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      )}
+                      {syncing ? "Syncing…" : "Sync Catalog Now"}
                     </button>
-                  </div>
+                    <button
+                      type="button"
+                      onClick={handleDisconnect}
+                      disabled={disconnecting}
+                      className="flex items-center gap-2 px-4 py-2.5 text-stone-500 border border-stone-200 text-[9px] font-black tracking-widest uppercase hover:text-red-600 hover:border-red-200 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      {disconnecting ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Link2Off className="w-3.5 h-3.5" />
+                      )}
+                      Disconnect
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Mode Switcher */}
+              {!isConnected && (
+                <div className="pt-2 text-left border-t border-stone-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualMode(!manualMode);
+                      setError("");
+                    }}
+                    className="text-[9px] font-black text-stone-500 hover:text-stone-900 tracking-wide uppercase transition-colors underline decoration-stone-200 decoration-1 underline-offset-4 cursor-pointer"
+                  >
+                    {manualMode
+                      ? "Or use simplified 1-Click OAuth (Recommended)"
+                      : "Or connect manually using Custom App Access Token (Developer Mode)"}
+                  </button>
                 </div>
+              )}
+            </section>
 
-                {/* Localhost Warning */}
-                {isLocalhost && (
-                  <div className="border border-amber-200 bg-amber-50 px-5 py-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span className="text-[9px] font-black tracking-widest uppercase text-amber-700">
-                        Local environment detected
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-amber-700 font-medium leading-relaxed">
-                      Shopify cannot reach{" "}
-                      <code className="font-mono bg-amber-100 px-1">localhost</code>. Use a public
-                      tunnel so Shopify can POST events to WappFlow:
-                    </p>
-                    <div className="bg-white border border-amber-200 divide-y divide-amber-100">
-                      {[
-                        "ngrok http 3000",
-                        "cloudflared tunnel --url http://localhost:3000",
-                      ].map((cmd) => (
-                        <div key={cmd} className="px-3 py-2 font-mono text-[10px] text-stone-700">
-                          {cmd}
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-amber-600 font-medium">
-                      Replace <code className="font-mono">localhost:3000</code> in the URL above
-                      with your tunnel domain, then paste it into Shopify Admin under webhook
-                      settings.
-                    </p>
-                  </div>
-                )}
+            {/* ── Section: How to get your token (Developer Mode Only) ── */}
+            {!isConnected && manualMode && (
+              <section className="animate-fade-in border border-stone-200 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setGuideOpen((v) => !v)}
+                  className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-stone-50 transition-colors cursor-pointer"
+                >
+                  <span className="text-[9px] font-black tracking-widest uppercase text-stone-600">
+                    How to get your Admin API Token
+                  </span>
+                  {guideOpen ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-stone-400" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+                  )}
+                </button>
 
-                {/* Active webhook topics */}
-                {isConnected && (
-                  <div className="border border-stone-200 bg-white">
-                    <div className="px-5 py-3 border-b border-stone-100">
-                      <span className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-500">
-                        Active subscriptions
-                      </span>
-                    </div>
-                    <div className="divide-y divide-stone-100">
-                      {WEBHOOK_TOPICS.map(({ topic, label }) => (
-                        <div
-                          key={topic}
-                          className="flex items-center justify-between px-5 py-3"
-                        >
-                          <div className="flex items-center gap-3">
-                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" style={{ color: "#96bf48" }} />
-                            <span className="text-xs font-medium text-stone-700">{label}</span>
-                          </div>
-                          <span className="text-[9px] font-mono text-stone-400">{topic}</span>
+                {guideOpen && (
+                  <div className="border-t border-stone-200 divide-y divide-stone-100 bg-[#fafaf9]">
+                    {GUIDE_STEPS.map((text, i) => (
+                      <div key={i} className="flex items-start gap-4 px-5 py-4">
+                        <div className="w-6 h-6 shrink-0 bg-stone-950 text-white flex items-center justify-center text-[9px] font-black">
+                          {i + 1}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </section>
-
-              {/* ── Section: Recent Activity ── */}
-              {activity.length > 0 && (
-                <section className="space-y-3">
-                  <h3 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
-                    Recent Activity
-                  </h3>
-                  <div className="border border-stone-200 bg-white divide-y divide-stone-100">
-                    {activity.map((entry) => (
-                      <div key={entry.id} className="flex items-start gap-4 px-5 py-3">
-                        <div className="flex items-center gap-2 shrink-0 pt-0.5">
-                          <Clock className="w-3 h-3 text-stone-300" />
-                          <span className="text-[9px] font-mono text-stone-400">{entry.time}</span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <div
-                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                              entry.type === "success"
-                                ? "bg-[#96bf48]"
-                                : entry.type === "error"
-                                ? "bg-red-400"
-                                : "bg-stone-300"
-                            }`}
-                          />
-                          <span
-                            className={`text-xs font-medium leading-relaxed ${
-                              entry.type === "success"
-                                ? "text-stone-700"
-                                : entry.type === "error"
-                                ? "text-red-600"
-                                : "text-stone-500"
-                            }`}
-                          >
-                            {entry.message}
-                          </span>
-                        </div>
+                        <p className="text-xs text-stone-600 font-medium leading-relaxed pt-0.5">
+                          {text}
+                        </p>
                       </div>
                     ))}
+                    <div className="px-5 py-3">
+                      <a
+                        href="https://help.shopify.com/en/manual/apps/app-types/custom-apps"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-[9px] font-black tracking-wide uppercase text-stone-500 hover:text-stone-900 transition-colors"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Shopify Custom Apps Docs
+                      </a>
+                    </div>
                   </div>
-                </section>
-              )}
-            </div>
-          )}
+                )}
+              </section>
+            )}
 
-          {/* ── Non-Shopify Placeholder ── */}
-          {meta.id !== "shopify" && (
-            <div className="flex flex-col items-start justify-center h-full px-16 py-20 max-w-xl">
-              <div
-                className="w-12 h-12 flex items-center justify-center border border-stone-200 mb-6"
-                style={{ color: meta.accentColor }}
-              >
-                {meta.icon}
+            {/* ── Section: Webhooks Details ── */}
+            <section className="pt-4 border-t border-stone-200">
+              {/* Webhook Receiver */}
+              <div className="space-y-2">
+                <h4 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
+                  Webhook Receiver URL
+                </h4>
+                <div className="flex items-stretch border border-stone-200 bg-stone-50 focus-within:border-stone-400 transition-colors">
+                  <input
+                    readOnly
+                    value={webhookReceiver}
+                    className="flex-1 px-3 py-2 text-[10px] font-mono text-stone-600 bg-transparent outline-none select-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={copyWebhook}
+                    className="px-3 border-l border-stone-200 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer bg-white"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {copied && (
+                  <p className="text-[9px] text-[#96bf48] font-bold tracking-wide">
+                    Copied to clipboard.
+                  </p>
+                )}
               </div>
-              <span className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400 mb-2">
-                {meta.badge === "beta" ? "Private Beta" : "Coming Soon"}
-              </span>
-              <h2 className="text-2xl font-black text-stone-950 tracking-tight mb-3 leading-tight">
-                {meta.name} is on the roadmap.
-              </h2>
-              <p className="text-sm text-stone-500 font-medium leading-relaxed mb-6">
-                {meta.description}
-              </p>
-              <button className="flex items-center gap-2 px-5 py-2.5 border border-stone-950 text-stone-950 text-[9px] font-black tracking-widest uppercase hover:bg-stone-950 hover:text-white transition-colors cursor-pointer">
-                Request Early Access
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+            </section>
+
+            {/* ── Section: Active Webhooks ── */}
+            {isConnected && integration?.webhookUrl && (
+              <section className="space-y-3">
+                <h4 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
+                  Active Webhook Subscriptions
+                </h4>
+                <div className="grid sm:grid-cols-3 gap-3">
+                  {WEBHOOK_TOPICS.map((item) => (
+                    <div
+                      key={item.topic}
+                      className="border border-stone-200 bg-white p-3 flex items-start gap-2.5"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-[#96bf48] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[10px] font-bold text-stone-900">{item.label}</p>
+                        <p className="text-[8px] font-mono text-stone-400 mt-0.5">{item.topic}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
         </div>
       </main>
-
-      {/* ── Mobile: stacked view (no left sidebar) ── */}
-      <style jsx global>{`
-        @media (max-width: 1023px) {
-          .integrations-mobile-nav {
-            display: flex;
-          }
-        }
-      `}</style>
     </div>
   );
 }
