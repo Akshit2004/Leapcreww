@@ -16,6 +16,7 @@ import {
   Clock,
   TrendingUp,
   Users,
+  X,
 } from "lucide-react";
 import { useApp, Contact, Campaign, Template } from "@/shared/context/AppContext";
 
@@ -45,6 +46,8 @@ interface AICopilotSidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   orgId: string;
+  isOpen?: boolean;
+  setIsOpen?: (open: boolean) => void;
 }
 
 function generateSuggestions(
@@ -162,6 +165,8 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
   activeTab,
   setActiveTab,
   orgId,
+  isOpen: controlledIsOpen,
+  setIsOpen: controlledSetIsOpen,
 }) => {
   const {
     contacts,
@@ -174,7 +179,9 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
     updateContact,
   } = useApp();
 
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  const setIsOpen = controlledSetIsOpen || setInternalIsOpen;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -460,7 +467,7 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-600/30 hover:bg-emerald-500 transition-all duration-200 cursor-pointer group"
+        className="hidden lg:flex fixed bottom-6 right-6 z-50 items-center gap-2 px-4 py-3 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-600/30 hover:bg-emerald-500 transition-all duration-200 cursor-pointer group"
       >
         <Sparkles className="w-5 h-5" />
         <span className="text-sm font-semibold">AI Copilot</span>
@@ -473,11 +480,11 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
     <>
       <div
         onClick={() => setIsOpen(false)}
-        className="fixed inset-0 bg-black/20 z-40 cursor-pointer"
+        className="fixed inset-0 bg-black/40 z-50 cursor-pointer backdrop-blur-sm transition-opacity"
       />
 
-      <aside className="fixed top-0 right-0 z-50 h-full w-[400px] max-w-[95vw] bg-white shadow-2xl border-l border-emerald-200 flex flex-col select-none animate-slide-in-left">
-        <div className="shrink-0 bg-emerald-600 text-white px-5 py-4 flex items-center justify-between">
+      <aside className="fixed inset-y-0 right-0 z-[60] w-full sm:w-[400px] bg-white shadow-2xl sm:border-l border-emerald-200 flex flex-col select-none animate-slide-up sm:animate-slide-in-left">
+        <div className="shrink-0 bg-emerald-600 text-white px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
               <Sparkles className="w-4 h-4" />
@@ -492,13 +499,15 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer active:scale-95"
+            aria-label="Close Copilot"
           >
-            <PanelRightClose className="w-5 h-5" />
+            <PanelRightClose className="w-5 h-5 hidden sm:block" />
+            <X className="w-6 h-6 sm:hidden" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50">
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50 pb-4">
           {messages.length === 1 && suggestions.length > 0 && (
             <div className="px-4 pt-4 pb-2">
               <div className="flex items-center gap-2 mb-3">
@@ -599,7 +608,7 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-emerald-100 bg-white p-4">
+        <div className="shrink-0 border-t border-emerald-100 bg-white p-3 sm:p-4 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
           <div className="flex items-center gap-2">
             <input
               ref={inputRef}
@@ -607,20 +616,20 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask me to do something..."
-              className="flex-1 px-4 py-2.5 bg-slate-50 border border-emerald-200 rounded-xl text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all"
+              placeholder="Message AI Copilot..."
+              className="flex-1 px-4 py-3 sm:py-2.5 bg-slate-50 border border-emerald-200 rounded-2xl text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 transition-all shadow-inner"
               disabled={isLoading}
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || isLoading}
-              className="p-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shrink-0"
+              className="p-3 sm:p-2.5 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shrink-0 shadow-sm active:scale-95"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-5 h-5 sm:w-4 sm:h-4" />
             </button>
           </div>
-          <div className="mt-2 flex items-center gap-3 text-[10px] text-stone-400">
-            <span>I can create campaigns, send messages, add tags</span>
+          <div className="mt-2 flex items-center justify-center sm:justify-start gap-3 text-[10px] text-stone-400 font-medium">
+            <span>I can create campaigns, send messages, and add tags.</span>
           </div>
         </div>
       </aside>

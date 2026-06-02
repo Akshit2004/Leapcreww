@@ -135,7 +135,7 @@ export interface AppContextType {
   updateChatbotNodes: (nodes: ChatbotNode[], organizationId: string) => Promise<void>;
   toggleIntegration: (id: string, config?: { apiKey?: string; webhookUrl?: string }) => void;
   addSystemLog: (type: SystemLog["type"], message: string) => void;
-  clearSystemLogs: () => void;
+  clearSystemLogs: (orgId?: string) => void;
   submitMetaTemplate: (templateData: { 
     name: string; 
     category: string; 

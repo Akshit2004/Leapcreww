@@ -21,7 +21,8 @@ const createPrismaClient = () => {
   });
 };
 
-export const prisma = globalForPrisma.prisma || createPrismaClient();
+// Temporarily bypass the global cache to force Next.js to load the new schema
+export const prisma = createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 export default prisma;

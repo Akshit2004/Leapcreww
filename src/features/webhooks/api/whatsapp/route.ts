@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
         if (value.messages) {
           for (const msg of value.messages) {
             const waFrom = msg.from;
-            const text = msg.text?.body || msg.interactive?.button_reply?.id || msg.button?.text || "";
+            const text = msg.text?.body || msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || msg.button?.text || "";
             const profileName = value.contacts?.[0]?.profile?.name || `Customer ${waFrom.slice(-4)}`;
 
             console.log(`WhatsApp message from ${waFrom} (${profileName}): ${text}`);
@@ -221,13 +221,22 @@ async function processInboundMessage(
   });
 
   if (contact.assignedAgent === "Bot") {
-    const marketplaceHandled = await handleMarketplaceMessage(
-      text,
-      contact.phone,
-      contact.id,
-      orgId
-    );
-    if (!marketplaceHandled) {
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { marketplaceBotEnabled: true },
+    });
+
+    if (org?.marketplaceBotEnabled) {
+      const marketplaceHandled = await handleMarketplaceMessage(
+        text,
+        contact.phone,
+        contact.id,
+        orgId
+      );
+      if (!marketplaceHandled) {
+        await handleAutoResponder(contact.id, orgId);
+      }
+    } else {
       await handleAutoResponder(contact.id, orgId);
     }
   }

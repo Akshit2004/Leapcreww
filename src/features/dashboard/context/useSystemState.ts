@@ -31,7 +31,16 @@ export const useSystemState = () => {
     ]);
   }, []);
 
-  const clearSystemLogs = useCallback(() => setSystemLogs([]), []);
+  const clearSystemLogs = useCallback(async (orgId?: string) => {
+    setSystemLogs([]);
+    if (orgId) {
+      try {
+        await fetch(`/api/org/${orgId}/system-logs`, { method: "DELETE" });
+      } catch (err) {
+        console.error("Failed to delete system logs from database:", err);
+      }
+    }
+  }, []);
 
   const toggleIntegration = useCallback((id: string, config?: { apiKey?: string; webhookUrl?: string }) => {
     setIntegrations((prev) =>

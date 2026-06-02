@@ -173,6 +173,16 @@ async function advanceFlow(
     return;
   }
 
+  // Record impression for analytics funnel drop-off calculation
+  await prisma.chatbotAnalytics.create({
+    data: {
+      nodeId: node.id,
+      contactId,
+      action: "impression",
+      organizationId: orgId,
+    },
+  }).catch(() => {});
+
   if (node.type === "message") {
     await sendReply(node.content, contactId, orgId, timeStr, contactName, contactPhone);
     if (node.nextId) {
@@ -379,15 +389,17 @@ export async function handleAutoResponder(contactId: string, orgId: string) {
     const d = new Date();
     const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
-    // 1. Try chatbot node tree flow
-    const nodes = await prisma.chatbotNode.findMany({
-      where: { organizationId: orgId },
-      orderBy: { id: "asc" },
-    });
+    // 1. Try chatbot node tree flow if builder is enabled
+    if (contact.organization.chatbotBuilderEnabled) {
+      const nodes = await prisma.chatbotNode.findMany({
+        where: { organizationId: orgId },
+        orderBy: { id: "asc" },
+      });
 
-    if (nodes.length > 0) {
-      const handled = await handleNodeFlow(contact, nodes as unknown as BotNode[], orgId, timeStr);
-      if (handled) return;
+      if (nodes.length > 0) {
+        const handled = await handleNodeFlow(contact, nodes as unknown as BotNode[], orgId, timeStr);
+        if (handled) return;
+      }
     }
 
     // 2. Fall back to free-form AI
@@ -431,7 +443,35 @@ async function handleNodeFlow(
     if (!trigger) return false;
 
     const triggerPhrase = trigger.content.toLowerCase().trim();
-    if (!triggerPhrase || !incomingText.includes(triggerPhrase)) return false;
+    if (!triggerPhrase) return false;
+
+    // 1. Fast exact/substring match
+    let isMatch = incomingText.includes(triggerPhrase);
+
+    // 2. Semantic AI Intent Match (if fast match fails)
+    if (!isMatch) {
+      try {
+        const intentPrompt = [
+          {
+            role: "system",
+            content: `You are an intent classification engine. The user wants to trigger a workflow defined by the phrase/intent: "${triggerPhrase}".
+Does the following user message match this intent, mean the same thing, or represent a clear desire to start this process?
+Reply ONLY with the exact word "true" or "false". No explanations.`
+          },
+          {
+            role: "user",
+            content: `User message: "${incomingText}"`
+          }
+        ];
+        // Note: getGroqChatCompletion is already imported at the top of the file
+        const response = await getGroqChatCompletion(intentPrompt);
+        isMatch = response.toLowerCase().includes("true");
+      } catch (err) {
+        console.error("Semantic intent match failed:", err);
+      }
+    }
+
+    if (!isMatch) return false;
 
     // Trigger matched — advance along the flow
     if (trigger.nextId) {
@@ -475,6 +515,16 @@ async function handleNodeFlow(
     }
 
     if (matchedOption && routes[matchedOption]) {
+      // Record response for analytics funnel calculations
+      await prisma.chatbotAnalytics.create({
+        data: {
+          nodeId: currentNode.id,
+          contactId: contact.id,
+          action: "response",
+          organizationId: orgId,
+        },
+      }).catch(() => {});
+
       await prisma.contact.update({
         where: { id: contact.id },
         data: { currentNodeId: null },

@@ -51,16 +51,23 @@ export async function sendCatalogCategories(phone: string, orgId: string) {
     await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Sorry, no products available right now. Please check back later! 😊" }, orgId);
     return;
   }
-  const buttons = categories.slice(0, 3).map((cat) => ({
-    type: "reply" as const,
-    reply: { id: `cat_${cat}`, title: cat.length > 20 ? cat.slice(0, 18) + "…" : cat },
-  }));
   await sendWhatsAppMessage({
     to: formatPhoneNumber(phone),
-    text: `📂 *Categories*
-
-Select a category to browse products:`,
-    buttons,
+    list: {
+      buttonText: "Browse Categories",
+      title: SHOP_NAME,
+      description: "Select a category below to browse products:",
+      sections: [
+        {
+          title: "Product Categories",
+          rows: categories.map((cat) => ({
+            id: `cat_${cat}`,
+            title: cat.substring(0, 24),
+            description: `Browse all items in ${cat}`
+          }))
+        }
+      ]
+    }
   }, orgId);
 }
 
@@ -74,14 +81,24 @@ export async function sendCategoryProducts(phone: string, category: string, orgI
     await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: `No products found in "${category}" category.` }, orgId);
     return;
   }
-  let text = `📁 *${category}*\n\n`;
-  products.forEach((p, i) => {
-    text += `${i + 1}. *${p.name}* — ${formatPrice(p.price)}\n`;
-    if (p.description) text += `   ${p.description.slice(0, 60)}\n`;
-    text += "\n";
-  });
-  text += `Reply with product *name* to add to cart.\nOr type *MENU* to go back.`;
-  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
+  await sendWhatsAppMessage({
+    to: formatPhoneNumber(phone),
+    list: {
+      buttonText: "View Products",
+      title: `${SHOP_NAME} - ${category}`,
+      description: "Select a product below to add it to your cart:",
+      sections: [
+        {
+          title: "Available Items",
+          rows: products.map((p) => ({
+            id: p.name,
+            title: p.name.substring(0, 24),
+            description: `${formatPrice(p.price)} - ${p.description ? p.description.slice(0, 60) : 'Tap to add to cart'}`
+          }))
+        }
+      ]
+    }
+  }, orgId);
 }
 
 export async function addToCart(phone: string, contactId: string, orgId: string, productName: string) {

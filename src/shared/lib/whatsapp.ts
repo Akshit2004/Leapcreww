@@ -11,6 +11,15 @@ export interface WhatsAppMessage {
   video?: { link?: string; id?: string };
   document?: { link?: string; id?: string; filename?: string };
   buttons?: { type: "reply"; reply: { id: string; title: string } }[];
+  list?: {
+    buttonText: string;
+    title: string;
+    description: string;
+    sections: {
+      title: string;
+      rows: { id: string; title: string; description?: string }[];
+    }[];
+  };
 }
 
 export interface WhatsAppWebhookPayload {
@@ -30,7 +39,10 @@ export interface WhatsAppWebhookPayload {
           type: string;
           image?: { id: string; mime_type: string };
           button?: { payload: string; text: string };
-          interactive?: { button_reply: { id: string; title: string } };
+          interactive?: {
+            button_reply?: { id: string; title: string };
+            list_reply?: { id: string; title: string; description?: string };
+          };
         }[];
         statuses?: {
           id: string;
@@ -151,6 +163,18 @@ export async function sendWhatsAppMessage(
           type: btn.type,
           reply: btn.reply,
         })),
+      },
+    };
+  } else if (message.list) {
+    // Interactive list message
+    body.type = "interactive";
+    body.interactive = {
+      type: "list",
+      header: { type: "text", text: message.list.title },
+      body: { text: message.list.description },
+      action: {
+        button: message.list.buttonText,
+        sections: message.list.sections,
       },
     };
   } else {

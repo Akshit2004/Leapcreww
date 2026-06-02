@@ -18,6 +18,7 @@ import {
   Settings,
   BarChart3,
   Users,
+  Sparkles,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useApp } from "../../context/AppContext";
@@ -28,6 +29,7 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isOpen?: boolean;
   onClose?: () => void;
+  onOpenCopilot?: () => void;
 }
 
 declare global {
@@ -47,7 +49,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeTab, 
   setActiveTab,
   isOpen = false,
-  onClose
+  onClose,
+  onOpenCopilot
 }) => {
   const params = useParams();
   const orgId = params.orgId as string;
@@ -81,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "customers", label: "Customers", icon: Users },
     { id: "campaigns", label: "Campaigns", icon: Megaphone },
     { id: "templates", label: "Templates", icon: FileText },
-    { id: "chatbot", label: "Bot Builder", icon: Cpu },
+    { id: "chatbot", label: "Bot Builder", icon: Cpu, hideOnMobile: true },
     { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
     { id: "settings", label: "Settings", icon: Settings },
   ];
@@ -92,20 +95,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Mobile Backdrop Overlay */}
-      {isOpen && (
-        <div 
-          onClick={onClose}
-          className="fixed inset-0 bg-[#fafaf9]/85 z-40 lg:hidden backdrop-blur-xs transition-opacity duration-350 cursor-pointer animate-fade-in"
-        />
-      )}
-
+      {/* --- DESKTOP SIDEBAR (Hidden on mobile) --- */}
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`fixed inset-y-0 left-0 z-50 lg:static bg-[#fafaf9] text-stone-900 flex flex-col border-r border-stone-200 h-screen select-none shrink-0 transition-all duration-300 ease-in-out relative overflow-hidden ${
-          isOpen ? "translate-x-0 w-[264px]" : "-translate-x-full lg:translate-x-0"
-        } ${isHovered ? "lg:w-[264px] shadow-[5px_0_30px_rgba(0,0,0,0.05)] lg:shadow-none" : "lg:w-20"}`}
+        className={`hidden lg:flex flex-col bg-[#fafaf9] text-stone-900 border-r border-stone-200 h-screen select-none shrink-0 transition-all duration-300 ease-in-out relative overflow-hidden ${
+          isHovered ? "w-[264px]" : "w-20"
+        }`}
       >
         {/* Brand Signature */}
         <div className={`p-6 border-b border-stone-200 flex items-center justify-between shrink-0 relative z-10 transition-all duration-300 ${
@@ -126,12 +122,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[9px] text-stone-900 border border-stone-950 bg-stone-100 font-black tracking-wider uppercase px-1.5 py-0.5 mt-1.5 inline-block rounded-none">{appVersion}</span>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="lg:hidden p-1.5 rounded-none hover:bg-stone-100 text-stone-500 hover:text-stone-950 cursor-pointer transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Navigation Links */}
@@ -152,10 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 data-stagger-pos={pos.toFixed(3)}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  if (onClose) onClose();
-                }}
+                onClick={() => setActiveTab(item.id)}
                 className={`w-full flex items-center justify-between px-3.5 py-3 transition-all duration-250 group relative cursor-pointer rounded-none border border-transparent ${
                   isActive
                     ? "bg-wa-green text-white font-bold"
@@ -191,7 +178,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
         </nav>
-
 
         {/* Bottom Profile / Signout */}
         <div className="p-4 border-t border-stone-200 bg-white shrink-0 relative z-10">
@@ -230,6 +216,67 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
       </aside>
+
+      {/* --- MOBILE BOTTOM NAVIGATION --- */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200 flex items-center overflow-x-auto pb-safe scrollbar-none snap-x snap-mandatory">
+        {menuItems.filter(item => !item.hideOnMobile).map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex-1 min-w-[72px] flex flex-col items-center justify-center py-3 px-1 relative transition-colors cursor-pointer snap-start shrink-0 ${
+                isActive ? "text-wa-green" : "text-stone-500 hover:text-stone-900 hover:bg-stone-50"
+              }`}
+            >
+              <div className="relative mb-1">
+                <Icon className={`w-5 h-5 transition-transform ${isActive ? "scale-110" : ""}`} />
+                {item.badge !== undefined && (
+                  <span className="absolute -top-1 -right-2 min-w-[14px] h-[14px] flex items-center justify-center bg-wa-green text-white text-[8px] font-bold rounded-full px-1 border border-white">
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
+              </div>
+              <span className={`text-[9px] tracking-wider uppercase font-bold truncate w-full text-center px-1 ${
+                isActive ? "text-wa-green" : "text-stone-500"
+              }`}>
+                {item.label}
+              </span>
+              {isActive && (
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-wa-green rounded-b-sm" />
+              )}
+            </button>
+          );
+        })}
+        {/* AI Copilot on mobile nav */}
+        <button
+          onClick={() => {
+            if (onOpenCopilot) onOpenCopilot();
+          }}
+          className="min-w-[72px] flex flex-col items-center justify-center py-3 px-1 relative transition-colors cursor-pointer snap-start shrink-0 text-emerald-600 hover:text-emerald-500 hover:bg-emerald-50 group"
+        >
+          <div className="relative mb-1">
+            <Sparkles className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
+          <span className="text-[9px] tracking-wider uppercase font-bold text-center px-1 text-emerald-600">
+            Copilot
+          </span>
+        </button>
+        {/* Profile / Logout on mobile nav */}
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="min-w-[72px] flex flex-col items-center justify-center py-3 px-1 relative transition-colors cursor-pointer snap-start shrink-0 text-stone-500 hover:text-red-500 hover:bg-stone-50"
+        >
+          <div className="relative mb-1">
+            <LogOut className="w-5 h-5" />
+          </div>
+          <span className="text-[9px] tracking-wider uppercase font-bold text-center px-1">
+            Logout
+          </span>
+        </button>
+      </nav>
     </>
   );
 };

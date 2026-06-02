@@ -48,6 +48,8 @@ export async function GET(
         metaBusinessId: true,
         walletBalance: true,
         onboardingDismissed: true,
+        marketplaceBotEnabled: true,
+        chatbotBuilderEnabled: true,
       }
     });
 

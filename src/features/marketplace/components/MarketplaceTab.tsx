@@ -49,6 +49,9 @@ export const MarketplaceTab: React.FC = () => {
   const params = useParams();
   const orgId = params.orgId as string;
 
+  const [organization, setOrganization] = useState<any>(null);
+  const [botToggling, setBotToggling] = useState(false);
+
   const [activeSection, setActiveSection] = useState<"overview" | "products" | "orders">("overview");
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -78,6 +81,7 @@ export const MarketplaceTab: React.FC = () => {
         if (mounted) {
           setProducts(dataP.products || []);
           if (dataO.orders) setOrders(dataO.orders);
+          if (dataO.organization) setOrganization(dataO.organization);
         }
       } catch (err) {
         console.error("Failed to fetch marketplace data", err);
@@ -88,6 +92,32 @@ export const MarketplaceTab: React.FC = () => {
     loadAll();
     return () => { mounted = false; };
   }, [orgId]);
+
+  const toggleMarketplaceBot = async () => {
+    if (!organization) return;
+    setBotToggling(true);
+    const targetState = !organization.marketplaceBotEnabled;
+    try {
+      const res = await fetch("/api/marketplace/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId, enabled: targetState }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.organization) {
+          setOrganization((prev: any) => ({
+            ...prev,
+            marketplaceBotEnabled: data.organization.marketplaceBotEnabled,
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to toggle marketplace bot setting", err);
+    } finally {
+      setBotToggling(false);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -214,11 +244,44 @@ export const MarketplaceTab: React.FC = () => {
       </div>
 
       {activeSection === "overview" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={Package} label="Total Products" value={stats.totalProducts} color="stone" />
-          <StatCard icon={ShoppingBag} label="Active Products" value={stats.activeProducts} color="stone" />
-          <StatCard icon={Package} label="Pending Orders" value={stats.pendingOrders} color="stone" />
-          <StatCard icon={ExternalLink} label="Revenue (paid)" value={`₹${(stats.revenue / 100).toFixed(2)}`} color="stone" />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard icon={Package} label="Total Products" value={stats.totalProducts} color="stone" />
+            <StatCard icon={ShoppingBag} label="Active Products" value={stats.activeProducts} color="stone" />
+            <StatCard icon={Package} label="Pending Orders" value={stats.pendingOrders} color="stone" />
+            <StatCard icon={ExternalLink} label="Revenue (paid)" value={`₹${(stats.revenue / 100).toFixed(2)}`} color="stone" />
+          </div>
+
+          <div className="bg-white rounded-none p-6 border border-stone-200 animate-fade-in flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className={`inline-block w-2 h-2 rounded-full transition-all duration-300 ${organization?.marketplaceBotEnabled ? "bg-stone-900 animate-pulse" : "bg-stone-300"}`} />
+                <h3 className="text-xs font-bold text-stone-900 uppercase tracking-widest">Marketplace Automation Bot</h3>
+              </div>
+              <p className="text-[11px] text-stone-500 max-w-2xl leading-relaxed">
+                When enabled, the automated AI agent intercepts inbound WhatsApp messages to guide users through catalogs, manage carts, handle checkout, and check payment status in real-time.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 self-start md:self-auto">
+              <span className="text-[10px] font-extrabold text-stone-400 uppercase tracking-widest">
+                {organization?.marketplaceBotEnabled ? "ACTIVE / ONLINE" : "DISABLED"}
+              </span>
+              <button
+                disabled={botToggling}
+                onClick={toggleMarketplaceBot}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-none border border-stone-300 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-stone-900 ${
+                  organization?.marketplaceBotEnabled ? "bg-stone-950" : "bg-stone-100"
+                } ${botToggling ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-none bg-white shadow-sm ring-0 transition duration-200 ease-in-out border border-stone-300 ${
+                    organization?.marketplaceBotEnabled ? "translate-x-5 bg-white border-stone-950" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

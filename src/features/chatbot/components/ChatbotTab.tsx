@@ -20,13 +20,70 @@ import {
   Save,
   CheckCircle,
   AlertTriangle,
-  Info
+  Info,
+  BarChart3,
+  X
 } from "lucide-react";
 
 export const ChatbotTab: React.FC = () => {
   const { chatbotNodes, updateChatbotNodes, addSystemLog, lockSync, unlockSync } = useApp();
   const params = useParams();
   const orgId = params.orgId as string;
+
+  // Chatbot nodes drop-off stats
+  const [nodeStats, setNodeStats] = useState<Record<string, { impressions: number; responses: number; dropoffs: number; rate: number }>>({});
+  const [showStats, setShowStats] = useState(false);
+  const [organization, setOrganization] = useState<any>(null);
+  const [botToggling, setBotToggling] = useState(false);
+  const [isMobileInspectorOpen, setIsMobileInspectorOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchInitData = async () => {
+      try {
+        const [resAnalytics, resOrg] = await Promise.all([
+          fetch(`/api/org/${orgId}/chatbot/analytics`),
+          fetch(`/api/org/${orgId}/data`)
+        ]);
+        if (resAnalytics.ok) {
+          const data = await resAnalytics.json();
+          if (data.stats) setNodeStats(data.stats);
+        }
+        if (resOrg.ok) {
+          const data = await resOrg.json();
+          if (data.organization) setOrganization(data.organization);
+        }
+      } catch (err) {
+        console.error("Failed to fetch init data", err);
+      }
+    };
+    fetchInitData();
+  }, [orgId]);
+
+  const toggleBuilderStatus = async () => {
+    if (!organization) return;
+    setBotToggling(true);
+    const targetState = !organization.chatbotBuilderEnabled;
+    try {
+      const res = await fetch("/api/chatbot/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId, enabled: targetState }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.organization) {
+          setOrganization((prev: any) => ({
+            ...prev,
+            chatbotBuilderEnabled: data.organization.chatbotBuilderEnabled,
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to toggle builder setting", err);
+    } finally {
+      setBotToggling(false);
+    }
+  };
 
   // Local nodes list so visual cards react instantly as the user types
   const [localNodes, setLocalNodes] = useState<ChatbotNode[]>([]);
@@ -49,6 +106,12 @@ export const ChatbotTab: React.FC = () => {
   // Dragging states for cards
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Touch gesture states for mobile
+  const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
+  const [twoFingerStart, setTwoFingerStart] = useState({ distance: 0, pan: { x: 0, y: 0 } });
+  const [isTouchPanning, setIsTouchPanning] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   // Inspector form states (local copy of selected node to avoid laggy typing)
   const [formTitle, setFormTitle] = useState("");
@@ -117,6 +180,45 @@ export const ChatbotTab: React.FC = () => {
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, []);
+
+  // Touch gesture handlers for mobile: two-finger pan and pinch-zoom
+  const calculateDistance = (touches: TouchList) => {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handleCanvasTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    } else if (e.touches.length === 2) {
+      setTwoFingerStart({
+        distance: calculateDistance(e.touches),
+        pan: { x: pan.x, y: pan.y }
+      });
+      setIsTouchPanning(true);
+    }
+  };
+
+  const handleCanvasTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const newDistance = calculateDistance(e.touches);
+      const scale = newDistance / twoFingerStart.distance;
+      const newZoom = Math.max(0.6, Math.min(1.5, zoom * scale));
+      setZoom(newZoom);
+      setTwoFingerStart({ ...twoFingerStart, distance: newDistance });
+    } else if (e.touches.length === 1 && isTouchPanning) {
+      const dx = e.touches[0].clientX - touchStart.x;
+      const dy = e.touches[0].clientY - touchStart.y;
+      setPan({ x: twoFingerStart.pan.x + dx, y: twoFingerStart.pan.y + dy });
+    }
+  };
+
+  const handleCanvasTouchEnd = () => {
+    setIsTouchPanning(false);
+  };
 
   // Loading screen messages for AI Flow architect
   const loadingMessages = [
@@ -326,6 +428,7 @@ export const ChatbotTab: React.FC = () => {
     e.preventDefault();
     setSelectedNodeId(nodeId);
     setDraggingNodeId(nodeId);
+    setIsMobileInspectorOpen(true);
 
     const pos = positions[nodeId] || { x: 100, y: 100 };
     setDragOffset({
@@ -636,6 +739,17 @@ export const ChatbotTab: React.FC = () => {
         {/* Sync & Layout Actions */}
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setShowStats((prev) => !prev)}
+            className={`flex items-center gap-1.5 border px-3 py-1.5 rounded-none text-xs font-semibold cursor-pointer transition-all shadow-none ${
+              showStats ? "bg-stone-900 border-stone-900 text-white" : "bg-white border-stone-200 hover:border-stone-400 text-stone-700"
+            }`}
+            title="Toggle conversational stats overlays"
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>{showStats ? "Hide Stats" : "Show Node Stats"}</span>
+          </button>
+
+          <button
             onClick={() => handleAutoLayout()}
             className="flex items-center gap-1.5 border border-stone-200 hover:border-stone-400 text-stone-700 bg-white px-3 py-1.5 rounded-none text-xs font-semibold cursor-pointer transition-all shadow-none"
             title="Clean canvas alignment"
@@ -669,25 +783,31 @@ export const ChatbotTab: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* LEFT CANVAS WORKSPACE */}
         <div
+          ref={canvasRef}
           className="flex-1 overflow-hidden bg-[#fafaf9] relative border-r border-stone-200"
           onMouseDown={handleCanvasMouseDown}
           onMouseMove={handleCanvasMouseMove}
           onMouseUp={handleCanvasMouseUp}
-          style={{ cursor: getCanvasCursor() }}
+          onTouchStart={handleCanvasTouchStart}
+          onTouchMove={handleCanvasTouchMove}
+          onTouchEnd={handleCanvasTouchEnd}
+          style={{ cursor: getCanvasCursor(), touchAction: "none" }}
         >
-          {/* Zoom Overlay Control buttons */}
-          <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+          {/* Zoom Overlay Control buttons - Touch-friendly sizing */}
+          <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 lg:gap-2 gap-1.5">
             <button
               onClick={() => setZoom((prev) => Math.min(1.5, prev + 0.1))}
-              className="w-9 h-9 border border-stone-200 hover:border-stone-400 bg-white rounded-none shadow-none text-stone-700 hover:bg-stone-50 flex items-center justify-center cursor-pointer transition-all"
+              className="w-11 h-11 lg:w-9 lg:h-9 border border-stone-200 hover:border-stone-400 bg-white rounded-none shadow-none text-stone-700 hover:bg-stone-50 flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              title="Zoom in"
             >
-              <ZoomIn className="w-4 h-4" />
+              <ZoomIn className="w-5 lg:w-4 h-5 lg:h-4" />
             </button>
             <button
               onClick={() => setZoom((prev) => Math.max(0.6, prev - 0.1))}
-              className="w-9 h-9 border border-stone-200 hover:border-stone-400 bg-white rounded-none shadow-none text-stone-700 hover:bg-stone-50 flex items-center justify-center cursor-pointer transition-all"
+              className="w-11 h-11 lg:w-9 lg:h-9 border border-stone-200 hover:border-stone-400 bg-white rounded-none shadow-none text-stone-700 hover:bg-stone-50 flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              title="Zoom out"
             >
-              <ZoomOut className="w-4 h-4" />
+              <ZoomOut className="w-5 lg:w-4 h-5 lg:h-4" />
             </button>
             <button
               onClick={() => {
@@ -695,41 +815,44 @@ export const ChatbotTab: React.FC = () => {
                 setPan({ x: 0, y: 0 });
                 handleAutoLayout();
               }}
-              className="w-9 h-9 border border-stone-200 hover:border-stone-400 bg-white rounded-none shadow-none text-stone-700 hover:bg-stone-50 flex items-center justify-center cursor-pointer transition-all"
-              title="Reset Zoom & Pan"
+              className="w-11 h-11 lg:w-9 lg:h-9 border border-stone-200 hover:border-stone-400 bg-white rounded-none shadow-none text-stone-700 hover:bg-stone-50 flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              title="Reset zoom and pan to fit"
             >
-              <Maximize2 className="w-4 h-4" />
+              <Maximize2 className="w-5 lg:w-4 h-5 lg:h-4" />
             </button>
           </div>
 
-          {/* Friendly Traversal Tips Helper */}
-          <div className="absolute bottom-4 left-4 z-10 hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-white border border-stone-200 rounded-none text-[9px] font-bold text-stone-500 shadow-none pointer-events-none select-none">
+          {/* Friendly Traversal Tips Helper - Desktop only */}
+          <div className="absolute bottom-4 left-4 z-10 hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-white border border-stone-200 rounded-none text-[9px] font-bold text-stone-500 shadow-none pointer-events-none select-none">
             <span className="bg-stone-100 border border-stone-300 px-1 py-0.5 rounded-none text-[8px] text-stone-700">SPACE + DRAG</span>
-            <span>to traverse canvas pan</span>
+            <span>to pan • Two fingers to pan on mobile</span>
           </div>
 
-          {/* Quick Node Add Toolbar Overlay */}
-          <div className="absolute top-4 right-4 z-10 flex gap-2">
+          {/* Quick Node Add Toolbar - Responsive layout */}
+          <div className="absolute top-4 right-4 z-10 flex flex-col lg:flex-row gap-2 lg:gap-1.5">
             <button
               onClick={() => handleAddNode("message")}
-              className="flex items-center gap-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-900 px-3 py-1.5 rounded-none text-xs font-semibold shadow-none cursor-pointer transition-all"
+              className="flex items-center justify-center lg:justify-start gap-2 lg:gap-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-900 px-3 py-2.5 lg:px-3 lg:py-1.5 rounded-none text-xs font-semibold shadow-none cursor-pointer transition-all active:scale-95 min-w-[44px] lg:min-w-auto h-11 lg:h-auto"
+              title="Add message node"
             >
-              <Plus className="w-3.5 h-3.5 text-stone-900" />
-              <span>Add Message</span>
+              <Plus className="w-5 lg:w-3.5 h-5 lg:h-3.5 text-stone-900" />
+              <span className="hidden lg:inline">Add Message</span>
             </button>
             <button
               onClick={() => handleAddNode("question")}
-              className="flex items-center gap-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-900 px-3 py-1.5 rounded-none text-xs font-semibold shadow-none cursor-pointer transition-all"
+              className="flex items-center justify-center lg:justify-start gap-2 lg:gap-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-900 px-3 py-2.5 lg:px-3 lg:py-1.5 rounded-none text-xs font-semibold shadow-none cursor-pointer transition-all active:scale-95 min-w-[44px] lg:min-w-auto h-11 lg:h-auto"
+              title="Add question node with options"
             >
-              <Plus className="w-3.5 h-3.5 text-stone-900" />
-              <span>Add Question</span>
+              <HelpCircle className="w-5 lg:w-3.5 h-5 lg:h-3.5 text-stone-900" />
+              <span className="hidden lg:inline">Add Question</span>
             </button>
             <button
               onClick={() => handleAddNode("delay")}
-              className="flex items-center gap-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-900 px-3 py-1.5 rounded-none text-xs font-semibold shadow-none cursor-pointer transition-all"
+              className="flex items-center justify-center lg:justify-start gap-2 lg:gap-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-900 px-3 py-2.5 lg:px-3 lg:py-1.5 rounded-none text-xs font-semibold shadow-none cursor-pointer transition-all active:scale-95 min-w-[44px] lg:min-w-auto h-11 lg:h-auto"
+              title="Add delay/wait node"
             >
-              <Plus className="w-3.5 h-3.5 text-stone-900" />
-              <span>Add Delay</span>
+              <Clock className="w-5 lg:w-3.5 h-5 lg:h-3.5 text-stone-900" />
+              <span className="hidden lg:inline">Add Delay</span>
             </button>
           </div>
 
@@ -761,8 +884,9 @@ export const ChatbotTab: React.FC = () => {
                 const startPos = positions[node.id];
                 if (!startPos) return null;
 
-                const cardWidth = 260;
-                const cardHeight = 160;
+                const isMobile = window.innerWidth < 1024;
+                const cardWidth = isMobile ? 200 : 260;
+                const cardHeight = isMobile ? 140 : 160;
 
                 // Message & Delay & Trigger connections
                 if (node.type !== "question" && node.nextId) {
@@ -848,6 +972,9 @@ export const ChatbotTab: React.FC = () => {
             {localNodes.map((node) => {
               const pos = positions[node.id] || { x: 100, y: 150 };
               const isSelected = selectedNodeId === node.id;
+              const isMobile = window.innerWidth < 1024;
+              const cardWidth = isMobile ? 200 : 260;
+              const cardHeight = isMobile ? 140 : 160;
 
               // Choose color & icon styles
               let badgeColor = "bg-stone-50 text-stone-700 border-stone-200";
@@ -872,11 +999,11 @@ export const ChatbotTab: React.FC = () => {
                     position: "absolute",
                     left: pos.x,
                     top: pos.y,
-                    width: 260,
-                    height: 160,
+                    width: cardWidth,
+                    height: cardHeight,
                     zIndex: isSelected ? 30 : 10
                   }}
-                  className={`backdrop-blur-sm rounded-none p-4 cursor-grab active:cursor-grabbing border flex flex-col justify-between transition-all select-none shadow-none ${
+                  className={`backdrop-blur-sm rounded-none p-3 lg:p-4 cursor-grab active:cursor-grabbing border flex flex-col justify-between transition-all select-none shadow-none ${
                     isSelected
                       ? "border-stone-950 bg-white ring-2 ring-stone-950/20 scale-[1.02]"
                       : "border-stone-200 bg-white hover:border-stone-400"
@@ -901,6 +1028,17 @@ export const ChatbotTab: React.FC = () => {
                       {node.type}
                     </span>
                   </div>
+
+                  {showStats && nodeStats[node.id] && (
+                    <div className="flex items-center justify-between gap-1 mt-1.5 border-b border-stone-100 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-500">
+                      <span className="text-stone-900">{nodeStats[node.id].impressions} Views</span>
+                      {node.type === "question" ? (
+                        <span className="text-stone-900">{nodeStats[node.id].rate}% Conv</span>
+                      ) : (
+                        <span className="text-stone-500">{nodeStats[node.id].dropoffs} Drops</span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Card Main Body */}
                   <div className="flex-1 flex flex-col justify-center my-2 text-left">
@@ -957,31 +1095,69 @@ export const ChatbotTab: React.FC = () => {
         </div>
 
         {/* RIGHT PANEL INSPECTOR & AI CONVERSATIONAL FLOW ARCHITECT */}
-        <aside className="w-[380px] shrink-0 border-l border-stone-200 bg-white flex flex-col justify-between select-text overflow-hidden h-full">
-          {/* Top Form Edit Inspector Area */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        {isMobileInspectorOpen && (
+          <div
+            className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+            onClick={() => setIsMobileInspectorOpen(false)}
+          />
+        )}
+        <aside className={`fixed bottom-0 right-0 lg:relative z-50 w-full lg:w-[380px] max-h-[85vh] lg:max-h-none bg-white border-t lg:border-t-0 lg:border-l border-stone-200 flex flex-col justify-between select-text overflow-hidden transform transition-transform duration-300 ease-in-out lg:translate-y-0 ${
+          isMobileInspectorOpen ? "translate-y-0 shadow-2xl" : "lg:translate-y-0 translate-y-full"
+        }`}>
+          {/* BOT BUILDER TOGGLE */}
+          <div className="p-4 border-b border-stone-200 bg-[#fafaf9] flex items-center justify-between z-10 shrink-0 min-h-[60px]">
+            <div className="flex flex-col gap-0.5 flex-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${organization?.chatbotBuilderEnabled ? "bg-stone-900 animate-pulse" : "bg-stone-300"}`} />
+                Visual Builder Engine
+              </span>
+              <span className="text-xs font-bold text-stone-900">{organization?.chatbotBuilderEnabled ? "ACTIVE" : "DISABLED (PURE AI MODE)"}</span>
+            </div>
+            <button
+              disabled={botToggling}
+              onClick={toggleBuilderStatus}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-none border border-stone-300 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-stone-900 mx-3 ${
+                organization?.chatbotBuilderEnabled ? "bg-stone-950" : "bg-stone-100"
+              } ${botToggling ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              <span className="sr-only">Toggle Builder</span>
+              <span
+                aria-hidden="true"
+                className={`inline-block h-4 w-4 transform rounded-full bg-white ring-0 transition duration-200 ease-in-out ${organization?.chatbotBuilderEnabled ? "translate-x-4" : "translate-x-0"}`}
+              />
+            </button>
+            <button
+              className="lg:hidden p-2 hover:bg-stone-200 rounded-none text-stone-500 transition-colors active:scale-95 shrink-0 w-11 h-11 flex items-center justify-center"
+              onClick={() => setIsMobileInspectorOpen(false)}
+              title="Close inspector"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar relative">
             {selectedNodeId ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-stone-200">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-stone-900 bg-stone-100 border border-stone-300 px-2 py-0.5 rounded-none">
+                <div className="flex items-center justify-between pb-3 border-b border-stone-200 gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-xs font-bold text-stone-900 bg-stone-100 border border-stone-300 px-2 py-0.5 rounded-none shrink-0">
                       {selectedNodeId}
                     </span>
-                    <h3 className="font-bold text-xs text-stone-900 uppercase tracking-wide">
+                    <h3 className="font-bold text-xs text-stone-900 uppercase tracking-wide truncate">
                       Edit Step Attributes
                     </h3>
                   </div>
                   <button
                     onClick={() => handleDeleteNode(selectedNodeId)}
                     disabled={selectedNodeId === "n1"}
-                    className={`p-1.5 rounded-none border text-stone-900 transition-all cursor-pointer ${
+                    className={`p-2 lg:p-1.5 rounded-none border text-stone-900 transition-all cursor-pointer w-10 h-10 lg:w-auto lg:h-auto flex items-center justify-center shrink-0 active:scale-95 ${
                       selectedNodeId === "n1"
                         ? "opacity-30 cursor-not-allowed border-stone-100 bg-stone-50 text-stone-400"
                         : "border-stone-200 hover:border-stone-400 hover:bg-stone-100"
                     }`}
                     title="Delete step"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-5 lg:w-4 h-5 lg:h-4" />
                   </button>
                 </div>
 
@@ -1032,15 +1208,15 @@ export const ChatbotTab: React.FC = () => {
                 {/* Question Option builder */}
                 {localNodes.find((n) => n.id === selectedNodeId)?.type === "question" && (
                   <div className="space-y-3 pt-2">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-2">
                       <label className="text-[10px] font-bold uppercase tracking-wide text-stone-500">
                         Quick Reply Options & Routes
                       </label>
                       <button
                         onClick={handleAddOption}
-                        className="flex items-center gap-1 text-[10px] font-bold text-stone-900 bg-stone-100 border border-stone-300 hover:border-stone-400 px-2 py-0.5 rounded-none cursor-pointer transition-all uppercase"
+                        className="flex items-center justify-center lg:justify-start gap-1.5 text-[10px] font-bold text-stone-900 bg-stone-100 border border-stone-300 hover:border-stone-400 px-3 py-2 lg:px-2 lg:py-0.5 rounded-none cursor-pointer transition-all uppercase active:scale-95 h-10 lg:h-auto w-full lg:w-auto"
                       >
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-4 lg:w-3 h-4 lg:h-3" />
                         <span>Add Option</span>
                       </button>
                     </div>
@@ -1056,13 +1232,13 @@ export const ChatbotTab: React.FC = () => {
                               type="text"
                               value={opt}
                               onChange={(e) => handleUpdateOptionText(oIdx, e.target.value)}
-                              className="flex-1 border border-stone-200 rounded-none px-3 py-1 bg-white focus:outline-none focus:border-stone-900 text-xs font-semibold text-stone-700"
+                              className="flex-1 border border-stone-200 rounded-none px-3 py-2 lg:py-1 bg-white focus:outline-none focus:border-stone-900 text-xs font-semibold text-stone-700"
                             />
                             <button
                               onClick={() => handleRemoveOption(oIdx)}
-                              className="p-1.5 border border-stone-200 hover:border-stone-400 text-stone-500 rounded-none hover:bg-stone-100 cursor-pointer transition-all shrink-0 bg-white"
+                              className="p-2 lg:p-1.5 border border-stone-200 hover:border-stone-400 text-stone-500 rounded-none hover:bg-stone-100 cursor-pointer transition-all shrink-0 bg-white active:scale-95 w-10 h-10 lg:w-auto lg:h-auto flex items-center justify-center"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 lg:w-3.5 h-4 lg:h-3.5" />
                             </button>
                           </div>
 
@@ -1186,13 +1362,13 @@ export const ChatbotTab: React.FC = () => {
                 type="button"
                 onClick={handleGenerateAiFlow}
                 disabled={!aiPrompt.trim()}
-                className={`w-full font-bold text-xs py-3 rounded-none transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
+                className={`w-full font-bold text-xs py-3 lg:py-2.5 rounded-none transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase active:scale-95 h-11 lg:h-auto ${
                   aiPrompt.trim()
                     ? "bg-stone-950 hover:bg-stone-900 text-white border border-stone-950"
                     : "bg-stone-100 text-stone-400 border border-stone-200 cursor-not-allowed shadow-none"
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <Sparkles className="w-4 lg:w-3.5 h-4 lg:h-3.5" />
                 <span>Architect Routing Flow</span>
               </button>
             </div>

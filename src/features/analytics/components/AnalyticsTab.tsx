@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import {
   BarChart3,
   TrendingUp,
@@ -96,6 +97,42 @@ const StatCard: React.FC<{
 /* ─── Analytics Tab ─── */
 export const AnalyticsTab: React.FC = () => {
   const { contacts, campaigns, templates, chatHistory } = useApp();
+  const params = useParams();
+  const orgId = params.orgId as string;
+
+  const [activeSection, setActiveSection] = useState<"campaigns" | "agents" | "roi">("campaigns");
+  const [agentMetrics, setAgentMetrics] = useState<Array<{ agent: string; avgLatencyMinutes: number; replies: number; conversations: number; resolutionRate: number }>>([]);
+  const [roiLedger, setRoiLedger] = useState<Array<{ id: string; name: string; templateName: string; sent: number; delivered: number; costPaise: number; attributedRevenuePaise: number; conversions: number; roi: number; status: string; date: string }>>([]);
+  const [roiSummary, setRoiSummary] = useState<{ totalCostPaise: number; totalRevenuePaise: number; totalConversions: number; overallRoi: number }>({ totalCostPaise: 0, totalRevenuePaise: 0, totalConversions: 0, overallRoi: 0 });
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
+
+  useEffect(() => {
+    if (!orgId) return;
+    const fetchPerformanceStats = async () => {
+      setLoadingMetrics(true);
+      try {
+        const [resAgents, resRoi] = await Promise.all([
+          fetch(`/api/org/${orgId}/analytics/agent-metrics`),
+          fetch(`/api/org/${orgId}/analytics/roi-ledger`),
+        ]);
+        if (resAgents.ok) {
+          const data = await resAgents.json();
+          if (data.metrics) setAgentMetrics(data.metrics);
+        }
+        if (resRoi.ok) {
+          const data = await resRoi.json();
+          if (data.ledger) setRoiLedger(data.ledger);
+          if (data.summary) setRoiSummary(data.summary);
+        }
+      } catch (err) {
+        console.error("Failed to load operational analytics", err);
+      } finally {
+        setLoadingMetrics(false);
+      }
+    };
+    fetchPerformanceStats();
+  }, [orgId]);
+
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "all">("all");
   const [funnelMode, setFunnelMode] = useState<"absolute" | "percentage">("absolute");
 
@@ -298,347 +335,531 @@ export const AnalyticsTab: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── Section 1: Top-Level KPI Cards ─── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Messages Sent"
-          value={fmt(kpis.totalSent)}
-          subtitle={`${filteredCampaigns.length} campaigns dispatch`}
-          icon={<Send className="w-5 h-5 text-stone-950" />}
-        />
-        <StatCard
-          title="Messages Delivered"
-          value={fmt(kpis.totalDelivered)}
-          subtitle={`${kpis.deliveryRate}% delivery rate`}
-          icon={<CheckCheck className="w-5 h-5 text-stone-950" />}
-          trend={kpis.deliveryRate > 90 ? 1 : -1}
-        />
-        <StatCard
-          title="Messages Read"
-          value={fmt(kpis.totalRead)}
-          subtitle={`${kpis.readRate}% read rate`}
-          icon={<Eye className="w-5 h-5 text-stone-950" />}
-          trend={kpis.readRate > 50 ? 1 : -1}
-        />
-        <StatCard
-          title="Link Clicks"
-          value={fmt(kpis.totalClicked)}
-          subtitle={`${kpis.clickRate}% click-through`}
-          icon={<MousePointerClick className="w-5 h-5 text-stone-950" />}
-          trend={kpis.clickRate > 5 ? 1 : -1}
-        />
-      </div>
-
-      {/* ─── Section 2: Radial Gauges ─── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <RadialGauge
-          value={kpis.deliveryRate}
-          label="Delivery Rate"
-          color="#1c1917"
-          icon={<CheckCheck className="w-3.5 h-3.5 text-stone-950" />}
-        />
-        <RadialGauge
-          value={kpis.readRate}
-          label="Read Rate"
-          color="#44403c"
-          icon={<Eye className="w-3.5 h-3.5 text-stone-900" />}
-        />
-        <RadialGauge
-          value={kpis.clickRate}
-          label="Click-Through Rate"
-          color="#78716c"
-          icon={<MousePointerClick className="w-3.5 h-3.5 text-stone-500" />}
-        />
-      </div>
-
-      {/* ─── Section 3: Campaign Funnel ─── */}
-      <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-stone-100">
-          <div>
-            <h3 className="text-lg font-light text-stone-900 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-stone-950" />
-              Campaign Delivery Funnel
-            </h3>
-            <p className="text-xs text-stone-500 tracking-wider uppercase mt-1">Message journey index from send to click</p>
-          </div>
+      {/* ─── Sub-Navigation Tabs ─── */}
+      <div className="flex items-center gap-2 border-b border-stone-200 pb-1.5 select-none shrink-0">
+        {(["campaigns", "agents", "roi"] as const).map((sec) => (
           <button
-            onClick={() => setFunnelMode(funnelMode === "absolute" ? "percentage" : "absolute")}
-            className="text-[9px] font-bold text-stone-900 bg-stone-100 hover:bg-stone-200 px-3 py-1.5 rounded-none border border-stone-200/20 uppercase tracking-widest transition-all cursor-pointer"
+            key={sec}
+            onClick={() => setActiveSection(sec)}
+            className={`text-xs font-bold uppercase tracking-wider px-4 py-2 border-b-2 transition-all cursor-pointer ${
+              activeSection === sec
+                ? "border-stone-950 text-stone-950 font-extrabold"
+                : "border-transparent text-stone-400 hover:text-stone-600"
+            }`}
           >
-            {funnelMode === "absolute" ? "Show %" : "Show #"}
+            {sec === "campaigns" ? "Campaign Performance" : sec === "agents" ? "Agent Latency Matrix" : "Attribution & ROI Ledger"}
           </button>
-        </div>
-        <div className="space-y-4">
-          {funnelStages.map((stage, i) => (
-            <div key={stage.label} className="flex items-center gap-4">
-              <span className="text-[10px] font-bold text-stone-400 w-20 text-right uppercase tracking-wider">{stage.label}</span>
-              <div className="flex-1 h-9 bg-stone-100 rounded-none overflow-hidden relative border border-stone-200/40">
-                <div
-                  className="h-full rounded-none transition-all duration-1000 ease-out flex items-center justify-end pr-3"
-                  style={{
-                    width: `${Math.max(stage.pct, 2)}%`,
-                    backgroundColor: stage.color,
-                  }}
-                >
-                  <span className="text-[10px] font-bold text-white tracking-widest uppercase">
-                    {funnelMode === "absolute" ? fmt(stage.value) : `${stage.pct}%`}
-                  </span>
-                </div>
-              </div>
-              {i < funnelStages.length - 1 && (
-                <span className="text-[10px] text-stone-400 font-bold w-12 text-center uppercase">
-                  {pct(funnelStages[i + 1].value, stage.value || 1)}%
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
 
-      {/* ─── Section 4: Campaign Timeline ─── */}
-      <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
-        <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
-          <Clock className="w-4 h-4 text-stone-950" />
-          Campaign Activity Timeline
-        </h3>
-        <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Messages dispatched per campaign day ledger</p>
-        {timelineData.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
-            NO ACTIVE CAMPAIGN RECORDS DISCOVERED IN THIS PERIOD
+      {/* ─── SECTION: CAMPAIGN OVERVIEW ─── */}
+      {activeSection === "campaigns" && (
+        <>
+          {/* ─── Section 1: Top-Level KPI Cards ─── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard
+              title="Total Messages Sent"
+              value={fmt(kpis.totalSent)}
+              subtitle={`${filteredCampaigns.length} campaigns dispatch`}
+              icon={<Send className="w-5 h-5 text-stone-950" />}
+            />
+            <StatCard
+              title="Messages Delivered"
+              value={fmt(kpis.totalDelivered)}
+              subtitle={`${kpis.deliveryRate}% delivery rate`}
+              icon={<CheckCheck className="w-5 h-5 text-stone-950" />}
+              trend={kpis.deliveryRate > 90 ? 1 : -1}
+            />
+            <StatCard
+              title="Messages Read"
+              value={fmt(kpis.totalRead)}
+              subtitle={`${kpis.readRate}% read rate`}
+              icon={<Eye className="w-5 h-5 text-stone-950" />}
+              trend={kpis.readRate > 50 ? 1 : -1}
+            />
+            <StatCard
+              title="Link Clicks"
+              value={fmt(kpis.totalClicked)}
+              subtitle={`${kpis.clickRate}% click-through`}
+              icon={<MousePointerClick className="w-5 h-5 text-stone-950" />}
+              trend={kpis.clickRate > 5 ? 1 : -1}
+            />
           </div>
-        ) : (
-          <div className="flex items-end gap-1.5 h-48 overflow-x-auto custom-scrollbar pb-1">
-            {timelineData.map((d) => {
-              const heightPct = (d.sent / maxTimelineSent) * 100;
-              return (
-                <div key={d.date} className="flex flex-col items-center gap-1.5 min-w-[36px] group flex-1">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-bold text-stone-900 bg-white border border-stone-200 px-2 py-1 uppercase whitespace-nowrap pointer-events-none tracking-widest">
-                    {fmt(d.sent)} sent
-                  </div>
-                  <div
-                    className={`w-full rounded-none transition-all duration-500 ${statusColor(d.status)}`}
-                    style={{ height: `${Math.max(heightPct, 4)}%` }}
-                  />
-                  <span className="text-[9px] text-stone-500 font-bold uppercase whitespace-nowrap tracking-wider">
-                    {d.date.slice(5)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 pt-4 border-t border-stone-100 text-[9px] text-stone-500 font-bold uppercase tracking-widest">
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-stone-950" /> Completed</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-stone-600" /> Active</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-stone-300" /> Scheduled</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-stone-200" /> Failed</span>
-        </div>
-      </div>
 
-      {/* ─── Section 5 + 6: Contact Source & Tag Cloud ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Contact Source Donut */}
-        <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
-          <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
-            <Users className="w-4 h-4 text-stone-950" />
-            Contact Source Distribution
-          </h3>
-          <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">CRM entry node index</p>
-          <div className="flex flex-col sm:flex-row items-center gap-8">
-            <div className="relative w-36 h-36 shrink-0">
-              <div
-                className="w-full h-full rounded-full border border-stone-200/50"
-                style={{ background: conicGradient }}
-              />
-              <div className="absolute inset-3 bg-white rounded-full flex flex-col items-center justify-center border border-stone-200">
-                <span className="text-lg font-bold text-stone-950">{contacts.length}</span>
-                <span className="text-[8px] text-stone-500 font-bold uppercase tracking-widest">Total CRM</span>
+          {/* ─── Section 2: Radial Gauges ─── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <RadialGauge
+              value={kpis.deliveryRate}
+              label="Delivery Rate"
+              color="#1c1917"
+              icon={<CheckCheck className="w-3.5 h-3.5 text-stone-950" />}
+            />
+            <RadialGauge
+              value={kpis.readRate}
+              label="Read Rate"
+              color="#44403c"
+              icon={<Eye className="w-3.5 h-3.5 text-stone-900" />}
+            />
+            <RadialGauge
+              value={kpis.clickRate}
+              label="Click-Through Rate"
+              color="#78716c"
+              icon={<MousePointerClick className="w-3.5 h-3.5 text-stone-500" />}
+            />
+          </div>
+
+          {/* ─── Section 3: Campaign Funnel ─── */}
+          <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-stone-100">
+              <div>
+                <h3 className="text-lg font-light text-stone-900 flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-stone-950" />
+                  Campaign Delivery Funnel
+                </h3>
+                <p className="text-xs text-stone-500 tracking-wider uppercase mt-1">Message journey index from send to click</p>
               </div>
+              <button
+                onClick={() => setFunnelMode(funnelMode === "absolute" ? "percentage" : "absolute")}
+                className="text-[9px] font-bold text-stone-900 bg-stone-100 hover:bg-stone-200 px-3 py-1.5 rounded-none border border-stone-200/20 uppercase tracking-widest transition-all cursor-pointer"
+              >
+                {funnelMode === "absolute" ? "Show %" : "Show #"}
+              </button>
             </div>
-            <div className="flex-1 space-y-2.5 max-h-36 overflow-y-auto w-full custom-scrollbar">
-              {sourceData.map((s) => (
-                <div key={s.source} className="flex items-center justify-between text-xs text-stone-700 border-b border-stone-50 pb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 shrink-0" style={{ backgroundColor: s.color }} />
-                    <span className="font-semibold text-stone-800 uppercase text-[10px] tracking-wider truncate max-w-[120px]">{s.source}</span>
+            <div className="space-y-4">
+              {funnelStages.map((stage, i) => (
+                <div key={stage.label} className="flex items-center gap-4">
+                  <span className="text-[10px] font-bold text-stone-400 w-20 text-right uppercase tracking-wider">{stage.label}</span>
+                  <div className="flex-1 h-9 bg-stone-100 rounded-none overflow-hidden relative border border-stone-200/40">
+                    <div
+                      className="h-full rounded-none transition-all duration-1000 ease-out flex items-center justify-end pr-3"
+                      style={{
+                        width: `${Math.max(stage.pct, 2)}%`,
+                        backgroundColor: stage.color,
+                      }}
+                    >
+                      <span className="text-[10px] font-bold text-white tracking-widest uppercase">
+                        {funnelMode === "absolute" ? fmt(stage.value) : `${stage.pct}%`}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-[10px] font-bold">
-                    <span className="text-stone-800">{s.count}</span>
-                    <span className="text-stone-400">{s.pct}%</span>
-                  </div>
+                  {i < funnelStages.length - 1 && (
+                    <span className="text-[10px] text-stone-400 font-bold w-12 text-center uppercase">
+                      {pct(funnelStages[i + 1].value, stage.value || 1)}%
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
-        </div>
 
-        {/* Tag Cloud */}
-        <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
-          <h3 className="text-lg font-light text-stone-900 flex items-center gap-2 mb-1">
-            <Tag className="w-4 h-4 text-stone-950" />
-            Audience Tag Distribution
-          </h3>
-          <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Active crm taxonomy segments</p>
-          {tagCloud.length === 0 ? (
-            <div className="h-32 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
-              NO CRM TAXONOMY TAGS SPECIFIED YET
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {tagCloud.map((t) => {
-                const intensity = t.count / maxTagCount;
-                const opacity = 0.6 + intensity * 0.4;
-                return (
-                  <span
-                    key={t.tag}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-900 text-[10px] font-bold uppercase tracking-wider transition-all"
-                    style={{ opacity }}
-                  >
-                    <Tag className="w-3 h-3 text-stone-500" />
-                    {t.tag}
-                    <span className="text-stone-400 ml-0.5">×{t.count}</span>
-                  </span>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ─── Section 7: Template Performance Matrix ─── */}
-      <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
-        <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
-          <FileText className="w-4 h-4 text-stone-950" />
-          Template Performance Matrix
-        </h3>
-        <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Waba payload delivery rate analysis index</p>
-        {templatePerf.length === 0 ? (
-          <div className="h-32 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
-            NO META APPROVED MESSAGE PAYLOADS CURRENTLY ON RECORD
-          </div>
-        ) : (
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-stone-200">
-                  <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4">Template</th>
-                  <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Status</th>
-                  <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Campaigns</th>
-                  <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Sent</th>
-                  <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Delivery %</th>
-                  <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Read %</th>
-                  <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 text-center">Click %</th>
-                </tr>
-              </thead>
-              <tbody>
-                {templatePerf.map((t) => (
-                  <tr key={t.id} className="border-b border-stone-100 hover:bg-[#fafaf9]/80 transition-colors">
-                    <td className="py-3 pr-4">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-stone-800 uppercase tracking-wider">{t.name}</span>
-                        <span className="text-[9px] text-stone-400 uppercase tracking-wider mt-0.5">{t.category}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4 text-center">
-                      <span className={`text-[8.5px] font-bold uppercase px-2 py-0.5 rounded-none border ${metaStatusBadge(t.metaStatus)}`}>
-                        {t.metaStatus || "pending"}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4 text-center text-xs font-bold">{t.usedInCampaigns}</td>
-                    <td className="py-3 pr-4 text-center text-xs font-bold">{fmt(t.sent)}</td>
-                    <td className="py-3 pr-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="w-14 h-1 bg-stone-100 border border-stone-200/50 rounded-none overflow-hidden shrink-0">
-                          <div className="h-full bg-stone-900 rounded-none" style={{ width: `${t.deliveryRate}%` }} />
-                        </div>
-                        <span className="text-[10px] font-bold text-stone-600">{t.deliveryRate}%</span>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="w-14 h-1 bg-stone-100 border border-stone-200/50 rounded-none overflow-hidden shrink-0">
-                          <div className="h-full bg-stone-600 rounded-none" style={{ width: `${t.readRate}%` }} />
-                        </div>
-                        <span className="text-[10px] font-bold text-stone-600">{t.readRate}%</span>
-                      </div>
-                    </td>
-                    <td className="py-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="w-14 h-1 bg-stone-100 border border-stone-200/50 rounded-none overflow-hidden shrink-0">
-                          <div className="h-full bg-stone-300 rounded-none" style={{ width: `${t.clickRate}%` }} />
-                        </div>
-                        <span className="text-[10px] font-bold text-stone-600">{t.clickRate}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ─── Section 8: Message Activity Heatmap ─── */}
-      <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
-        <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
-          <BarChart3 className="w-4 h-4 text-stone-950" />
-          Message Activity Heatmap
-        </h3>
-        <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Hourly webhook chat transmission volume metrics by week day</p>
-        <div className="overflow-x-auto custom-scrollbar">
-          <div className="flex items-center mb-2">
-            <div className="w-10 shrink-0" />
-            {hourLabels.map((h, i) => (
-              i % 2 === 0 ? (
-                <span key={i} className="text-[8.5px] text-stone-400 font-bold uppercase" style={{ width: "calc(100% / 24)", minWidth: "20px", textAlign: "center" }}>
-                  {h}
-                </span>
-              ) : (
-                <span key={i} style={{ width: "calc(100% / 24)", minWidth: "20px" }} />
-              )
-            ))}
-          </div>
-          {heatmapData.map((row, dayIdx) => (
-            <div key={dayIdx} className="flex items-center gap-0 mb-1">
-              <span className="text-[10px] text-stone-500 font-bold w-10 shrink-0 text-right pr-3 uppercase">
-                {dayLabels[dayIdx]}
-              </span>
-              <div className="flex-1 flex gap-[2px]">
-                {row.map((val, hourIdx) => {
-                  const intensity = val / maxHeat;
+          {/* ─── Section 4: Campaign Timeline ─── */}
+          <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
+            <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
+              <Clock className="w-4 h-4 text-stone-950" />
+              Campaign Activity Timeline
+            </h3>
+            <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Messages dispatched per campaign day ledger</p>
+            {timelineData.length === 0 ? (
+              <div className="h-48 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
+                NO ACTIVE CAMPAIGN RECORDS DISCOVERED IN THIS PERIOD
+              </div>
+            ) : (
+              <div className="flex items-end gap-1.5 h-48 overflow-x-auto custom-scrollbar pb-1">
+                {timelineData.map((d) => {
+                  const heightPct = (d.sent / maxTimelineSent) * 100;
                   return (
-                    <div
-                      key={hourIdx}
-                      className="aspect-square rounded-none transition-all hover:scale-125 hover:z-10 group relative border border-stone-200/10 cursor-default"
-                      style={{
-                        flex: 1,
-                        minWidth: "14px",
-                        backgroundColor: val === 0
-                          ? "#fafaf9"
-                          : `rgba(28, 25, 23, ${0.12 + intensity * 0.88})`,
-                      }}
-                      title={`${dayLabels[dayIdx]} ${hourLabels[hourIdx]}: ${val} messages`}
-                    />
+                    <div key={d.date} className="flex flex-col items-center gap-1.5 min-w-[36px] group flex-1">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-bold text-stone-900 bg-white border border-stone-200 px-2 py-1 uppercase whitespace-nowrap pointer-events-none tracking-widest">
+                        {fmt(d.sent)} sent
+                      </div>
+                      <div
+                        className={`w-full rounded-none transition-all duration-500 ${statusColor(d.status)}`}
+                        style={{ height: `${Math.max(heightPct, 4)}%` }}
+                      />
+                      <span className="text-[9px] text-stone-500 font-bold uppercase whitespace-nowrap tracking-wider">
+                        {d.date.slice(5)}
+                      </span>
+                    </div>
                   );
                 })}
               </div>
+            )}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 pt-4 border-t border-stone-100 text-[9px] text-stone-500 font-bold uppercase tracking-widest">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-stone-950" /> Completed</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-stone-600" /> Active</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-stone-300" /> Scheduled</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-stone-200" /> Failed</span>
             </div>
-          ))}
-          <div className="flex items-center justify-end gap-1 mt-4 text-[9px] font-bold text-stone-400 uppercase tracking-widest">
-            <span className="mr-1">Less Activity</span>
-            {[0, 0.25, 0.5, 0.75, 1].map((i) => (
-              <div
-                key={i}
-                className="w-3.5 h-3.5 rounded-none border border-stone-200/50"
-                style={{
-                  backgroundColor: i === 0 ? "#fafaf9" : `rgba(28, 25, 23, ${0.12 + i * 0.88})`,
-                }}
-              />
-            ))}
-            <span className="ml-1">More Activity</span>
+          </div>
+
+          {/* ─── Section 5 + 6: Contact Source & Tag Cloud ─── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Contact Source Donut */}
+            <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
+              <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
+                <Users className="w-4 h-4 text-stone-950" />
+                Contact Source Distribution
+              </h3>
+              <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">CRM entry node index</p>
+              <div className="flex flex-col sm:flex-row items-center gap-8">
+                <div className="relative w-36 h-36 shrink-0">
+                  <div
+                    className="w-full h-full rounded-full border border-stone-200/50"
+                    style={{ background: conicGradient }}
+                  />
+                  <div className="absolute inset-3 bg-white rounded-full flex flex-col items-center justify-center border border-stone-200">
+                    <span className="text-lg font-bold text-stone-950">{contacts.length}</span>
+                    <span className="text-[8px] text-stone-500 font-bold uppercase tracking-widest">Total CRM</span>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-2.5 max-h-36 overflow-y-auto w-full custom-scrollbar">
+                  {sourceData.map((s) => (
+                    <div key={s.source} className="flex items-center justify-between text-xs text-stone-700 border-b border-stone-50 pb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 shrink-0" style={{ backgroundColor: s.color }} />
+                        <span className="font-semibold text-stone-800 uppercase text-[10px] tracking-wider truncate max-w-[120px]">{s.source}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] font-bold">
+                        <span className="text-stone-800">{s.count}</span>
+                        <span className="text-stone-400">{s.pct}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Tag Cloud */}
+            <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
+              <h3 className="text-lg font-light text-stone-900 flex items-center gap-2 mb-1">
+                <Tag className="w-4 h-4 text-stone-950" />
+                Audience Tag Distribution
+              </h3>
+              <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Active crm taxonomy segments</p>
+              {tagCloud.length === 0 ? (
+                <div className="h-32 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
+                  NO CRM TAXONOMY TAGS SPECIFIED YET
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {tagCloud.map((t) => {
+                    const intensity = t.count / maxTagCount;
+                    const opacity = 0.6 + intensity * 0.4;
+                    return (
+                      <span
+                        key={t.tag}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-900 text-[10px] font-bold uppercase tracking-wider transition-all"
+                        style={{ opacity }}
+                      >
+                        <Tag className="w-3 h-3 text-stone-500" />
+                        {t.tag}
+                        <span className="text-stone-400 ml-0.5">×{t.count}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ─── Section 7: Template Performance Matrix ─── */}
+          <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
+            <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
+              <FileText className="w-4 h-4 text-stone-950" />
+              Template Performance Matrix
+            </h3>
+            <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Waba payload delivery rate analysis index</p>
+            {templatePerf.length === 0 ? (
+              <div className="h-32 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
+                NO META APPROVED MESSAGE PAYLOADS CURRENTLY ON RECORD
+              </div>
+            ) : (
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-stone-200">
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4">Template</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Status</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Campaigns</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Sent</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Delivery %</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Read %</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 text-center">Click %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {templatePerf.map((t) => (
+                      <tr key={t.id} className="border-b border-stone-100 hover:bg-[#fafaf9]/80 transition-colors">
+                        <td className="py-3 pr-4">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-stone-800 uppercase tracking-wider">{t.name}</span>
+                            <span className="text-[9px] text-stone-400 uppercase tracking-wider mt-0.5">{t.category}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4 text-center">
+                          <span className={`text-[8.5px] font-bold uppercase px-2 py-0.5 rounded-none border ${metaStatusBadge(t.metaStatus)}`}>
+                            {t.metaStatus || "pending"}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 text-center text-xs font-bold">{t.usedInCampaigns}</td>
+                        <td className="py-3 pr-4 text-center text-xs font-bold">{fmt(t.sent)}</td>
+                        <td className="py-3 pr-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-14 h-1 bg-stone-100 border border-stone-200/50 rounded-none overflow-hidden shrink-0">
+                              <div className="h-full bg-stone-900 rounded-none" style={{ width: `${t.deliveryRate}%` }} />
+                            </div>
+                            <span className="text-[10px] font-bold text-stone-600">{t.deliveryRate}%</span>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-14 h-1 bg-stone-100 border border-stone-200/50 rounded-none overflow-hidden shrink-0">
+                              <div className="h-full bg-stone-600 rounded-none" style={{ width: `${t.readRate}%` }} />
+                            </div>
+                            <span className="text-[10px] font-bold text-stone-600">{t.readRate}%</span>
+                          </div>
+                        </td>
+                        <td className="py-3 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-14 h-1 bg-stone-100 border border-stone-200/50 rounded-none overflow-hidden shrink-0">
+                              <div className="h-full bg-stone-300 rounded-none" style={{ width: `${t.clickRate}%` }} />
+                            </div>
+                            <span className="text-[10px] font-bold text-stone-600">{t.clickRate}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ─── Section 8: Message Activity Heatmap ─── */}
+          <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
+            <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
+              <BarChart3 className="w-4 h-4 text-stone-950" />
+              Message Activity Heatmap
+            </h3>
+            <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Hourly webhook chat transmission volume metrics by week day</p>
+            <div className="overflow-x-auto custom-scrollbar">
+              <div className="flex items-center mb-2">
+                <div className="w-10 shrink-0" />
+                {hourLabels.map((h, i) => (
+                  i % 2 === 0 ? (
+                    <span key={i} className="text-[8.5px] text-stone-400 font-bold uppercase" style={{ width: "calc(100% / 24)", minWidth: "20px", textAlign: "center" }}>
+                      {h}
+                    </span>
+                  ) : (
+                    <span key={i} style={{ width: "calc(100% / 24)", minWidth: "20px" }} />
+                  )
+                ))}
+              </div>
+              {heatmapData.map((row, dayIdx) => (
+                <div key={dayIdx} className="flex items-center gap-0 mb-1">
+                  <span className="text-[10px] text-stone-500 font-bold w-10 shrink-0 text-right pr-3 uppercase">
+                    {dayLabels[dayIdx]}
+                  </span>
+                  <div className="flex-1 flex gap-[2px]">
+                    {row.map((val, hourIdx) => {
+                      const intensity = val / maxHeat;
+                      return (
+                        <div
+                          key={hourIdx}
+                          className="aspect-square rounded-none transition-all hover:scale-125 hover:z-10 group relative border border-stone-200/10 cursor-default"
+                          style={{
+                            flex: 1,
+                            minWidth: "14px",
+                            backgroundColor: val === 0
+                              ? "#fafaf9"
+                              : `rgba(28, 25, 23, ${0.12 + intensity * 0.88})`,
+                          }}
+                          title={`${dayLabels[dayIdx]} ${hourLabels[hourIdx]}: ${val} messages`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-end gap-1 mt-4 text-[9px] font-bold text-stone-400 uppercase tracking-widest">
+                <span className="mr-1">Less Activity</span>
+                {[0, 0.25, 0.5, 0.75, 1].map((i) => (
+                  <div
+                    key={i}
+                    className="w-3.5 h-3.5 rounded-none border border-stone-200/50"
+                    style={{
+                      backgroundColor: i === 0 ? "#fafaf9" : `rgba(28, 25, 23, ${0.12 + i * 0.88})`,
+                    }}
+                  />
+                ))}
+                <span className="ml-1">More Activity</span>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ─── SECTION: AGENT PERFORMANCE MATRIX ─── */}
+      {activeSection === "agents" && (
+        <div className="space-y-8 animate-slide-up">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <StatCard
+              title="Active Team Handlers"
+              value={agentMetrics.length.toString()}
+              subtitle="Monitored in CRM index"
+              icon={<Users className="w-5 h-5 text-stone-950" />}
+            />
+            <StatCard
+              title="Avg Operational Latency"
+              value={`${Math.round(agentMetrics.reduce((acc, a) => acc + a.avgLatencyMinutes, 0) / (agentMetrics.length || 1))} min`}
+              subtitle="Global average ticket delay"
+              icon={<Clock className="w-5 h-5 text-stone-950" />}
+            />
+            <StatCard
+              title="Total Reply Transactions"
+              value={fmt(agentMetrics.reduce((acc, a) => acc + a.replies, 0))}
+              subtitle="Bot & manual conversational events"
+              icon={<Zap className="w-5 h-5 text-stone-950" />}
+            />
+          </div>
+
+          <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
+            <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
+              <Users className="w-4 h-4 text-stone-950" />
+              Agent Response Latency & Conversational Volume Matrix
+            </h3>
+            <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">CRM performance audit ledger</p>
+            
+            {loadingMetrics ? (
+              <div className="h-48 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest animate-pulse">
+                SYNCHRONIZING OPERATIONAL INDEX...
+              </div>
+            ) : agentMetrics.length === 0 ? (
+              <div className="h-48 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
+                NO TEAM ACTIVITY DISCOVERED ON FILE
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {agentMetrics.map((ag) => (
+                  <div key={ag.agent} className="space-y-2 border-b border-stone-100 pb-4 last:border-b-0 last:pb-0">
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="text-stone-900 uppercase tracking-wide flex items-center gap-1.5">
+                        <span className="w-2 h-2 bg-stone-950" />
+                        {ag.agent}
+                      </span>
+                      <span className="text-stone-500 uppercase tracking-wider">{ag.replies} Replies | {ag.avgLatencyMinutes}m avg latency</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 h-3 bg-stone-100 border border-stone-200/50 rounded-none overflow-hidden relative">
+                        <div
+                          className="h-full bg-stone-900 rounded-none transition-all duration-1000 ease-out"
+                          style={{
+                            width: `${Math.min(100, Math.max(8, (ag.replies / Math.max(...agentMetrics.map(a => a.replies), 1)) * 100))}%`
+                          }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-bold text-stone-950 w-16 text-right uppercase tracking-widest">
+                        {ag.resolutionRate}% Res
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ─── SECTION: ROI ATTRIBUTION LEDGER ─── */}
+      {activeSection === "roi" && (
+        <div className="space-y-8 animate-slide-up">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+            <StatCard
+              title="Attributed Sales Revenue"
+              value={`₹${(roiSummary.totalRevenuePaise / 100).toFixed(2)}`}
+              subtitle="Driven by campaigns (72h window)"
+              icon={<Tag className="w-5 h-5 text-stone-950" />}
+            />
+            <StatCard
+              title="Simulated Ad Costs"
+              value={`₹${(roiSummary.totalCostPaise / 100).toFixed(2)}`}
+              subtitle="Delivered templates flat cost index"
+              icon={<Clock className="w-5 h-5 text-stone-950" />}
+            />
+            <StatCard
+              title="Ledger Conversion Events"
+              value={roiSummary.totalConversions.toString()}
+              subtitle="Campaign driven order checkouts"
+              icon={<Zap className="w-5 h-5 text-stone-950" />}
+            />
+            <StatCard
+              title="Aggregate Campaign ROI"
+              value={`${roiSummary.overallRoi}x`}
+              subtitle="Revenue-to-spend multiplier ratio"
+              icon={<TrendingUp className="w-5 h-5 text-stone-950" />}
+              trend={roiSummary.overallRoi > 1 ? 1 : -1}
+            />
+          </div>
+
+          <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
+            <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
+              <FileText className="w-4 h-4 text-stone-950" />
+              Campaign Attribution & ROI Performance Matrix
+            </h3>
+            <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Waba campaign spend audit ledgers</p>
+            
+            {loadingMetrics ? (
+              <div className="h-48 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest animate-pulse">
+                AUDITING CAMPAIGN BALANCES...
+              </div>
+            ) : roiLedger.length === 0 ? (
+              <div className="h-48 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
+                NO BROADCAST CAMPAIGN DATA RECORDED YET
+              </div>
+            ) : (
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-stone-200">
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4">Campaign</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Conversions</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Cost</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Attributed Revenue</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 text-center">ROI Multiplier</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roiLedger.map((rl) => (
+                      <tr key={rl.id} className="border-b border-stone-100 hover:bg-[#fafaf9]/80 transition-colors">
+                        <td className="py-3 pr-4">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-stone-800 uppercase tracking-wider">{rl.name}</span>
+                            <span className="text-[9px] text-stone-400 uppercase tracking-wider mt-0.5">{rl.templateName}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4 text-center text-xs font-bold text-stone-850">{rl.conversions}</td>
+                        <td className="py-3 pr-4 text-center text-xs font-bold text-stone-600">₹{(rl.costPaise / 100).toFixed(2)}</td>
+                        <td className="py-3 pr-4 text-center text-xs font-bold text-stone-900">₹{(rl.attributedRevenuePaise / 100).toFixed(2)}</td>
+                        <td className="py-3 text-center">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase border ${
+                            rl.roi > 2 
+                              ? "bg-stone-900 text-white border-stone-950" 
+                              : rl.roi > 0 
+                              ? "bg-stone-100 text-stone-900 border-stone-300"
+                              : "bg-stone-50 text-stone-400 border-stone-200"
+                          }`}>
+                            {rl.roi > 0 ? `${rl.roi}x ROI` : "0.0x ROI"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

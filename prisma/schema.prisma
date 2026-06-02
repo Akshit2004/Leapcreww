@@ -39,6 +39,12 @@ model Organization {
   // Onboarding state
   onboardingDismissed      Boolean    @default(false)
 
+  // Marketplace Bot state
+  marketplaceBotEnabled    Boolean    @default(false)
+
+  // Chatbot Builder state
+  chatbotBuilderEnabled    Boolean    @default(true)
+
   memberships  Membership[]
   contacts     Contact[]
   campaigns    Campaign[]
@@ -269,3 +275,13 @@ model WhatsAppLoginAttempt {
   createdAt DateTime @default(now())
   expiresAt DateTime
 }
+
+model ChatbotAnalytics {
+  id             String   @id @default(uuid())
+  nodeId         String
+  contactId      String
+  action         String   // "impression" | "response" | "dropoff"
+  organizationId String
+  createdAt      DateTime @default(now())
+}
+

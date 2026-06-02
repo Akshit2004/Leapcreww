@@ -97,7 +97,7 @@ export const CustomersTab: React.FC = () => {
             Manage your contacts, apply tags, and segment your audience.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button className="flex items-center gap-2 bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm">
             <Filter className="w-4 h-4" />
             More Filters
@@ -111,6 +111,33 @@ export const CustomersTab: React.FC = () => {
           </button>
         </div>
       </header>
+
+      {/* Mobile Segments (Horizontal Scroll) */}
+      <div className="lg:hidden flex items-center gap-2 overflow-x-auto custom-scrollbar pb-3 mb-3">
+        <button
+          onClick={() => setSelectedSegment(null)}
+          className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+            selectedSegment === null
+              ? "bg-stone-950 text-white border-stone-950"
+              : "bg-white text-stone-600 border-stone-200"
+          }`}
+        >
+          All ({contacts.length})
+        </button>
+        {allTags.map((tag) => (
+          <button
+            key={tag}
+            onClick={() => setSelectedSegment(tag)}
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+              selectedSegment === tag
+                ? "bg-wa-green border-wa-green text-white"
+                : "bg-white text-stone-600 border-stone-200"
+            }`}
+          >
+            {tag} ({contacts.filter((c) => c.tags?.includes(tag)).length})
+          </button>
+        ))}
+      </div>
 
       <div className="flex-1 flex gap-6 min-h-0">
         {/* Left Sidebar - Segments */}

@@ -73,7 +73,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
           {/* Chronological Activity Stream Ledger */}
           <FlowJournalStream
             systemLogs={systemLogs}
-            clearSystemLogs={clearSystemLogs}
+            clearSystemLogs={() => clearSystemLogs(organization?.id)}
             onNavigate={onNavigate}
           />
         </div>
