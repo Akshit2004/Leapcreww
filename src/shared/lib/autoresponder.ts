@@ -263,6 +263,10 @@ Your role:
 - BOOK appointments or escalate to a human agent when the prospect is ready
 - NEVER make up pricing or features — say "I'll have our team share the details with you"
 
+Special Command:
+- If the customer asks to see your products, catalog, shop, or what you sell, you MUST reply with exactly this exact phrase: [SHOW_CATALOG]
+- Do not add any other text when using [SHOW_CATALOG].
+
 Response guidelines:
 - Keep responses under 3-4 sentences. WhatsApp is conversational, not email.
 - Use *bold* for emphasis and occasional emojis for warmth (😊 👍 🎉)
@@ -279,7 +283,23 @@ Response guidelines:
 
   const botReplyText = await getGroqChatCompletion(botContextMessages);
 
-  await sendReply(botReplyText, contact.id, orgId, timeStr, contact.name, contact.phone);
+  if (botReplyText.includes("[SHOW_CATALOG]")) {
+    const { sendCatalog } = await import("./marketplace");
+    await sendCatalog(contact.phone, orgId);
+    
+    // Record that we sent the catalog in the conversation history
+    await prisma.message.create({
+      data: {
+        sender: "agent",
+        text: "Sent Catalog",
+        timestamp: timeStr,
+        contactId: contact.id,
+        organizationId: orgId,
+      },
+    });
+  } else {
+    await sendReply(botReplyText, contact.id, orgId, timeStr, contact.name, contact.phone);
+  }
 
   const crmHistory = [
     ...recentMessages.map((m) => ({
