@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Organization, Integration, ChatbotNode, SystemLog, Member } from "@/shared/context/types";
+import { Organization, BrandProfile, Integration, ChatbotNode, SystemLog, Member } from "@/shared/context/types";
 
 export const useSystemState = () => {
   const [organization, setOrganization] = useState<Organization | null>(null);
@@ -73,6 +73,21 @@ export const useSystemState = () => {
     }
   }, []);
 
+  const updateBrandProfile = useCallback(async (orgId: string, profile: BrandProfile) => {
+    // Optimistically update local state so the UI reflects the change immediately.
+    setOrganization((prev: Organization | null) => (prev ? { ...prev, brandProfile: profile } : prev));
+    const res = await fetch(`/api/org/${orgId}/brand-profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(profile),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to save brand profile.");
+    }
+    addSystemLog("integration", `Brand profile updated for "${profile.name}".`);
+  }, [addSystemLog]);
+
   const updateChatbotNodes = useCallback(async (newNodes: ChatbotNode[], organizationId: string) => {
     setChatbotNodes(newNodes);
     try {
@@ -112,6 +127,7 @@ export const useSystemState = () => {
     clearSystemLogs,
     toggleIntegration,
     dismissOnboarding,
+    updateBrandProfile,
     updateChatbotNodes,
   };
 };

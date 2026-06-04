@@ -44,6 +44,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     clearSystemLogs,
     toggleIntegration,
     dismissOnboarding,
+    updateBrandProfile,
     updateChatbotNodes,
   } = useSystemState();
 
@@ -197,6 +198,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         unlockSync,
         refreshWorkspace,
         dismissOnboarding,
+        updateBrandProfile,
         initializeWorkspace,
       }}
     >

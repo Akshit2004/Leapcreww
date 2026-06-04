@@ -1,8 +1,16 @@
+export interface BrandProfile {
+  name: string;
+  industry: string;
+  toneOfVoice: string;
+  websiteUrl?: string;
+}
+
 export interface Organization {
   id: string;
   name?: string;
   onboardingDismissed?: boolean;
   walletBalance?: number;
+  brandProfile?: BrandProfile | null;
   [key: string]: unknown;
 }
 
@@ -61,6 +69,7 @@ export interface Template {
   category: "Marketing" | "Utility" | "Authentication";
   buttons: string[];
   mediaType?: "none" | "image" | "video" | "document";
+  mediaUrl?: string | null;
   metaStatus?: "pending" | "approved" | "rejected";
   metaId?: string;
   isShared?: boolean;
@@ -136,19 +145,21 @@ export interface AppContextType {
   toggleIntegration: (id: string, config?: { apiKey?: string; webhookUrl?: string }) => void;
   addSystemLog: (type: SystemLog["type"], message: string) => void;
   clearSystemLogs: (orgId?: string) => void;
-  submitMetaTemplate: (templateData: { 
-    name: string; 
-    category: string; 
-    body: string; 
-    buttons: string[]; 
-    mediaType: string; 
-    organizationId: string; 
+  submitMetaTemplate: (templateData: {
+    name: string;
+    category: string;
+    body: string;
+    buttons: string[];
+    mediaType: string;
+    mediaUrl?: string;
+    organizationId: string;
   }) => Promise<void>;
   deleteTemplate: (id: string) => Promise<void>;
   lockSync: () => void;
   unlockSync: () => void;
   refreshWorkspace: (orgId: string) => Promise<void>;
   dismissOnboarding: (orgId: string) => Promise<void>;
+  updateBrandProfile: (orgId: string, profile: BrandProfile) => Promise<void>;
   initializeWorkspace: (data: {
     organization: Organization | null;
     contacts: Contact[];

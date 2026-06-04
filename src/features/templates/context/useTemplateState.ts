@@ -16,13 +16,14 @@ export const useTemplateState = ({
 }: UseTemplateStateProps) => {
   const [templates, setTemplates] = useState<Template[]>([]);
 
-  const submitMetaTemplate = useCallback(async (newTmpl: { 
-    name: string; 
-    category: string; 
-    body: string; 
-    buttons: string[]; 
-    mediaType: string; 
-    organizationId: string; 
+  const submitMetaTemplate = useCallback(async (newTmpl: {
+    name: string;
+    category: string;
+    body: string;
+    buttons: string[];
+    mediaType: string;
+    mediaUrl?: string;
+    organizationId: string;
   }) => {
     try {
       addSystemLog("crm", `Submitting template "${newTmpl.name}" for Meta approval...`);

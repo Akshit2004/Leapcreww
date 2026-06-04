@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useApp } from "@/shared/context/AppContext";
 import { CustomersTable } from "./CustomersTable";
-import { TagBadge } from "./TagBadge";
 import { BulkAddTagModal } from "./BulkAddTagModal";
 import { AddCustomerModal } from "./AddCustomerModal";
 import { Users, Search, Tag, Filter, Plus, Trash2 } from "lucide-react";

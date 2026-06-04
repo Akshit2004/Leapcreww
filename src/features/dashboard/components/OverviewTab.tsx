@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Users, Send, FileCode2, UploadCloud, ChevronRight } from "lucide-react";
+import { Send, FileCode2, UploadCloud } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { CSVImporterModal } from "@/features/inbox/components/CSVImporterModal";
 import { ChecklistWizard } from "./ChecklistWizard";
@@ -21,10 +21,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
     templates, 
     systemLogs, 
     clearSystemLogs, 
-    dismissOnboarding, 
+    dismissOnboarding,
     refreshWorkspace,
-    sendLiveChatMessage,
-    addSystemLog,
   } = useApp();
   
   const [isCSVModalOpen, setIsCSVModalOpen] = useState(false);

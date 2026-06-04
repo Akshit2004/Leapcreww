@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
 
   const product = await prisma.product.create({
     data: {
+      sku: body.sku || null,
       name,
       description: description || "",
       price,
@@ -50,6 +51,9 @@ export async function POST(req: NextRequest) {
       organizationId,
     },
   });
+
+  // Sync to Meta Catalog
+  import("@/shared/lib/meta-catalog").then((m) => m.syncProductToMetaCatalog(product.id));
 
   return NextResponse.json({ product }, { status: 201 });
 }

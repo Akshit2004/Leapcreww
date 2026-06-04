@@ -82,7 +82,7 @@ export async function POST(
 
   const webhookUrl = webhookBase ? `${webhookBase}/api/webhooks/shopify` : null;
 
-  let webhooksRegistered: string[] = [];
+  const webhooksRegistered: string[] = [];
   let webhookWarning: string | null = null;
 
   if (webhookUrl) {

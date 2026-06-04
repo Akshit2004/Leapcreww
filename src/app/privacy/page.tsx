@@ -2,23 +2,15 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { 
-  Bot, 
-  ArrowLeft, 
-  ShieldCheck, 
-  Database, 
-  Cpu, 
-  Lock, 
-  Server, 
-  Layers, 
-  Check, 
-  Terminal, 
-  RefreshCw, 
-  Send,
-  Sparkles,
-  Smartphone,
-  Eye,
-  Key
+import {
+  Bot,
+  ArrowLeft,
+  ShieldCheck,
+  Database,
+  Server,
+  Check,
+  Terminal,
+  RefreshCw
 } from "lucide-react";
 
 type FlowNode = "transit" | "postgres" | "meta";
@@ -125,10 +117,10 @@ export default function PrivacyPage() {
       content: (
         <div className="space-y-4">
           <p>
-            As a platform integrated with the <strong>WhatsApp Business Cloud API (Meta)</strong>, WappFlow routes communication payloads directly to Meta's endpoints.
+            As a platform integrated with the <strong>WhatsApp Business Cloud API (Meta)</strong>, WappFlow routes communication payloads directly to Meta&apos;s endpoints.
           </p>
           <p>
-            When you broadcast campaigns or chat via the team inbox, your messages bypass secondary third-party brokers. The transmission uses secure, end-to-end TLS 1.3 tunnels routed straight to Meta's global data centers. 
+            When you broadcast campaigns or chat via the team inbox, your messages bypass secondary third-party brokers. The transmission uses secure, end-to-end TLS 1.3 tunnels routed straight to Meta&apos;s global data centers. 
           </p>
           <p>
             WappFlow operates under a <strong>zero-knowledge message retention philosophy</strong> for historical chat bodies. We do not persist the raw contents of your customer conversations on our servers beyond what is required to display your active support queue. Once a chat is archived or resolved, message body records are queued for complete scrub cycles.
@@ -292,7 +284,7 @@ export default function PrivacyPage() {
           </h1>
 
           <p className="text-[#1D211F]/70 text-sm sm:text-base leading-relaxed font-medium max-w-2xl">
-            We believe privacy isn't a passive legal checklist—it's an engineering constraint. WappFlow orchestrates message relays, multi-tenant databases, and external webhooks under rigid isolation protocols.
+            We believe privacy isn&apos;t a passive legal checklist—it&apos;s an engineering constraint. WappFlow orchestrates message relays, multi-tenant databases, and external webhooks under rigid isolation protocols.
           </p>
 
           <div className="pt-6 flex items-center gap-6 font-mono text-[9px] tracking-widest text-[#1D211F]/40 uppercase select-none">

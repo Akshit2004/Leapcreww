@@ -88,7 +88,7 @@ async function handleWebhook(req: NextRequest, topic: string, orgId: string) {
   }
 
   if (topic === "orders/create") {
-    const { customer, line_items, total_price, order_number } = payload;
+    const { customer, total_price, order_number } = payload;
     const phone = customer?.phone || "";
     const name = `${customer?.first_name || ""} ${customer?.last_name || ""}`.trim() || "Shopify Customer";
     if (phone) await upsertShopifyContact(orgId, phone, name, "Shopify-Buyer", "Shopify Order");

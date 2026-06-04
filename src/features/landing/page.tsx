@@ -1,26 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { 
-  Bot, 
-  MessageSquare, 
-  Megaphone, 
-  Cpu, 
+import {
+  Bot,
+  MessageSquare,
+  Megaphone,
+  Cpu,
   ArrowRight,
-  Sparkles,
-  CheckCircle,
   ExternalLink,
   Terminal,
-  Settings,
-  Database,
-  Layers,
-  Send,
-  Smartphone,
-  Share2,
-  ChevronRight,
-  TrendingUp,
-  ShieldCheck,
   Check,
   Zap,
   RefreshCw,
@@ -482,7 +471,7 @@ export default function LandingPage() {
                         <div className="bg-[#171A19] border border-[#FAF7F2]/5 rounded-lg p-3 space-y-1.5">
                           <div className="text-[9px] font-mono text-[#FAF7F2]/40 uppercase tracking-wider">Meta Broadcast Template Preview:</div>
                           <p className="text-xs bg-[#1D211F] rounded p-2 text-[#FAF7F2]/80 border border-[#FAF7F2]/5 leading-relaxed font-mono">
-                            "Hello <span className="text-[#D05E3C] font-bold">{"{{"}customer_name{"}}"}</span>, your subscription is ready for activation. Log in to <span className="text-emerald-400">wappflow.app/verify</span> to authorize access."
+                            &quot;Hello <span className="text-[#D05E3C] font-bold">{"{{"}customer_name{"}}"}</span>, your subscription is ready for activation. Log in to <span className="text-emerald-400">wappflow.app/verify</span> to authorize access.&quot;
                           </p>
                         </div>
                       </div>
@@ -520,7 +509,7 @@ export default function LandingPage() {
                             </div>
                             <div className="min-w-0">
                               <div className="text-[9px] font-mono text-[#FAF7F2]/45 uppercase tracking-wider">Trigger event</div>
-                              <div className="text-xs font-bold truncate">User Message contains "Join"</div>
+                              <div className="text-xs font-bold truncate">User Message contains &quot;Join&quot;</div>
                             </div>
                           </div>
 
@@ -533,7 +522,7 @@ export default function LandingPage() {
                             </div>
                             <div className="min-w-0">
                               <div className="text-[9px] font-mono text-[#FAF7F2]/45 uppercase tracking-wider">Conditional logic filter</div>
-                              <div className="text-xs font-bold truncate">Validate User Tag: "vip"</div>
+                              <div className="text-xs font-bold truncate">Validate User Tag: &quot;vip&quot;</div>
                             </div>
                           </div>
 

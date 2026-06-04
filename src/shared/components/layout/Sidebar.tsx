@@ -1,20 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { 
+import React, { useState, useCallback } from "react";
+import {
   LayoutDashboard,
   MessageSquare,
   Megaphone,
   FileText,
-  Bot,
   Cpu,
   LogOut,
-  X,
   ShoppingBag,
-  Smartphone,
-  CheckCircle2,
-  Loader,
-  AlertCircle,
   Settings,
   BarChart3,
   Users,
@@ -23,7 +17,6 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useApp } from "../../context/AppContext";
-import { useParams } from "next/navigation";
 
 interface SidebarProps {
   activeTab: string;
@@ -46,19 +39,13 @@ declare global {
   }
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ 
-  activeTab, 
+export const Sidebar: React.FC<SidebarProps> = ({
+  activeTab,
   setActiveTab,
-  isOpen = false,
-  onClose,
   onOpenCopilot
 }) => {
-  const params = useParams();
-  const orgId = params.orgId as string;
   const { contacts } = useApp();
   const { data: session } = useSession();
-
-  const [waConnected, setWaConnected] = useState(true);
 
   const [isHovered, setIsHovered] = useState(false);
   const isExpanded = isHovered;

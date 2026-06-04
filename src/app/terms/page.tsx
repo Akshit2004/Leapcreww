@@ -2,17 +2,14 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { 
-  Bot, 
-  ArrowLeft, 
-  ShieldCheck, 
-  Database, 
-  Cpu, 
-  Lock, 
-  Server, 
-  Check, 
-  Terminal, 
-  RefreshCw, 
+import {
+  Bot,
+  ArrowLeft,
+  Database,
+  Server,
+  Check,
+  Terminal,
+  RefreshCw,
   Scale,
   FileText
 } from "lucide-react";
@@ -92,7 +89,7 @@ export default function TermsPage() {
             WappFlow serves as an architectural intermediary SaaS application that facilitates seamless integrations with the **WhatsApp Business Cloud API (Meta)**. By registering a tenant workspace, you acknowledge and agree that our software’s operation is strictly bound by Meta’s official Service Level Agreements (SLAs).
           </p>
           <p>
-            We represent a stateless and logical multi-tenant CRM layer. Any outages, API modifications, template blocking policies, or number suspensions executed by Meta Business Platform fall entirely outside WappFlow’s structural liabilities. You are obligated to maintain active, compliant Developer accounts and WhatsApp Business accounts directly inside Meta's dashboard.
+            We represent a stateless and logical multi-tenant CRM layer. Any outages, API modifications, template blocking policies, or number suspensions executed by Meta Business Platform fall entirely outside WappFlow’s structural liabilities. You are obligated to maintain active, compliant Developer accounts and WhatsApp Business accounts directly inside Meta&apos;s dashboard.
           </p>
         </div>
       )
@@ -143,7 +140,7 @@ export default function TermsPage() {
           </p>
           <ul className="list-disc pl-5 text-xs space-y-2 text-[#1D211F]/80">
             <li><strong>Non-Refundable Balance</strong>: Wallet top-up credits are non-refundable and hold no monetary cash value outside WappFlow campaign operations.</li>
-            <li><strong>Session Cost Index</strong>: WhatsApp charges are based on Meta's official country index pricing rules and are deducted dynamically from your wallet ledger upon each webhook dispatch check.</li>
+            <li><strong>Session Cost Index</strong>: WhatsApp charges are based on Meta&apos;s official country index pricing rules and are deducted dynamically from your wallet ledger upon each webhook dispatch check.</li>
             <li><strong>Automatic Queue Halting</strong>: If your active wallet balance drops below ₹0, the outbound API dispatch pool halts instantly to prevent credit liability build-up.</li>
           </ul>
         </div>

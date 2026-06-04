@@ -114,6 +114,9 @@ export function IntegrationsTab() {
   }, [orgId]);
 
   useEffect(() => {
+    // Fetch-on-mount + read one-time OAuth redirect flags: synchronizing with
+    // external systems (integration status API and URL query params).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchIntegration();
 
     const isSuccess = searchParams.get("success") === "true";

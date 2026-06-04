@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { Tag, X } from "lucide-react";
 
 interface BulkAddTagModalProps {
@@ -15,11 +15,11 @@ export const BulkAddTagModal: React.FC<BulkAddTagModalProps> = ({
   selectedCount,
 }) => {
   const [tagValue, setTagValue] = useState("");
-  const prevIsOpenRef = useRef(isOpen);
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
 
   // Detect isOpen changes synchronously in render, before component returns
-  if (isOpen !== prevIsOpenRef.current) {
-    prevIsOpenRef.current = isOpen;
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       setTagValue("");
     }

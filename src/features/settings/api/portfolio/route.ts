@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/features/auth/api/[...nextauth]/route";
 import { prisma } from "@/shared/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
 
@@ -88,19 +89,24 @@ export async function POST(request: NextRequest) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const { orgId, wabaId, phoneNumberId } = body;
+    const { orgId, wabaId, phoneNumberId, metaCatalogId } = body;
 
     if (!orgId || !wabaId || !phoneNumberId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    const dataToUpdate: Prisma.OrganizationUpdateInput = {
+      whatsappBusinessAccountId: wabaId,
+      whatsappPhoneNumberId: phoneNumberId,
+      whatsappConnected: true,
+    };
+    if (metaCatalogId) {
+      dataToUpdate.metaCatalogId = metaCatalogId;
+    }
+
     await prisma.organization.update({
       where: { id: orgId },
-      data: {
-        whatsappBusinessAccountId: wabaId,
-        whatsappPhoneNumberId: phoneNumberId,
-        whatsappConnected: true,
-      }
+      data: dataToUpdate
     });
 
     return NextResponse.json({ success: true });

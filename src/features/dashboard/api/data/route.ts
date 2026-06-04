@@ -3,8 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/features/auth/api/[...nextauth]/route";
 import { prisma } from "@/shared/lib/prisma";
 
-const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ orgId: string }> }
@@ -50,6 +48,7 @@ export async function GET(
         onboardingDismissed: true,
         marketplaceBotEnabled: true,
         chatbotBuilderEnabled: true,
+        brandProfile: true,
       }
     });
 
@@ -90,7 +89,7 @@ export async function GET(
       orderBy: { createdAt: "desc" },
       select: {
         id: true, name: true, body: true, category: true,
-        buttons: true, mediaType: true, metaStatus: true, metaId: true, isShared: true,
+        buttons: true, mediaType: true, mediaUrl: true, metaStatus: true, metaId: true, isShared: true,
         organizationId: true, createdAt: true,
       },
     });
@@ -100,7 +99,7 @@ export async function GET(
       orderBy: { createdAt: "desc" },
       select: {
         id: true, name: true, body: true, category: true,
-        buttons: true, mediaType: true, metaStatus: true, metaId: true, isShared: true,
+        buttons: true, mediaType: true, mediaUrl: true, metaStatus: true, metaId: true, isShared: true,
         organizationId: true, createdAt: true,
       },
     });

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect} from "react";
 import { useParams } from "next/navigation";
+import type { Organization } from "@/shared/context/types";
 import {
   ShoppingBag,
   Package,
@@ -49,7 +50,7 @@ export const MarketplaceTab: React.FC = () => {
   const params = useParams();
   const orgId = params.orgId as string;
 
-  const [organization, setOrganization] = useState<any>(null);
+  const [organization, setOrganization] = useState<Organization | null>(null);
   const [botToggling, setBotToggling] = useState(false);
 
   const [activeSection, setActiveSection] = useState<"overview" | "products" | "orders">("overview");
@@ -106,10 +107,10 @@ export const MarketplaceTab: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.organization) {
-          setOrganization((prev: any) => ({
+          setOrganization((prev) => prev ? {
             ...prev,
             marketplaceBotEnabled: data.organization.marketplaceBotEnabled,
-          }));
+          } : prev);
         }
       }
     } catch (err) {

@@ -418,6 +418,7 @@ function SignupContent() {
       <div className="hidden md:flex md:col-span-5 lg:col-span-6 h-full relative bg-stone-950 flex-col justify-between p-12 overflow-hidden">
         {/* Full-bleed high-taste illustration showcase */}
         <div className="absolute inset-0 z-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/login_showcase.png"
             alt="WappFlow SaaS Dashboard Mockup"

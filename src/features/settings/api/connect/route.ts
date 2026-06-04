@@ -102,6 +102,31 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // ─── Fetch Catalogs ──────────────────────────────────────────────────────
+    let metaCatalogId = null;
+    if (businessId) {
+      try {
+        const catRes = await fetch(
+          `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${businessId}/owned_product_catalogs?access_token=${shortLivedToken}`
+        );
+        const catData = catRes.ok ? await catRes.json() : { data: [] };
+        if (catData.data && catData.data.length > 0) {
+          metaCatalogId = catData.data[0].id;
+        } else {
+          // Fallback check client_product_catalogs
+          const clientCatRes = await fetch(
+            `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${businessId}/client_product_catalogs?access_token=${shortLivedToken}`
+          );
+          const clientCatData = clientCatRes.ok ? await clientCatRes.json() : { data: [] };
+          if (clientCatData.data && clientCatData.data.length > 0) {
+            metaCatalogId = clientCatData.data[0].id;
+          }
+        }
+      } catch (err) {
+        console.error("[Connect] Failed to fetch catalogs:", err);
+      }
+    }
+
     // ─── Step 3: Fetch phone numbers for discovered WABAs ────────────────
     const portfolios: { 
       wabaId: string; 
@@ -144,6 +169,7 @@ export async function POST(request: NextRequest) {
           whatsappBusinessAccountId: selectedWaba.wabaId,
           whatsappPhoneNumberId: selectedPhone.id,
           metaBusinessId: businessId,
+          metaCatalogId,
           whatsappConnected: true,
         },
       });
@@ -168,6 +194,7 @@ export async function POST(request: NextRequest) {
         phoneNumberId: selectedPhone.id,
         displayPhoneNumber: selectedPhone.display_phone_number,
         businessId,
+        metaCatalogId,
       });
     }
 
@@ -177,6 +204,7 @@ export async function POST(request: NextRequest) {
       status: "selection_required",
       portfolios,
       businessId,
+      metaCatalogId,
     });
   } catch (err: unknown) {
     console.error("[Connect] Embedded Signup connect error:", err);

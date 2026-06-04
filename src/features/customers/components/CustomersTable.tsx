@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Contact } from "@/shared/context/types";
 import { TagBadge } from "./TagBadge";
-import { Check, Plus, Tag as TagIcon, Mail, Phone, Clock, User } from "lucide-react";
+import { Check, Plus, Mail, Phone, Clock, User } from "lucide-react";
 
 interface CustomersTableProps {
   contacts: Contact[];

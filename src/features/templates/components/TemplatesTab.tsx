@@ -39,6 +39,7 @@ export const TemplatesTab: React.FC = () => {
   const [category, setCategory] = useState("Marketing");
   const [bodyText, setBodyText] = useState("");
   const [mediaType, setMediaType] = useState("none");
+  const [mediaUrl, setMediaUrl] = useState("");
   
   // Buttons Builder
   const [buttonsList, setButtonsList] = useState<string[]>([]);
@@ -54,6 +55,13 @@ export const TemplatesTab: React.FC = () => {
 
   // Client-side quick validation rules
   const [clientWarnings, setClientWarnings] = useState<string[]>([]);
+
+  // Brand-Aware AI generator (topic + URL → body copy)
+  const [showGenerator, setShowGenerator] = useState(false);
+  const [genTopic, setGenTopic] = useState("");
+  const [genUrl, setGenUrl] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
 
   // Filter templates
   const filteredTemplates = templates.filter((t) => {
@@ -139,6 +147,34 @@ export const TemplatesTab: React.FC = () => {
     }
   };
 
+  // Brand-Aware AI Generation Call
+  const handleGenerateWithAI = async () => {
+    if (!genTopic.trim() || !orgId) return;
+    setGenerating(true);
+    setGenError(null);
+    try {
+      const res = await fetch("/api/ai/generate-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: genTopic.trim(), url: genUrl.trim(), orgId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setGenError(data.error || "Generation failed. Please try again.");
+        return;
+      }
+      setBodyText(data.generatedText);
+      addSystemLog("crm", "Template body generated via Brand-Aware AI");
+      setShowGenerator(false);
+      setGenTopic("");
+      setGenUrl("");
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : "Network error during generation.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   // Submit Template
   const handleSubmitTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,6 +193,7 @@ export const TemplatesTab: React.FC = () => {
       body: bodyText,
       buttons: buttonsList,
       mediaType,
+      mediaUrl: mediaType !== "none" ? mediaUrl.trim() : undefined,
       organizationId: orgId
     });
 
@@ -165,6 +202,7 @@ export const TemplatesTab: React.FC = () => {
     setBodyText("");
     setButtonsList([]);
     setMediaType("none");
+    setMediaUrl("");
     setComplianceScore(null);
     setComplianceFeedback([]);
     setSuggestedCategory(null);
@@ -479,10 +517,13 @@ export const TemplatesTab: React.FC = () => {
                     <button
                       key={type}
                       type="button"
-                      onClick={() => setMediaType(type)}
+                      onClick={() => {
+                        setMediaType(type);
+                        if (type === "none") setMediaUrl("");
+                      }}
                       className={`flex-1 py-2 text-center text-xs font-bold rounded-none border capitalize cursor-pointer transition-all ${
-                        mediaType === type 
-                          ? "bg-stone-950 text-white border-stone-950" 
+                        mediaType === type
+                          ? "bg-stone-950 text-white border-stone-950"
                           : "bg-white border-stone-200 text-stone-600 hover:bg-stone-100"
                       }`}
                     >
@@ -490,14 +531,104 @@ export const TemplatesTab: React.FC = () => {
                     </button>
                   ))}
                 </div>
+
+                {/* Sample media URL — required by Meta to register a media header */}
+                {mediaType !== "none" && (
+                  <div className="space-y-1 pt-1">
+                    <input
+                      type="url"
+                      placeholder={`Sample ${mediaType} URL — e.g. https://cdn.mysite.com/banner.${mediaType === "image" ? "jpg" : mediaType === "video" ? "mp4" : "pdf"}`}
+                      value={mediaUrl}
+                      onChange={(e) => setMediaUrl(e.target.value)}
+                      className="w-full bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-900"
+                    />
+                    <span className="text-[9px] text-stone-400 block font-semibold flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      Meta uploads this sample to approve the header. Each broadcast can override the actual {mediaType}.
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Template Body Copy Textarea */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600 flex justify-between">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600 flex justify-between items-center">
                   <span>Template Text body</span>
-                  <span className="text-[9px] text-stone-400">{bodyText.length} / 1024 characters</span>
+                  <span className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => { setShowGenerator((v) => !v); setGenError(null); }}
+                      className="flex items-center gap-1 text-[10px] font-bold text-stone-900 hover:text-stone-600 transition-colors cursor-pointer normal-case tracking-normal"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Generate with AI
+                    </button>
+                    <span className="text-[9px] text-stone-400">{bodyText.length} / 1024 characters</span>
+                  </span>
                 </label>
+
+                {/* Brand-Aware AI generator popover */}
+                {showGenerator && (
+                  <div className="border border-stone-300 rounded-none bg-stone-50 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h6 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Brand-Aware AI Generator
+                      </h6>
+                      <button
+                        type="button"
+                        onClick={() => setShowGenerator(false)}
+                        className="text-stone-400 hover:text-stone-900 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <p className="text-[9px] text-stone-500 leading-relaxed">
+                      Uses your saved Brand Profile (Settings) to write copy in your brand&apos;s tone.
+                    </p>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Topic / offer — e.g. 50% off Diwali Sale"
+                        value={genTopic}
+                        onChange={(e) => setGenTopic(e.target.value)}
+                        className="w-full bg-white border border-stone-200 rounded-none px-3 py-2 text-xs focus:outline-none focus:border-stone-900"
+                      />
+                      <input
+                        type="text"
+                        placeholder="URL to embed (optional) — e.g. https://mysite.com/sale"
+                        value={genUrl}
+                        onChange={(e) => setGenUrl(e.target.value)}
+                        className="w-full bg-white border border-stone-200 rounded-none px-3 py-2 text-xs focus:outline-none focus:border-stone-900"
+                      />
+                    </div>
+                    {genError && (
+                      <div className="text-[10px] text-red-600 font-semibold flex items-start gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>{genError}</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      disabled={!genTopic.trim() || generating}
+                      onClick={handleGenerateWithAI}
+                      className="w-full px-4 py-2 bg-stone-950 hover:bg-stone-900 disabled:opacity-40 text-white text-xs font-bold rounded-none border border-stone-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      {generating ? (
+                        <>
+                          <Loader className="w-3.5 h-3.5 animate-spin" />
+                          Writing in your brand voice...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Generate Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
                 <textarea
                   required
                   rows={4}
@@ -669,7 +800,7 @@ export const TemplatesTab: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={clientWarnings.length > 0 || !templateName.trim() || !bodyText.trim()}
+                  disabled={clientWarnings.length > 0 || !templateName.trim() || !bodyText.trim() || (mediaType !== "none" && !mediaUrl.trim())}
                   className="px-5 py-2 bg-stone-950 hover:bg-stone-900 disabled:opacity-40 text-white font-semibold text-xs rounded-none border border-stone-950 cursor-pointer flex items-center gap-1.5 transition-all"
                 >
                   <ThumbsUp className="w-3.5 h-3.5" />

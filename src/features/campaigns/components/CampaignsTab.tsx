@@ -58,7 +58,7 @@ export const CampaignsTab: React.FC = () => {
 
   // Auto-initialize template choice and variables
   useEffect(() => {
-    let timer: any;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (!templateName && templates.length > 0) {
       timer = setTimeout(() => {
         setTemplateName(templates[0].name);
@@ -73,7 +73,6 @@ export const CampaignsTab: React.FC = () => {
 
   // Scan and parse variables from active template body
   useEffect(() => {
-    let timer: any;
     const t = templates.find((x) => x.name === templateName);
     const initialMapping: Record<string, { type: "contact_field" | "static"; value: string }> = {};
     if (t?.body) {
@@ -84,11 +83,11 @@ export const CampaignsTab: React.FC = () => {
         });
       }
     }
-    timer = setTimeout(() => {
+    const timer = setTimeout(() => {
       setVariablesMapping(initialMapping);
     }, 0);
     return () => {
-      if (timer) clearTimeout(timer);
+      clearTimeout(timer);
     };
   }, [templateName, templates]);
 

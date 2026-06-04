@@ -20,6 +20,20 @@ export interface WhatsAppMessage {
       rows: { id: string; title: string; description?: string }[];
     }[];
   };
+  catalogList?: {
+    headerText: string;
+    bodyText: string;
+    catalogId: string;
+    sections: {
+      title: string;
+      productItems: { product_retailer_id: string }[];
+    }[];
+  };
+  product?: {
+    bodyText: string;
+    catalogId: string;
+    productRetailerId: string;
+  };
 }
 
 export interface WhatsAppWebhookPayload {
@@ -42,6 +56,16 @@ export interface WhatsAppWebhookPayload {
           interactive?: {
             button_reply?: { id: string; title: string };
             list_reply?: { id: string; title: string; description?: string };
+          };
+          order?: {
+            catalog_id: string;
+            text?: string;
+            product_items: {
+              product_retailer_id: string;
+              quantity: string;
+              item_price: string;
+              currency: string;
+            }[];
           };
         }[];
         statuses?: {
@@ -175,6 +199,32 @@ export async function sendWhatsAppMessage(
       action: {
         button: message.list.buttonText,
         sections: message.list.sections,
+      },
+    };
+  } else if (message.catalogList) {
+    // Native WhatsApp Product List
+    body.type = "interactive";
+    body.interactive = {
+      type: "product_list",
+      header: { type: "text", text: message.catalogList.headerText },
+      body: { text: message.catalogList.bodyText },
+      action: {
+        catalog_id: message.catalogList.catalogId,
+        sections: message.catalogList.sections.map((sec) => ({
+          title: sec.title,
+          product_items: sec.productItems,
+        })),
+      },
+    };
+  } else if (message.product) {
+    // Native WhatsApp Single Product
+    body.type = "interactive";
+    body.interactive = {
+      type: "product",
+      body: { text: message.product.bodyText },
+      action: {
+        catalog_id: message.product.catalogId,
+        product_retailer_id: message.product.productRetailerId,
       },
     };
   } else {

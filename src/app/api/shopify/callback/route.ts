@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
     const origin = `${protocol}://${host}`;
     const webhookReceiverUrl = `${origin}/api/webhooks/shopify`;
 
-    let webhooksRegistered: string[] = [];
+    const webhooksRegistered: string[] = [];
     let webhookWarning = "";
 
     const isLocal = host.includes("localhost") || host.includes("127.0.0.1");

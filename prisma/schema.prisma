@@ -31,6 +31,7 @@ model Organization {
   whatsappBusinessAccountId String?
   whatsappPhoneNumberId     String?
   metaBusinessId            String?
+  metaCatalogId             String?
   whatsappConnected         Boolean    @default(false)
 
   // Wallet & SaaS credits
@@ -44,6 +45,9 @@ model Organization {
 
   // Chatbot Builder state
   chatbotBuilderEnabled    Boolean    @default(true)
+
+  // Brand-Aware AI content generation profile ({ name, industry, toneOfVoice })
+  brandProfile             Json?
 
   memberships  Membership[]
   contacts     Contact[]
@@ -145,6 +149,7 @@ model Template {
   category       String       // "Marketing" | "Utility" | "Authentication"
   buttons        String[]     // Postgres scalar list support
   mediaType      String       @default("none") // "none" | "image" | "video" | "document"
+  mediaUrl       String?      // sample media for the optional header (image/video/document)
   metaStatus     String       @default("pending") // "pending" | "approved" | "rejected"
   metaId         String?      // Meta template ID for status polling
   isShared       Boolean      @default(false) // visible to all orgs
@@ -197,6 +202,7 @@ model SystemLog {
 
 model Product {
   id             String       @id @default(uuid())
+  sku            String?      @unique
   name           String
   description    String       @db.Text
   price          Int          // in paise (₹100 = 10000)

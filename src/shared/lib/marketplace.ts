@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { sendWhatsAppMessage, formatPhoneNumber } from "./whatsapp";
-import { createRazorpayPaymentLink, getRazorpayInstance } from "./razorpay";
+import { getRazorpayInstance } from "./razorpay";
 
 const SHOP_NAME = "WappFlow Store";
 const CURRENCY_SYMBOL = "₹";
@@ -9,24 +9,14 @@ function formatPrice(paise: number): string {
   return `${CURRENCY_SYMBOL}${(paise / 100).toFixed(2)}`;
 }
 
-function generateOrderId(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let result = "ORD-";
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
 export async function sendMainMenu(phone: string, _contactId: string, orgId: string) {
   const text = `🛍️ Welcome to *${SHOP_NAME}*!
 
 What would you like to do?
 
 1️⃣ *Browse Catalog* — See our products
-2️⃣ *My Cart* — View items in your cart
-3️⃣ *My Orders* — Check order status
-4️⃣ *Help* — Get assistance
+2️⃣ *My Orders* — Check order status
+3️⃣ *Help* — Get assistance
 
 Reply with a number or just say what you need! 😊`;
   await sendWhatsAppMessage({
@@ -34,217 +24,57 @@ Reply with a number or just say what you need! 😊`;
     text,
     buttons: [
       { type: "reply", reply: { id: "catalog", title: "📦 Browse Catalog" } },
-      { type: "reply", reply: { id: "cart", title: "🛒 My Cart" } },
       { type: "reply", reply: { id: "orders", title: "📋 My Orders" } },
     ],
   }, orgId);
 }
 
-export async function sendCatalogCategories(phone: string, orgId: string) {
+export async function sendCatalog(phone: string, orgId: string) {
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { metaCatalogId: true },
+  });
+
+  if (!org?.metaCatalogId) {
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Catalog is not configured. Please contact support! 😊" }, orgId);
+    return;
+  }
+
   const products = await prisma.product.findMany({
     where: { organizationId: orgId, isActive: true },
-    select: { category: true },
-    distinct: ["category"],
+    orderBy: { category: "asc" },
+    take: 30, // Meta max 30 items
   });
-  const categories = [...new Set(products.map((p) => p.category))];
-  if (categories.length === 0) {
+
+  if (products.length === 0) {
     await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Sorry, no products available right now. Please check back later! 😊" }, orgId);
     return;
   }
-  await sendWhatsAppMessage({
-    to: formatPhoneNumber(phone),
-    list: {
-      buttonText: "Browse Categories",
-      title: SHOP_NAME,
-      description: "Select a category below to browse products:",
-      sections: [
-        {
-          title: "Product Categories",
-          rows: categories.map((cat) => ({
-            id: `cat_${cat}`,
-            title: cat.substring(0, 24),
-            description: `Browse all items in ${cat}`
-          }))
-        }
-      ]
+
+  const categoriesMap: Record<string, typeof products> = {};
+  for (const p of products) {
+    if (!categoriesMap[p.category]) categoriesMap[p.category] = [];
+    if (categoriesMap[p.category].length < 10) {
+      categoriesMap[p.category].push(p);
     }
-  }, orgId);
-}
-
-export async function sendCategoryProducts(phone: string, category: string, orgId: string) {
-  const products = await prisma.product.findMany({
-    where: { organizationId: orgId, category: { contains: category, mode: "insensitive" }, isActive: true },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-  });
-  if (products.length === 0) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: `No products found in "${category}" category.` }, orgId);
-    return;
   }
+
+  // Meta max 10 sections
+  const sections = Object.keys(categoriesMap).slice(0, 10).map((cat) => ({
+    title: cat.substring(0, 24),
+    productItems: categoriesMap[cat].map((p) => ({
+      product_retailer_id: p.sku || p.id,
+    })),
+  }));
+
   await sendWhatsAppMessage({
     to: formatPhoneNumber(phone),
-    list: {
-      buttonText: "View Products",
-      title: `${SHOP_NAME} - ${category}`,
-      description: "Select a product below to add it to your cart:",
-      sections: [
-        {
-          title: "Available Items",
-          rows: products.map((p) => ({
-            id: p.name,
-            title: p.name.substring(0, 24),
-            description: `${formatPrice(p.price)} - ${p.description ? p.description.slice(0, 60) : 'Tap to add to cart'}`
-          }))
-        }
-      ]
+    catalogList: {
+      headerText: SHOP_NAME,
+      bodyText: "Browse our products and add them to your cart. Click the catalog button below!",
+      catalogId: org.metaCatalogId,
+      sections,
     }
-  }, orgId);
-}
-
-export async function addToCart(phone: string, contactId: string, orgId: string, productName: string) {
-  const product = await prisma.product.findFirst({
-    where: {
-      organizationId: orgId,
-      isActive: true,
-      name: { contains: productName, mode: "insensitive" },
-    },
-  });
-  if (!product || product.stock < 1) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Sorry, that product is not available or out of stock. 😔" }, orgId);
-    return;
-  }
-  let cart = await prisma.cart.findUnique({ where: { contactId } });
-  if (!cart) {
-    cart = await prisma.cart.create({ data: { contactId } });
-  }
-  const existing = await prisma.cartItem.findFirst({
-    where: { cartId: cart.id, productId: product.id },
-  });
-  if (existing) {
-    await prisma.cartItem.update({
-      where: { id: existing.id },
-      data: { quantity: { increment: 1 } },
-    });
-  } else {
-    await prisma.cartItem.create({
-      data: { cartId: cart.id, productId: product.id, quantity: 1 },
-    });
-  }
-  await sendWhatsAppMessage({
-    to: formatPhoneNumber(phone),
-    text: `✅ *${product.name}* added to your cart! (${formatPrice(product.price)})
-
-Reply *CART* to view your cart.
-Reply *MENU* for main menu.`,
-    buttons: [
-      { type: "reply", reply: { id: "cart", title: "🛒 View Cart" } },
-      { type: "reply", reply: { id: "menu", title: "🏠 Menu" } },
-    ],
-  }, orgId);
-}
-
-export async function sendCart(phone: string, contactId: string, orgId: string) {
-  const cart = await prisma.cart.findUnique({
-    where: { contactId },
-    include: { items: { include: { product: true } } },
-  });
-  if (!cart || cart.items.length === 0) {
-    await sendWhatsAppMessage({
-      to: formatPhoneNumber(phone),
-      text: "🛒 Your cart is empty.\n\nBrowse our catalog and add items!",
-      buttons: [{ type: "reply", reply: { id: "catalog", title: "📦 Browse Catalog" } }],
-    }, orgId);
-    return;
-  }
-  let total = 0;
-  let text = `🛒 *Your Cart*\n\n`;
-  cart.items.forEach((item, i) => {
-    const lineTotal = item.product.price * item.quantity;
-    total += lineTotal;
-    text += `${i + 1}. *${item.product.name}* x${item.quantity} — ${formatPrice(lineTotal)}\n`;
-    text += `   To remove: reply *REMOVE ${i + 1}*\n\n`;
-  });
-  text += `━━━━━━━━━━━━\n*Total: ${formatPrice(total)}*\n\nReply *CHECKOUT* to place your order 🚀`;
-  await sendWhatsAppMessage({
-    to: formatPhoneNumber(phone),
-    text,
-    buttons: [
-      { type: "reply", reply: { id: "checkout", title: "🚀 Checkout" } },
-      { type: "reply", reply: { id: "menu", title: "🏠 Menu" } },
-    ],
-  }, orgId);
-}
-
-export async function removeCartItem(phone: string, contactId: string, index: number, orgId: string) {
-  const cart = await prisma.cart.findUnique({
-    where: { contactId },
-    include: { items: { include: { product: true }, orderBy: { createdAt: "asc" } } },
-  });
-  if (!cart || !cart.items[index]) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Invalid item number. Please check your cart." }, orgId);
-    return;
-  }
-  const item = cart.items[index];
-  await prisma.cartItem.delete({ where: { id: item.id } });
-  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: `Removed *${item.product.name}* from your cart. ✅` }, orgId);
-}
-
-export async function startCheckout(phone: string, contactId: string, orgId: string) {
-  const cart = await prisma.cart.findUnique({
-    where: { contactId },
-    include: { items: { include: { product: true } } },
-  });
-  if (!cart || cart.items.length === 0) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Your cart is empty! Browse our catalog first. 😊" }, orgId);
-    return;
-  }
-  const contact = await prisma.contact.findUnique({ where: { id: contactId } });
-  if (!contact) return;
-  const total = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const orderId = generateOrderId();
-  const razorpayPaymentLink = await createRazorpayPaymentLink(total, orderId, contact.phone, contact.name);
-  await prisma.order.create({
-    data: {
-      orderId,
-      contactId,
-      total,
-      status: "pending",
-      paymentStatus: "pending",
-      razorpayOrderId: razorpayPaymentLink.id,
-      phone: contact.phone,
-      organizationId: orgId,
-      address: { address: "pending" },
-      items: {
-        create: cart.items.map((item) => ({
-          productId: item.product.id,
-          name: item.product.name,
-          price: item.product.price,
-          quantity: item.quantity,
-        })),
-      },
-    },
-  });
-  const paymentLink = razorpayPaymentLink.short_url;
-  let text = `🧾 *Order Summary*
-
-━━━━━━━━━━━━━━━━━━━\n`;
-  cart.items.forEach((item) => {
-    text += `*${item.product.name}* x${item.quantity} — ${formatPrice(item.product.price * item.quantity)}\n`;
-  });
-  text += `━━━━━━━━━━━━━━━━━━━\n*Total: ${formatPrice(total)}*
-*Order ID:* ${orderId}
-
-💳 *Pay online:*
-${paymentLink}
-
-Or reply *CONFIRM* after payment to verify your order.`;
-  await sendWhatsAppMessage({
-    to: formatPhoneNumber(phone),
-    text,
-    buttons: [
-      { type: "reply", reply: { id: "confirm_order", title: "✅ Paid" } },
-      { type: "reply", reply: { id: "menu", title: "🏠 Menu" } },
-    ],
   }, orgId);
 }
 
@@ -288,7 +118,8 @@ export async function sendSingleOrderStatus(phone: string, contactId: string, or
     text += `\n*Address:* ${(order.address as { address: string }).address}`;
   }
   text += `\n*Date:* ${order.createdAt.toLocaleDateString()}`;
-  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);}
+  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
+}
 
 export async function handleMarketplaceMessage(
   text: string,
@@ -298,27 +129,10 @@ export async function handleMarketplaceMessage(
 ): Promise<boolean> {
   const lower = text.trim().toLowerCase();
 
-  // Check if user is replying with a product name
-  const products = await prisma.product.findMany({
-    where: { organizationId: orgId, isActive: true },
-    select: { name: true }
-  });
-
-  let matchedProduct = products.find(p => p.name.toLowerCase() === lower);
-  if (!matchedProduct) {
-    matchedProduct = products.find(p => p.name.length >= 3 && lower.includes(p.name.toLowerCase()));
-  }
-
-  if (matchedProduct) {
-    await addToCart(phone, contactId, orgId, matchedProduct.name);
-    return true;
-  }
-
-  if (lower === "1" || lower === "2" || lower === "3" || lower === "4") {
-    const map: Record<string, string> = { "1": "catalog", "2": "cart", "3": "orders", "4": "menu" };
+  if (lower === "1" || lower === "2" || lower === "3") {
+    const map: Record<string, string> = { "1": "catalog", "2": "orders", "3": "menu" };
     const action = map[lower];
-    if (action === "catalog") { await sendCatalogCategories(phone, orgId); return true; }
-    if (action === "cart") { await sendCart(phone, contactId, orgId); return true; }
+    if (action === "catalog") { await sendCatalog(phone, orgId); return true; }
     if (action === "orders") { await sendOrderStatus(phone, contactId, orgId); return true; }
     if (action === "menu") { await sendMainMenu(phone, contactId, orgId); return true; }
   }
@@ -327,27 +141,7 @@ export async function handleMarketplaceMessage(
     return true;
   }
   if (["catalog", "products", "shop", "browse"].includes(lower) || lower.includes("browse")) {
-    await sendCatalogCategories(phone, orgId);
-    return true;
-  }
-  if (lower.startsWith("cat_")) {
-    const category = text.trim().slice(4);
-    await sendCategoryProducts(phone, category, orgId);
-    return true;
-  }
-  if (["cart", "my cart"].includes(lower)) {
-    await sendCart(phone, contactId, orgId);
-    return true;
-  }
-  if (lower.startsWith("remove ")) {
-    const idx = parseInt(lower.replace("remove ", "")) - 1;
-    if (!isNaN(idx)) {
-      await removeCartItem(phone, contactId, idx, orgId);
-      return true;
-    }
-  }
-  if (["checkout", "checkout 🛒", "buy", "order now"].includes(lower)) {
-    await startCheckout(phone, contactId, orgId);
+    await sendCatalog(phone, orgId);
     return true;
   }
   if (["orders", "my orders"].includes(lower)) {

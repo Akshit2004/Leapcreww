@@ -12,7 +12,10 @@ import {
   Globe,
   Shield,
   RefreshCw,
+  Sparkles,
+  Save,
 } from "lucide-react";
+import type { BrandProfile } from "@/shared/context/types";
 
 // ─── Facebook SDK helpers (avoids conflicts with @types/facebook-js-sdk) ────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,7 +23,7 @@ function getFB(): any | undefined {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (window as any).FB;
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function setFbAsyncInit(fn: () => void) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).fbAsyncInit = fn;
@@ -38,8 +41,18 @@ interface PortfolioItem {
 }
 
 export const SettingsTab: React.FC = () => {
-  const { organization, refreshWorkspace } = useApp();
+  const { organization, refreshWorkspace, updateBrandProfile } = useApp();
   const orgId = organization?.id;
+
+  // ─── Brand Profile (Brand-Aware AI content generation) ────────────────
+  const [brandName, setBrandName] = useState("");
+  const [brandIndustry, setBrandIndustry] = useState("");
+  const [brandTone, setBrandTone] = useState("");
+  const [brandWebsite, setBrandWebsite] = useState("");
+  const [savingBrand, setSavingBrand] = useState(false);
+  const [brandSaved, setBrandSaved] = useState(false);
+  const [brandError, setBrandError] = useState<string | null>(null);
+  const [syncedBrandKey, setSyncedBrandKey] = useState<string | null>(null);
 
   const [whatsappStatus, setWhatsappStatus] = useState<{
     connected: boolean;
@@ -106,8 +119,49 @@ export const SettingsTab: React.FC = () => {
   }, [orgId]);
 
   useEffect(() => {
+    // Fetch-on-mount: synchronizing with an external system (WhatsApp status API).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchStatus();
   }, [fetchStatus]);
+
+  // ─── Seed Brand Profile fields from loaded organization ───────────────
+  // The org loads asynchronously (and updates on save), so we sync the form
+  // fields whenever the persisted profile content changes — using React's
+  // render-time state adjustment rather than an effect. Typing into the
+  // inputs doesn't change the persisted profile, so edits are never clobbered.
+  const persistedBrand = (organization?.brandProfile as BrandProfile | null | undefined) ?? null;
+  const persistedBrandKey = persistedBrand ? JSON.stringify(persistedBrand) : null;
+  if (persistedBrandKey !== syncedBrandKey) {
+    setSyncedBrandKey(persistedBrandKey);
+    setBrandName(persistedBrand?.name || "");
+    setBrandIndustry(persistedBrand?.industry || "");
+    setBrandTone(persistedBrand?.toneOfVoice || "");
+    setBrandWebsite(persistedBrand?.websiteUrl || "");
+  }
+
+  const handleSaveBrand = async () => {
+    if (!orgId || !brandName.trim()) {
+      setBrandError("Brand name is required.");
+      return;
+    }
+    setSavingBrand(true);
+    setBrandError(null);
+    setBrandSaved(false);
+    try {
+      await updateBrandProfile(orgId, {
+        name: brandName.trim(),
+        industry: brandIndustry.trim(),
+        toneOfVoice: brandTone.trim(),
+        websiteUrl: brandWebsite.trim(),
+      });
+      setBrandSaved(true);
+      setTimeout(() => setBrandSaved(false), 2500);
+    } catch (err) {
+      setBrandError(err instanceof Error ? err.message : "Failed to save brand profile.");
+    } finally {
+      setSavingBrand(false);
+    }
+  };
 
   // ─── Embedded Signup Launch ───────────────────────────────────────────
   const launchEmbeddedSignup = () => {
@@ -484,6 +538,95 @@ export const SettingsTab: React.FC = () => {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Brand Profile Card */}
+      <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+        <div className="p-6 border-b border-stone-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-100 text-indigo-600">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-stone-900 text-sm">Brand Profile</h3>
+              <p className="text-stone-400 text-[11px] mt-0.5">
+                Powers Brand-Aware AI so generated templates sound like your business.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Brand Name</label>
+              <input
+                type="text"
+                value={brandName}
+                onChange={(e) => setBrandName(e.target.value)}
+                placeholder="e.g. Aurora Coffee Co."
+                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Industry</label>
+              <input
+                type="text"
+                value={brandIndustry}
+                onChange={(e) => setBrandIndustry(e.target.value)}
+                placeholder="e.g. E-commerce, EdTech, D2C"
+                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Tone of Voice</label>
+              <input
+                type="text"
+                value={brandTone}
+                onChange={(e) => setBrandTone(e.target.value)}
+                placeholder="e.g. Professional, Friendly, Urgent, Playful"
+                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Website URL</label>
+              <input
+                type="url"
+                value={brandWebsite}
+                onChange={(e) => setBrandWebsite(e.target.value)}
+                placeholder="e.g. https://www.auroracoffee.com"
+                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all"
+              />
+            </div>
+          </div>
+
+          {brandError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-medium px-4 py-2.5 rounded-xl flex items-center gap-2">
+              <XCircle className="w-4 h-4 shrink-0" />
+              {brandError}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={handleSaveBrand}
+              disabled={savingBrand || !brandName.trim()}
+              className="flex items-center gap-2 px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50"
+            >
+              {savingBrand ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              {savingBrand ? "Saving..." : "Save Profile"}
+            </button>
+            {brandSaved && (
+              <span className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold">
+                <CheckCircle2 className="w-4 h-4" />
+                Saved
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Security Info */}

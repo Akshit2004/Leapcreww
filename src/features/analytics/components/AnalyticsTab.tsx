@@ -204,7 +204,7 @@ export const AnalyticsTab: React.FC = () => {
     });
     const total = contacts.length || 1;
     const colors = ["#1c1917", "#44403c", "#78716c", "#a8a29e", "#d6d3d1", "#e7e5e4"];
-    let entries = Object.entries(map)
+    const entries = Object.entries(map)
       .sort(([, a], [, b]) => b - a)
       .map(([source, count], i) => ({
         source,

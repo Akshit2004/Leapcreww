@@ -176,14 +176,40 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ─── Shopify webhook payload shapes (only the fields this handler reads) ──
+interface ShopifyAddress {
+  phone?: string;
+}
+interface ShopifyLineItem {
+  title: string;
+  price?: string;
+  quantity?: number;
+}
+interface ShopifyFulfillment {
+  tracking_company?: string;
+  tracking_number?: string;
+}
+interface ShopifyWebhookPayload {
+  id?: string | number;
+  email?: string;
+  customer?: { email?: string; first_name?: string; last_name?: string; phone?: string };
+  billing_address?: ShopifyAddress;
+  shipping_address?: ShopifyAddress;
+  line_items?: ShopifyLineItem[];
+  total_price?: string;
+  financial_status?: string;
+  order_number?: string | number;
+  fulfillments?: ShopifyFulfillment[];
+}
+
 // ─── 3. CORE WEBHOOK EVENT PARSER & HANDLER ────────────────────────────
-async function handleWebhookEvent(topic: string, payload: any, orgId: string) {
+async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload, orgId: string) {
   const d = new Date();
   const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   const timestampStr = `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
 
   // Helper to extract clean phone number
-  const extractPhone = (addressObj: any) => {
+  const extractPhone = (addressObj?: ShopifyAddress) => {
     const rawPhone = addressObj?.phone || payload.customer?.phone || "+919999988888";
     return rawPhone.startsWith("+") ? rawPhone : `+${rawPhone.replace(/[^0-9]/g, "")}`;
   };
@@ -368,7 +394,7 @@ async function handleWebhookEvent(topic: string, payload: any, orgId: string) {
       data: {
         timestamp: timeStr,
         type: "integration",
-        message: `Shopify Webhook: orders/fulfilled - Order #${payload.order_number || payload.id} fulfilled via ${trackingCompany}.`,
+        message: `Shopify Webhook: orders/fulfilled - Order #${payload.order_number || payload.id} fulfilled via ${trackingCompany} (Tracking: ${trackingNumber}).`,
         organizationId: orgId,
       },
     });

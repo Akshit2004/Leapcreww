@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
         if (value.messages) {
           for (const msg of value.messages) {
             const waFrom = msg.from;
-            const text = msg.text?.body || msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || msg.button?.text || "";
+            const text = msg.text?.body || msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || msg.button?.text || (msg.order ? "WhatsApp Native Order" : "");
             const profileName = value.contacts?.[0]?.profile?.name || `Customer ${waFrom.slice(-4)}`;
 
             console.log(`WhatsApp message from ${waFrom} (${profileName}): ${text}`);
@@ -132,11 +132,11 @@ export async function POST(req: NextRequest) {
               }
 
               // Process with fallback org
-              await processInboundMessage(orgFallback.id, waFrom, text, profileName, msg.id);
+              await processInboundMessage(orgFallback.id, waFrom, text, profileName, msg.id, msg.order);
               continue;
             }
 
-            await processInboundMessage(org.id, waFrom, text, profileName, msg.id);
+            await processInboundMessage(org.id, waFrom, text, profileName, msg.id, msg.order);
           }
         }
       }
@@ -149,16 +149,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/**
- * Process an inbound WhatsApp message for a specific organization.
- * Handles contact lookup/creation, message storage, and autoresponder dispatch.
- */
 async function processInboundMessage(
   orgId: string,
   waFrom: string,
   text: string,
   profileName: string,
-  waMessageId?: string
+  waMessageId?: string,
+  orderData?: { catalog_id: string; product_items: { product_retailer_id: string; quantity: string; item_price: string; currency: string }[]; text?: string }
 ) {
   const normalizedPhone = `+${waFrom.replace(/[^0-9]/g, "")}`;
 
@@ -219,6 +216,78 @@ async function processInboundMessage(
       organizationId: orgId,
     },
   });
+
+  // Handle Native WhatsApp Order
+  if (orderData) {
+    console.log(`[Marketplace] Native order received from ${contact.phone} with ${orderData.product_items.length} items.`);
+    let totalCents = 0;
+    const orderItemsToCreate = [];
+
+    for (const item of orderData.product_items) {
+      // Find product by SKU or ID
+      const product = await prisma.product.findFirst({
+        where: {
+          organizationId: orgId,
+          OR: [
+            { sku: item.product_retailer_id },
+            { id: item.product_retailer_id }
+          ]
+        }
+      });
+      if (product) {
+        const qty = parseInt(item.quantity) || 1;
+        totalCents += product.price * qty;
+        orderItemsToCreate.push({
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: qty,
+        });
+      }
+    }
+
+    if (orderItemsToCreate.length > 0) {
+      const orderIdStr = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const { createRazorpayPaymentLink } = await import("@/shared/lib/razorpay");
+      const rzpLink = await createRazorpayPaymentLink(totalCents, orderIdStr, contact.phone, contact.name);
+
+      await prisma.order.create({
+        data: {
+          orderId: orderIdStr,
+          contactId: contact.id,
+          total: totalCents,
+          status: "pending",
+          paymentStatus: "pending",
+          razorpayOrderId: rzpLink.id,
+          phone: contact.phone,
+          organizationId: orgId,
+          address: { address: "pending" },
+          items: {
+            create: orderItemsToCreate,
+          },
+        },
+      });
+
+      const { sendWhatsAppMessage, formatPhoneNumber } = await import("@/shared/lib/whatsapp");
+      const CURRENCY_SYMBOL = "₹";
+      const totalFormatted = `${CURRENCY_SYMBOL}${(totalCents / 100).toFixed(2)}`;
+      let summaryText = `🧾 *Order Received!*\n\n━━━━━━━━━━━━━━━━━━━\n`;
+      orderItemsToCreate.forEach((item) => {
+        summaryText += `*${item.name}* x${item.quantity} — ${CURRENCY_SYMBOL}${(item.price * item.quantity / 100).toFixed(2)}\n`;
+      });
+      summaryText += `━━━━━━━━━━━━━━━━━━━\n*Total: ${totalFormatted}*\n*Order ID:* ${orderIdStr}\n\n💳 *Pay online:*\n${rzpLink.short_url}\n\nOr reply *CONFIRM* after payment to verify your order.`;
+
+      await sendWhatsAppMessage({
+        to: formatPhoneNumber(contact.phone),
+        text: summaryText,
+        buttons: [
+          { type: "reply", reply: { id: "confirm_order", title: "✅ Paid" } },
+          { type: "reply", reply: { id: "menu", title: "🏠 Menu" } },
+        ],
+      }, orgId);
+    }
+    return;
+  }
 
   if (contact.assignedAgent === "Bot") {
     const org = await prisma.organization.findUnique({

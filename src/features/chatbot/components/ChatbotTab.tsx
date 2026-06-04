@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import { useApp, ChatbotNode } from "@/shared/context/AppContext";
+import { useApp, ChatbotNode, Organization } from "@/shared/context/AppContext";
 import {
   Play,
   MessageSquare,
@@ -33,7 +33,7 @@ export const ChatbotTab: React.FC = () => {
   // Chatbot nodes drop-off stats
   const [nodeStats, setNodeStats] = useState<Record<string, { impressions: number; responses: number; dropoffs: number; rate: number }>>({});
   const [showStats, setShowStats] = useState(false);
-  const [organization, setOrganization] = useState<any>(null);
+  const [organization, setOrganization] = useState<Organization | null>(null);
   const [botToggling, setBotToggling] = useState(false);
   const [isMobileInspectorOpen, setIsMobileInspectorOpen] = useState(false);
 
@@ -72,10 +72,10 @@ export const ChatbotTab: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.organization) {
-          setOrganization((prev: any) => ({
+          setOrganization((prev) => prev ? {
             ...prev,
             chatbotBuilderEnabled: data.organization.chatbotBuilderEnabled,
-          }));
+          } : prev);
         }
       }
     } catch (err) {
@@ -182,7 +182,7 @@ export const ChatbotTab: React.FC = () => {
   }, []);
 
   // Touch gesture handlers for mobile: two-finger pan and pinch-zoom
-  const calculateDistance = (touches: any) => {
+  const calculateDistance = (touches: React.TouchList) => {
     if (touches.length < 2) return 0;
     const dx = touches[0].clientX - touches[1].clientX;
     const dy = touches[0].clientY - touches[1].clientY;

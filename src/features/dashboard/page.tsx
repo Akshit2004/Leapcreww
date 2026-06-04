@@ -16,7 +16,7 @@ import { SettingsTab } from "@/features/settings/components/SettingsTab";
 import { IntegrationsTab } from "@/features/integrations/components/IntegrationsTab";
 import { AnalyticsTab } from "@/features/analytics/components/AnalyticsTab";
 import { AICopilotSidebar } from "@/features/ai/components/AICopilotSidebar";
-import { Loader, AlertCircle, Bot, Menu } from "lucide-react";
+import { Loader, AlertCircle, Bot } from "lucide-react";
 
 export default function TenantDashboard() {
   const params = useParams();
