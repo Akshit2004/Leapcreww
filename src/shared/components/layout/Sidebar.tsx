@@ -88,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`hidden lg:flex flex-col bg-[#fafaf9] text-stone-900 border-r border-stone-200 h-screen select-none shrink-0 transition-all duration-300 ease-in-out relative overflow-hidden ${
+        className={`max-lg:hidden lg:flex flex-col bg-[#fafaf9] text-stone-900 border-r border-stone-200 h-screen select-none shrink-0 transition-all duration-300 ease-in-out relative overflow-hidden ${
           isHovered ? "w-[264px]" : "w-20"
         }`}
       >
@@ -207,7 +207,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </aside>
 
       {/* --- MOBILE BOTTOM NAVIGATION --- */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200 flex items-center overflow-x-auto pb-safe scrollbar-none snap-x snap-mandatory">
+      <nav className="max-lg:flex lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200 items-center overflow-x-auto pb-safe scrollbar-none snap-x snap-mandatory">
         {menuItems.filter(item => !item.hideOnMobile).map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;

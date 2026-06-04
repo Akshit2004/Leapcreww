@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
+import { UploadButton } from "@/shared/lib/uploadthing";
 
 export const TemplatesTab: React.FC = () => {
   const { templates, submitMetaTemplate, deleteTemplate, addSystemLog } = useApp();
@@ -40,6 +41,18 @@ export const TemplatesTab: React.FC = () => {
   const [bodyText, setBodyText] = useState("");
   const [mediaType, setMediaType] = useState("none");
   const [mediaUrl, setMediaUrl] = useState("");
+
+  // Lock body scroll when create template modal is open
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isModalOpen]);
   
   // Buttons Builder
   const [buttonsList, setButtonsList] = useState<string[]>([]);
@@ -297,12 +310,13 @@ export const TemplatesTab: React.FC = () => {
       return part;
     });
   };
-
   return (
-    <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9]">
+    <div className={`flex-1 p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9] ${
+      isModalOpen ? "overflow-hidden" : "overflow-y-auto"
+    }`}>
       
       {/* Tab Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-6">
+      <div className="flex max-sm:flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-6">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-stone-900 uppercase">Meta Approved Templates</h2>
           <p className="text-stone-500 text-xs mt-1">Manage WhatsApp-compliant template layouts, media variables, and quick action headers.</p>
@@ -319,7 +333,7 @@ export const TemplatesTab: React.FC = () => {
       </div>
 
       {/* Filter and Search controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-200 pb-3">
+      <div className="flex max-md:flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-200 pb-3">
         <div className="flex flex-wrap items-center gap-1.5">
           {["all", "Marketing", "Utility", "Authentication"].map((cat) => (
             <button
@@ -339,7 +353,7 @@ export const TemplatesTab: React.FC = () => {
         </div>
 
         {/* Search Box */}
-        <div className="relative w-full md:w-72">
+        <div className="relative max-md:w-full md:w-72">
           <input
             type="text"
             placeholder="Search templates by name or content..."
@@ -534,14 +548,32 @@ export const TemplatesTab: React.FC = () => {
 
                 {/* Sample media URL — required by Meta to register a media header */}
                 {mediaType !== "none" && (
-                  <div className="space-y-1 pt-1">
-                    <input
-                      type="url"
-                      placeholder={`Sample ${mediaType} URL — e.g. https://cdn.mysite.com/banner.${mediaType === "image" ? "jpg" : mediaType === "video" ? "mp4" : "pdf"}`}
-                      value={mediaUrl}
-                      onChange={(e) => setMediaUrl(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-900"
-                    />
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="url"
+                        placeholder={`Sample ${mediaType} URL — e.g. https://cdn.mysite.com/banner.${mediaType === "image" ? "jpg" : mediaType === "video" ? "mp4" : "pdf"}`}
+                        value={mediaUrl}
+                        onChange={(e) => setMediaUrl(e.target.value)}
+                        className="flex-1 bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-900"
+                      />
+                      <UploadButton
+                        endpoint="mediaUploader"
+                        onClientUploadComplete={(res) => {
+                          if (res && res[0]) {
+                            setMediaUrl(res[0].url);
+                            alert("Upload completed successfully!");
+                          }
+                        }}
+                        onUploadError={(error: Error) => {
+                          alert(`Upload failed: ${error.message}`);
+                        }}
+                        appearance={{
+                          button: "bg-stone-900 hover:bg-stone-800 text-white rounded-none text-xs font-bold px-3 py-2 cursor-pointer h-9 shrink-0 flex items-center justify-center border border-stone-900 transition-all",
+                          allowedContent: "hidden"
+                        }}
+                      />
+                    </div>
                     <span className="text-[9px] text-stone-400 block font-semibold flex items-center gap-1">
                       <AlertCircle className="w-3 h-3 shrink-0" />
                       Meta uploads this sample to approve the header. Each broadcast can override the actual {mediaType}.

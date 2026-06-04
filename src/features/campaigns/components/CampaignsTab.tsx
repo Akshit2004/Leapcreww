@@ -23,12 +23,25 @@ import {
 import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
 import { CampaignReportDrawer } from "./CampaignReportDrawer";
+import { UploadButton } from "@/shared/lib/uploadthing";
 
 export const CampaignsTab: React.FC = () => {
   const { campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign, addSystemLog } = useApp();
   const params = useParams();
   const orgId = params.orgId as string;
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Lock body scroll when launch campaign modal is open
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isModalOpen]);
   
   // Status filtering
   const [statusFilter, setStatusFilter] = useState<"all" | "Completed" | "Sending" | "Scheduled">("all");
@@ -231,10 +244,12 @@ export const CampaignsTab: React.FC = () => {
   });
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9]">
+    <div className={`flex-1 p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9] ${
+      isModalOpen ? "overflow-hidden" : "overflow-y-auto"
+    }`}>
       
       {/* Tab Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-6">
+      <div className="flex max-sm:flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-6">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-stone-900 uppercase">Campaigns & Broadcasts</h2>
           <p className="text-stone-500 text-xs mt-1">Broadcast WhatsApp bulk templates, track dynamic click metrics, and filter target leads.</p>
@@ -508,13 +523,31 @@ export const CampaignsTab: React.FC = () => {
                       <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500">
                         {activeTemplate.mediaType} Media URL
                       </label>
-                      <input
-                        type="url"
-                        placeholder={`https://example.com/media.${activeTemplate.mediaType === 'image' ? 'jpg' : 'mp4'}`}
-                        value={mediaUrl}
-                        onChange={(e) => setMediaUrl(e.target.value)}
-                        className="w-full bg-white text-stone-900 placeholder:text-stone-400 border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900"
-                      />
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="url"
+                          placeholder={`https://example.com/media.${activeTemplate.mediaType === 'image' ? 'jpg' : 'mp4'}`}
+                          value={mediaUrl}
+                          onChange={(e) => setMediaUrl(e.target.value)}
+                          className="flex-1 bg-white text-stone-900 placeholder:text-stone-400 border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-900"
+                        />
+                        <UploadButton
+                          endpoint="mediaUploader"
+                          onClientUploadComplete={(res) => {
+                            if (res && res[0]) {
+                              setMediaUrl(res[0].url);
+                              alert("Upload completed successfully!");
+                            }
+                          }}
+                          onUploadError={(error: Error) => {
+                            alert(`Upload failed: ${error.message}`);
+                          }}
+                          appearance={{
+                            button: "bg-stone-900 hover:bg-stone-850 text-white rounded-none text-xs font-bold px-3 py-2 cursor-pointer h-9 shrink-0 flex items-center justify-center border border-stone-900 transition-all",
+                            allowedContent: "hidden"
+                          }}
+                        />
+                      </div>
                     </div>
                   )}
 

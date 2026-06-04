@@ -415,7 +415,7 @@ function SignupContent() {
     <div className="h-screen w-screen bg-[#FAF9F5] text-stone-900 grid grid-cols-1 md:grid-cols-12 overflow-hidden select-none font-sans">
       
       {/* ─── Left Column: Premium Visual Cover Showcase ─── */}
-      <div className="hidden md:flex md:col-span-5 lg:col-span-6 h-full relative bg-stone-950 flex-col justify-between p-12 overflow-hidden">
+      <div className="max-md:hidden md:flex md:col-span-5 lg:col-span-6 h-full relative bg-stone-950 flex-col justify-between p-12 overflow-hidden">
         {/* Full-bleed high-taste illustration showcase */}
         <div className="absolute inset-0 z-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}

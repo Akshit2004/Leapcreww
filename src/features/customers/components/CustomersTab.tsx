@@ -112,7 +112,7 @@ export const CustomersTab: React.FC = () => {
       </header>
 
       {/* Mobile Segments (Horizontal Scroll) */}
-      <div className="lg:hidden flex items-center gap-2 overflow-x-auto custom-scrollbar pb-3 mb-3">
+      <div className="max-lg:flex lg:hidden items-center gap-2 overflow-x-auto custom-scrollbar pb-3 mb-3">
         <button
           onClick={() => setSelectedSegment(null)}
           className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
@@ -140,7 +140,7 @@ export const CustomersTab: React.FC = () => {
 
       <div className="flex-1 flex gap-6 min-h-0">
         {/* Left Sidebar - Segments */}
-        <div className="hidden lg:flex flex-col w-64 shrink-0 gap-4">
+        <div className="max-lg:hidden lg:flex flex-col w-64 shrink-0 gap-4">
           <div className="bg-white border border-stone-200/60 rounded-2xl p-4 shadow-sm">
             <div className="text-[10px] font-black uppercase text-stone-400 tracking-wider mb-3 px-2">Segments</div>
             <button

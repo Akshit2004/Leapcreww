@@ -207,7 +207,7 @@ export const MarketplaceTab: React.FC = () => {
   return (
     <div className="flex-1 overflow-y-auto p-4 pb-12 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9]">
       {/* Dynamic Header Layout */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center justify-between border-b border-stone-200 pb-6 select-none">
+      <div className="flex max-lg:flex-col gap-4 lg:flex-row lg:items-center justify-between border-b border-stone-200 pb-6 select-none">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-none bg-stone-950 flex items-center justify-center border border-stone-950 shrink-0">
             <ShoppingBag className="w-5 h-5 text-white" />
@@ -217,7 +217,7 @@ export const MarketplaceTab: React.FC = () => {
             <p className="text-xs text-stone-500">Manage products and orders</p>
           </div>
         </div>
-        <div className="grid grid-cols-3 w-full lg:flex lg:w-auto gap-1">
+        <div className="grid grid-cols-3 max-lg:w-full lg:flex lg:w-auto gap-1">
           <button
             onClick={() => setActiveSection("overview")}
             className={`px-4 py-2.5 rounded-none text-[10px] sm:text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer text-center ${
@@ -254,7 +254,7 @@ export const MarketplaceTab: React.FC = () => {
             <StatCard icon={ExternalLink} label="Revenue (paid)" value={`₹${(stats.revenue / 100).toFixed(2)}`} />
           </div>
 
-          <div className="bg-white rounded-none p-5 sm:p-8 border border-stone-200 hover:border-stone-400 transition-colors duration-300 animate-fade-in flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="bg-white rounded-none p-5 sm:p-8 border border-stone-200 hover:border-stone-400 transition-colors duration-300 animate-fade-in flex max-md:flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className={`inline-block w-2 h-2 rounded-full transition-all duration-300 ${organization?.marketplaceBotEnabled ? "bg-stone-900 animate-pulse" : "bg-stone-300"}`} />
@@ -341,7 +341,7 @@ export const MarketplaceTab: React.FC = () => {
           )}
 
           {/* Desktop Table Catalog View */}
-          <div className="hidden lg:block bg-white rounded-none border border-stone-200 overflow-hidden">
+          <div className="max-lg:hidden lg:block bg-white rounded-none border border-stone-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -395,7 +395,7 @@ export const MarketplaceTab: React.FC = () => {
           </div>
 
           {/* Mobile Product Card Catalog View */}
-          <div className="grid grid-cols-1 gap-4 lg:hidden">
+          <div className="max-lg:grid lg:hidden grid-cols-1 gap-4">
             {filteredProducts.map((product) => (
               <div key={product.id} className="bg-white border border-stone-200 p-5 hover:border-stone-400 transition-colors duration-300 space-y-4">
                 <div className="flex items-center justify-between">
@@ -455,7 +455,7 @@ export const MarketplaceTab: React.FC = () => {
       {activeSection === "orders" && (
         <div className="space-y-4">
           {/* Desktop Table Orders Ledger View */}
-          <div className="hidden lg:block bg-white rounded-none border border-stone-200 overflow-hidden">
+          <div className="max-lg:hidden lg:block bg-white rounded-none border border-stone-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -498,7 +498,7 @@ export const MarketplaceTab: React.FC = () => {
           </div>
 
           {/* Mobile Orders Card Ledger View */}
-          <div className="grid grid-cols-1 gap-4 lg:hidden">
+          <div className="max-lg:grid lg:hidden grid-cols-1 gap-4">
             {orders.map((order) => (
               <div key={order.id} className="bg-white border border-stone-200 p-5 hover:border-stone-400 transition-colors duration-300 space-y-4">
                 <div className="flex items-center justify-between">

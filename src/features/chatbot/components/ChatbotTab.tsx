@@ -702,7 +702,7 @@ export const ChatbotTab: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative select-none bg-[#fafaf9]">
       {/* MOBILE FALLBACK */}
-      <div className="lg:hidden flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
+      <div className="items-center justify-center h-full p-8 text-center space-y-4 max-lg:flex flex-col lg:hidden">
         <Cpu className="w-12 h-12 text-stone-300" />
         <h2 className="text-lg font-bold text-stone-900 uppercase">Desktop Only</h2>
         <p className="text-xs text-stone-500 max-w-xs leading-relaxed">
@@ -711,7 +711,7 @@ export const ChatbotTab: React.FC = () => {
       </div>
 
       {/* DESKTOP BUILDER */}
-      <div className="hidden lg:flex flex-col h-full overflow-hidden">
+      <div className="max-lg:hidden lg:flex flex-col h-full overflow-hidden">
         {/* AI Generating Loading Overlay */}
       {isAiLoading && (
         <div className="absolute inset-0 bg-white/70 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -834,7 +834,7 @@ export const ChatbotTab: React.FC = () => {
           </div>
 
           {/* Friendly Traversal Tips Helper - Desktop only */}
-          <div className="absolute bottom-4 left-4 z-10 hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-white border border-stone-200 rounded-none text-[9px] font-bold text-stone-500 shadow-none pointer-events-none select-none">
+          <div className="max-lg:hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-white border border-stone-200 rounded-none text-[9px] font-bold text-stone-500 shadow-none pointer-events-none select-none">
             <span className="bg-stone-100 border border-stone-300 px-1 py-0.5 rounded-none text-[8px] text-stone-700">SPACE + DRAG</span>
             <span>to pan • Two fingers to pan on mobile</span>
           </div>
@@ -1138,7 +1138,7 @@ export const ChatbotTab: React.FC = () => {
               />
             </button>
             <button
-              className="lg:hidden p-2 hover:bg-stone-200 rounded-none text-stone-500 transition-colors active:scale-95 shrink-0 w-11 h-11 flex items-center justify-center"
+              className="p-2 hover:bg-stone-200 rounded-none text-stone-500 transition-colors active:scale-95 shrink-0 w-11 h-11 items-center justify-center max-lg:flex lg:hidden"
               onClick={() => setIsMobileInspectorOpen(false)}
               title="Close inspector"
             >

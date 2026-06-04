@@ -236,7 +236,7 @@ export function IntegrationsTab() {
   return (
     <div className="flex h-full overflow-hidden bg-[#fafaf9]">
       {/* ── Left: Integration List (Shopify Only) ─────────────────────────── */}
-      <aside className="w-72 shrink-0 flex flex-col border-r border-stone-200 bg-white h-full hidden lg:flex">
+      <aside className="w-72 shrink-0 flex flex-col border-r border-stone-200 bg-white h-full max-lg:hidden lg:flex">
         <div className="px-5 pt-6 pb-4 border-b border-stone-100">
           <p className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400 mb-1">
             Integration Hub

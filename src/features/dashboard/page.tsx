@@ -160,9 +160,9 @@ export default function TenantDashboard() {
       />
 
       {/* 2. Main Tab View Panels */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#f4f6f5] relative pb-20 lg:pb-0">
+      <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#f4f6f5] relative max-lg:pb-20 lg:pb-0">
         {/* Mobile Top Navigation Header */}
-        <header className="h-14 px-4 bg-white/80 backdrop-blur-md border-b border-slate-200/50 flex items-center justify-between shrink-0 lg:hidden select-none z-30">
+        <header className="h-14 px-4 bg-white/80 backdrop-blur-md border-b border-slate-200/50 items-center justify-between shrink-0 max-lg:flex lg:hidden select-none z-30">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-wa-green flex items-center justify-center shadow-md shadow-wa-green/20">

@@ -140,6 +140,42 @@ export const InboxTab: React.FC = () => {
     updateContact(activeContact.id, { assignedAgent: e.target.value });
   };
 
+  const closeMobileProfile = () => {
+    setShowMobileProfile(false);
+  };
+
+  const openMobileProfile = () => {
+    setShowMobileProfile(true);
+  };
+
+  // Simulate inbound message handler
+  const handleSimulateInbound = async () => {
+    if (!simMessage.trim() || !activeContact) return;
+    const text = simMessage.trim();
+    setSimMessage("");
+    setShowSimulate(false);
+
+    lockSync();
+    sendLiveChatMessage(activeContact.id, text, "user");
+
+    try {
+      await fetch("/api/webhooks/whatsapp/process", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: activeContact.phone,
+          text,
+          msgId: `sim-${Date.now()}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        })
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      unlockSync();
+    }
+  };
+
   // Render ticks
   const renderMessageStatus = (status: Message["status"]) => {
     if (!status) return null;
@@ -155,270 +191,249 @@ export const InboxTab: React.FC = () => {
     return null;
   };
 
+  // ─── Determine which mobile pane to show ────────────────────────
+  // On mobile (<1024px): show contact list OR chat, never both
+  // On desktop (>=1024px): show all three columns
+  const mobileShowChat = !!activeContactId;
+
   return (
     <div className="flex-1 flex h-full overflow-hidden animate-slide-up relative bg-[#fafaf9]">
-      {/* 1. Left Contact List Pane */}
-      <div className={`w-full md:w-80 border-r border-stone-200 flex flex-col h-full bg-white shrink-0 ${
-        activeContactId ? "hidden md:flex" : "flex"
-      }`}>
-        {/* Search */}
-        <div className="p-4 border-b border-stone-200 shrink-0 space-y-3 bg-[#fafaf9]">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-stone-900 text-xs tracking-wider uppercase">Active Conversations</h3>
-            <button
-              onClick={() => setAutoRefresh((p) => !p)}
-              className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-none border transition-all cursor-pointer ${
-                autoRefresh
-                  ? "bg-stone-950 text-white border-stone-950"
-                  : "bg-white text-stone-400 border-stone-200 hover:border-stone-950 hover:text-stone-950"
-              }`}
-              title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
-            >
-              {autoRefresh ? "Live" : "Paused"}
-            </button>
-          </div>
-          <div className="relative">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="FILTER LEADS, PHONES..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-stone-50 border border-stone-200 rounded-none py-2 pl-9 pr-4 text-xs font-semibold focus:outline-none focus:border-stone-900 focus:bg-white transition-all uppercase placeholder:text-stone-300"
-            />
-          </div>
-        </div>
+      <style>{`
+        @media (max-width: 1023px) {
+          .inbox-contact-list-pane[data-mobile-hidden="true"] { display: none !important; }
+          .inbox-chat-pane[data-mobile-hidden="true"] { display: none !important; }
+          .inbox-profile-drawer {
+            transform: translateX(100%) !important;
+          }
+          .inbox-profile-drawer[data-mobile-open="true"] {
+            transform: translateX(0) !important;
+          }
+        }
+      `}</style>
 
-        {/* Contacts Stream */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-stone-100">
-          {filteredContacts.length === 0 ? (
-            <div className="p-8 text-center text-xs text-stone-400 font-bold uppercase tracking-wider">
-              NO MATCHING CRM LEADS DISCOVERED
+      {/* ═══════════════════════════════════════════════════════════════
+          COLUMN 1 — Contact List
+          Desktop: always visible (w-80)
+          Mobile: visible only when NO contact is selected
+       ═══════════════════════════════════════════════════════════════ */}
+      <div
+        className="w-full lg:w-80 border-r border-stone-200 flex flex-col h-full bg-white shrink-0 inbox-contact-list-pane"
+        data-mobile-hidden={mobileShowChat ? "true" : "false"}
+        style={{ display: mobileShowChat ? undefined : "flex" }}
+      >
+          {/* Search Header */}
+          <div className="p-4 border-b border-stone-200 shrink-0 space-y-3 bg-[#fafaf9]">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-stone-900 text-xs tracking-wider uppercase">Active Conversations</h3>
+              <button
+                onClick={() => setAutoRefresh((p) => !p)}
+                className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                  autoRefresh
+                    ? "bg-stone-950 text-white border-stone-950"
+                    : "bg-white text-stone-400 border-stone-200 hover:border-stone-950 hover:text-stone-950"
+                }`}
+                title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
+              >
+                {autoRefresh ? "Live" : "Paused"}
+              </button>
             </div>
-          ) : (
-            filteredContacts.map((c) => {
-              const isSelected = c.id === activeContactId;
-              const hasUnread = (c.unreadCount || 0) > 0 && !isSelected;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setActiveContactId(c.id)}
-                  className={`w-full p-4 flex items-start gap-3 transition-all duration-200 hover:bg-stone-50 text-left relative rounded-none ${
-                    isSelected ? "bg-stone-50" : ""
-                  }`}
-                >
-                  <div className="relative shrink-0 mt-0.5 select-none">
-                    <div className="w-10 h-10 bg-stone-950 text-white flex items-center justify-center font-bold text-xs border border-stone-950 uppercase rounded-none">
-                      {c.name.split(" ").map(n => n[0]).join("")}
+            <div className="relative">
+              <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search contacts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-stone-50 border border-stone-200 rounded-lg py-2.5 pl-9 pr-4 text-xs font-medium focus:outline-none focus:border-stone-900 focus:bg-white transition-all placeholder:text-stone-400"
+              />
+            </div>
+          </div>
+
+          {/* Contacts Stream */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {filteredContacts.length === 0 ? (
+              <div className="p-8 text-center text-xs text-stone-400 font-bold uppercase tracking-wider">
+                No matching contacts found
+              </div>
+            ) : (
+              filteredContacts.map((c) => {
+                const isSelected = c.id === activeContactId;
+                const hasUnread = (c.unreadCount || 0) > 0 && !isSelected;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setActiveContactId(c.id)}
+                    className={`w-full p-4 flex items-start gap-3 transition-all duration-150 hover:bg-stone-50 text-left relative border-b border-stone-100 ${
+                      isSelected ? "bg-stone-50" : ""
+                    }`}
+                  >
+                    {/* Avatar */}
+                    <div className="relative shrink-0 mt-0.5">
+                      <div className="w-11 h-11 bg-stone-100 text-stone-700 flex items-center justify-center font-bold text-sm rounded-full">
+                        {c.name.split(" ").map(n => n[0]).join("")}
+                      </div>
+                      <span className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${
+                        c.status === "Active" ? "bg-emerald-500" : "bg-stone-300"
+                      }`} />
                     </div>
-                    {c.status === "Active" ? (
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-stone-950 border border-white" />
-                    ) : (
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-stone-200 border border-white" />
-                    )}
-                  </div>
 
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold truncate text-stone-950 uppercase tracking-wider">
-                        {c.name}
-                      </h4>
-                      <span className="text-[9px] text-stone-400 font-bold uppercase tracking-wider shrink-0">{c.lastMessageTime}</span>
-                    </div>
-
-                    <p className="text-xs text-stone-500 truncate leading-normal">
-                      {c.lastMessage || "No messages yet"}
-                    </p>
-
-                    {/* Meta Info */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                      <span className="text-[8px] font-bold text-stone-500 uppercase tracking-wider bg-stone-100 border border-stone-200 px-1.5 py-0.5 rounded-none leading-none shrink-0">
-                        {c.source.includes("Shopify") ? "Shopify" : c.source.includes("Woo") ? "Woo" : "Ad"}
-                      </span>
-                      {c.tags.slice(0, 1).map((t, idx) => (
-                        <span key={idx} className="text-[9px] font-bold bg-stone-900/10 text-stone-800 px-2 py-0.5 border border-stone-200 leading-none truncate max-w-[80px] rounded-none uppercase tracking-wider">
-                          {t}
+                    {/* Content */}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold truncate text-stone-900">{c.name}</h4>
+                        <span className="text-[10px] text-stone-400 font-medium shrink-0 ml-2">{c.lastMessageTime}</span>
+                      </div>
+                      <p className="text-xs text-stone-500 truncate leading-normal">
+                        {c.lastMessage || "No messages yet"}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        <span className="text-[8px] font-bold text-stone-500 uppercase tracking-wider bg-stone-100 border border-stone-200 px-1.5 py-0.5 rounded-full leading-none shrink-0">
+                          {c.source.includes("Shopify") ? "Shopify" : c.source.includes("Woo") ? "Woo" : "Ad"}
                         </span>
-                      ))}
-                      {c.tags.length > 1 && (
-                        <span className="text-[9px] text-stone-400 font-bold">+{c.tags.length - 1}</span>
-                      )}
+                        {c.tags.slice(0, 1).map((t, idx) => (
+                          <span key={idx} className="text-[9px] font-semibold bg-stone-100 text-stone-700 px-2 py-0.5 border border-stone-200 leading-none truncate max-w-[80px] rounded-full">
+                            {t}
+                          </span>
+                        ))}
+                        {c.tags.length > 1 && (
+                          <span className="text-[9px] text-stone-400 font-medium">+{c.tags.length - 1}</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {hasUnread && (
-                    <span className="bg-stone-950 text-white text-[9px] font-bold w-5 h-5 rounded-none flex items-center justify-center shrink-0 mt-1.5 border border-stone-950">
-                      {c.unreadCount}
-                    </span>
-                  )}
+                    {/* Unread badge */}
+                    {hasUnread && (
+                      <span className="bg-emerald-600 text-white text-[9px] font-bold min-w-[20px] h-5 rounded-full flex items-center justify-center shrink-0 mt-1.5 px-1.5">
+                        {c.unreadCount}
+                      </span>
+                    )}
 
-                  {isSelected && (
-                    <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-stone-950" />
-                  )}
-                </button>
-              );
-            })
-          )}
+                    {/* Active indicator */}
+                    {isSelected && (
+                      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-stone-950 rounded-r-full" />
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* 2. Middle Chat Stream Window */}
-      <div className={`flex-1 flex flex-col h-full relative overflow-hidden ${
-        activeContactId ? "flex" : "hidden md:flex"
-      }`}>
+      {/* ═══════════════════════════════════════════════════════════════
+          COLUMN 2 — Chat Stream
+          Desktop: always visible (flex-1)
+          Mobile: visible only when a contact IS selected
+       ═══════════════════════════════════════════════════════════════ */}
+      <div
+        className="flex-1 flex flex-col h-full relative overflow-hidden inbox-chat-pane"
+        data-mobile-hidden={!mobileShowChat ? "true" : "false"}
+      >
         {activeContact ? (
           <>
-            {/* Active Contact Header */}
-            <div className="h-16 px-4 md:px-6 bg-white border-b border-stone-200 flex items-center justify-between shrink-0 relative z-10 select-none shadow-none">
-              <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                {/* Back button for mobile view */}
+            {/* ─── Chat Header ─── */}
+            <div className="h-14 lg:h-16 px-3 lg:px-6 bg-white border-b border-stone-200 flex items-center justify-between shrink-0 relative z-10 select-none">
+              <div className="flex items-center gap-2.5 min-w-0">
+                {/* Back button — mobile only */}
                 <button
                   type="button"
                   onClick={() => setActiveContactId("")}
-                  className="md:hidden p-1.5 rounded-none hover:bg-stone-100 text-stone-750 cursor-pointer shrink-0 transition-colors"
+                  className="lg:hidden w-9 h-9 flex items-center justify-center rounded-full hover:bg-stone-100 text-stone-700 cursor-pointer shrink-0 transition-colors active:scale-95"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
 
-                <div className="w-9 h-9 bg-stone-950 text-white flex items-center justify-center font-bold text-xs shrink-0 uppercase border border-stone-950 rounded-none">
+                <div className="w-9 h-9 bg-gradient-to-br from-stone-700 to-stone-900 text-white flex items-center justify-center font-bold text-xs shrink-0 uppercase rounded-full">
                   {activeContact.name.split(" ").map(n => n[0]).join("")}
                 </div>
                 <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-stone-950 leading-none truncate uppercase tracking-wider">{activeContact.name}</h4>
-                  <span className="text-[9px] text-stone-400 font-bold flex items-center gap-1 mt-1 truncate uppercase">
+                  <h4 className="text-xs font-bold text-stone-900 leading-none truncate">{activeContact.name}</h4>
+                  <span className="text-[10px] text-stone-400 font-medium flex items-center gap-1 mt-0.5 truncate">
                     <span className="truncate">{activeContact.phone}</span>
-                    <span>•</span>
-                    <span className="truncate text-stone-600">{activeContact.source}</span>
+                    <span>·</span>
+                    <span className="truncate text-stone-500">{activeContact.source}</span>
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                {/* Simulate button */}
                 <button
                   type="button"
                   onClick={() => setShowSimulate(!showSimulate)}
-                  className="text-[9px] px-3 py-1.5 rounded-none bg-stone-950 text-white hover:bg-white hover:text-stone-950 border border-stone-950 font-bold uppercase tracking-wider flex items-center gap-1.5 select-none transition-all shrink-0 cursor-pointer"
+                  className="text-[9px] px-2.5 py-1.5 bg-stone-950 text-white hover:bg-stone-800 border border-stone-950 font-bold uppercase tracking-wider flex items-center gap-1.5 select-none transition-all shrink-0 cursor-pointer rounded-lg"
                   title="Simulate Inbound Customer Message"
                 >
                   <Bot className="w-3.5 h-3.5" />
-                  Simulate
+                  <span className="max-sm:hidden">Simulate</span>
                 </button>
 
-                <span className="hidden sm:inline-flex text-[9px] px-3 py-1.5 rounded-none bg-stone-50 text-stone-500 font-bold items-center gap-1.5 shrink-0 border border-stone-200 uppercase tracking-wider">
+                {/* Agent badge — desktop */}
+                <span className="max-sm:hidden text-[9px] px-3 py-1.5 bg-stone-50 text-stone-500 font-bold flex items-center gap-1.5 shrink-0 border border-stone-200 uppercase tracking-wider rounded-lg">
                   <Laptop className="w-3.5 h-3.5 text-stone-400" />
                   Agent: <span className="font-bold text-stone-800">{activeContact.assignedAgent}</span>
                 </span>
                 
-                {/* Profile panel toggle button */}
+                {/* Profile panel toggle — mobile only */}
                 <button
                   type="button"
-                  onClick={() => setShowMobileProfile(!showMobileProfile)}
-                  className="lg:hidden p-2 rounded-none hover:bg-stone-100 text-stone-700 cursor-pointer shrink-0 transition-colors"
+                  onClick={openMobileProfile}
+                  className="lg:hidden w-9 h-9 flex items-center justify-center rounded-full hover:bg-stone-100 text-stone-700 cursor-pointer shrink-0 transition-colors active:scale-95"
                   title="View Customer Profile"
                 >
-                  <User className="w-4.5 h-4.5" />
+                  <User className="w-[18px] h-[18px]" />
                 </button>
               </div>
             </div>
 
-            {/* Inbound Customer Simulator Banner */}
+            {/* ─── Inbound Customer Simulator Banner ─── */}
             {showSimulate && (
-              <div className="bg-stone-50 border-b border-stone-200 px-6 py-3.5 flex items-center justify-between gap-4 z-20 relative select-none animate-slide-up">
-                <div className="flex items-center gap-2 text-[10px] font-bold text-stone-900 shrink-0 uppercase tracking-wider">
-                  <Bot className="w-4.5 h-4.5" />
+              <div className="bg-stone-50 border-b border-stone-200 px-4 lg:px-6 py-3 flex items-center justify-between gap-3 z-20 relative select-none animate-slide-up">
+                <div className="flex items-center gap-2 text-[10px] font-bold text-stone-900 shrink-0 uppercase tracking-wider max-sm:hidden">
+                  <Bot className="w-4 h-4" />
                   <span>Simulate from {activeContact.name}:</span>
                 </div>
-                <div className="flex items-center gap-2.5 flex-1 max-w-md">
+                <div className="flex items-center gap-2 flex-1">
                   <input
                     type="text"
                     placeholder="Type simulated customer response..."
                     value={simMessage}
                     onChange={(e) => setSimMessage(e.target.value)}
-                    onKeyDown={async (e) => {
-                      if (e.key === "Enter" && simMessage.trim()) {
-                        const text = simMessage.trim();
-                        setSimMessage("");
-                        setShowSimulate(false);
-                        
-                        lockSync();
-                        sendLiveChatMessage(activeContact.id, text, "user");
-
-                        try {
-                          await fetch("/api/webhooks/whatsapp/process", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              from: activeContact.phone,
-                              text,
-                              msgId: `sim-${Date.now()}`,
-                              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                            })
-                          });
-                        } catch (err) {
-                          console.error(err);
-                        } finally {
-                          unlockSync();
-                        }
-                      }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSimulateInbound();
                     }}
-                    className="flex-1 bg-white border border-stone-200 rounded-none px-3 py-2 text-xs font-semibold focus:outline-none focus:border-stone-900 uppercase"
+                    className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-stone-900"
                   />
                   <button
                     type="button"
-                    onClick={async () => {
-                      if (!simMessage.trim()) return;
-                      const text = simMessage.trim();
-                      setSimMessage("");
-                      setShowSimulate(false);
-                      
-                      lockSync();
-                      sendLiveChatMessage(activeContact.id, text, "user");
-
-                      try {
-                        await fetch("/api/webhooks/whatsapp/process", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            from: activeContact.phone,
-                            text,
-                            msgId: `sim-${Date.now()}`,
-                            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                          })
-                        });
-                      } catch (err) {
-                        console.error(err);
-                      } finally {
-                        unlockSync();
-                      }
-                    }}
-                    className="bg-stone-950 hover:bg-stone-800 text-white border border-stone-950 font-bold text-[9px] tracking-wider uppercase px-4 py-2 rounded-none transition-all cursor-pointer shrink-0"
+                    onClick={handleSimulateInbound}
+                    className="bg-stone-950 text-white border border-stone-950 font-bold text-[9px] tracking-wider uppercase px-3 py-2 rounded-lg transition-all cursor-pointer shrink-0 hover:bg-stone-800"
                   >
-                    Simulate Inbound
+                    Send
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowSimulate(false)}
-                    className="p-2 rounded-none hover:bg-stone-100 text-stone-500 cursor-pointer shrink-0 transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-stone-200 text-stone-500 cursor-pointer shrink-0 transition-colors"
                   >
-                    <X className="w-4.5 h-4.5" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Live Message History Scroll */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar relative bg-[#fafaf9]">
+            {/* ─── Live Message History ─── */}
+            <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-4 space-y-3 custom-scrollbar relative bg-[#fafaf9]">
               {activeChat.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center text-xs text-stone-600 font-bold uppercase tracking-wider gap-2.5 relative z-10">
-                  <Bot className="w-9 h-9 text-stone-950" />
-                  <p className="max-w-xs leading-relaxed">Live support channel is operational. Send an outbound support message or trigger template payload below.</p>
+                <div className="h-full flex flex-col items-center justify-center text-center text-xs text-stone-500 gap-2.5">
+                  <Bot className="w-8 h-8 text-stone-300" />
+                  <p className="max-w-xs leading-relaxed font-medium">No messages yet. Send a message to start the conversation.</p>
                 </div>
               ) : (
                 activeChat.map((msg) => {
                   if (msg.sender === "system") {
                     return (
-                      <div key={msg.id} className="flex justify-center my-3.5 animate-slide-up relative z-10 select-none">
-                        <div className="bg-stone-100 text-[9px] font-bold text-stone-500 px-3.5 py-2 rounded-none shadow-none max-w-[85%] text-center uppercase tracking-wider border border-stone-200">
+                      <div key={msg.id} className="flex justify-center my-3 animate-slide-up select-none">
+                        <div className="bg-stone-100 text-[10px] font-medium text-stone-500 px-3.5 py-1.5 rounded-full max-w-[85%] text-center border border-stone-200">
                           {msg.text}
                         </div>
                       </div>
@@ -430,19 +445,19 @@ export const InboxTab: React.FC = () => {
                   return (
                     <div 
                       key={msg.id} 
-                      className={`flex ${isAgent ? "justify-end" : "justify-start"} animate-slide-up relative z-10`}
+                      className={`flex ${isAgent ? "justify-end" : "justify-start"} animate-slide-up`}
                     >
-                      <div className={`max-w-[70%] rounded-none px-4 py-3.5 shadow-none text-xs leading-relaxed relative ${
+                      <div className={`max-w-[75%] px-4 py-3 text-[13px] leading-relaxed relative ${
                         isAgent 
-                          ? "bg-stone-900 text-stone-50 border border-stone-900" 
-                          : "bg-white text-stone-900 border border-stone-200"
+                          ? "bg-stone-900 text-stone-50 rounded-2xl rounded-br-sm shadow-md" 
+                          : "bg-white text-stone-900 border border-stone-200 rounded-2xl rounded-bl-sm shadow-sm"
                       }`}>
                         {/* Text */}
                         <p className="whitespace-pre-line select-text">{msg.text}</p>
                         
                         {/* Interactive Buttons (e.g. CTA Quick Replies) */}
                         {msg.buttons && msg.buttons.length > 0 && (
-                          <div className="mt-3.5 border-t border-stone-200/40 pt-2.5 space-y-2 select-none">
+                          <div className="mt-3 border-t border-stone-200/30 pt-2.5 space-y-1.5 select-none">
                             {msg.buttons.map((btn, bIdx) => (
                               <button
                                 key={bIdx}
@@ -460,17 +475,17 @@ export const InboxTab: React.FC = () => {
                                     );
                                   }, 1500);
                                 }}
-                                className="w-full flex items-center justify-center gap-1.5 py-2 px-4 rounded-none bg-stone-50 border border-stone-200 hover:border-stone-950 text-stone-900 font-bold hover:bg-stone-100 transition-all text-[9px] uppercase tracking-wider shadow-none"
+                                className="w-full flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl bg-white/10 border border-stone-200/30 hover:bg-white/20 text-current font-semibold transition-all text-[10px] uppercase tracking-wider"
                               >
                                 <span>{btn}</span>
-                                <ExternalLink className="w-3 h-3 text-stone-400" />
+                                <ExternalLink className="w-3 h-3 opacity-50" />
                               </button>
                             ))}
                           </div>
                         )}
 
-                        {/* Footer Details */}
-                        <div className="flex items-center justify-end gap-1 mt-2.5 text-[8px] text-stone-400 font-bold uppercase select-none">
+                        {/* Footer */}
+                        <div className="flex items-center justify-end gap-1 mt-2 text-[9px] opacity-60 font-medium select-none">
                           <span>{msg.timestamp}</span>
                           {isAgent && renderMessageStatus(msg.status)}
                         </div>
@@ -482,168 +497,203 @@ export const InboxTab: React.FC = () => {
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input Bar Form */}
+            {/* ─── Input Bar ─── */}
             <form 
               onSubmit={handleSendMessage}
-              className="p-4 bg-white border-t border-stone-200 flex items-center gap-3 shrink-0 relative z-10"
+              className="p-3 lg:p-4 bg-white border-t border-stone-200 flex items-center gap-2.5 shrink-0 relative z-10"
             >
               <input
                 type="text"
-                placeholder="Compose secure WhatsApp messaging transmission..."
+                placeholder="Type a message..."
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                className="flex-1 bg-stone-50 border border-stone-200 rounded-none py-3 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900 transition-all placeholder:text-stone-300 uppercase tracking-wider"
+                className="flex-1 bg-stone-50 border border-stone-200 rounded-2xl py-3 px-4 text-sm font-medium focus:outline-none focus:border-stone-400 transition-all placeholder:text-stone-400"
               />
               <button
                 type="submit"
                 disabled={!inputText.trim()}
-                className="w-11 h-11 rounded-none bg-stone-950 text-white hover:bg-white hover:text-stone-950 border border-stone-950 flex items-center justify-center disabled:opacity-40 disabled:hover:bg-stone-950 disabled:hover:text-white transition-all shadow-none cursor-pointer shrink-0"
+                className="w-11 h-11 rounded-full bg-stone-950 text-white hover:bg-stone-800 flex items-center justify-center disabled:opacity-30 transition-all shadow-sm cursor-pointer shrink-0 active:scale-95"
               >
                 <Send className="w-4 h-4" />
               </button>
             </form>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-4 select-none relative z-10">
-            <div className="w-16 h-16 bg-stone-50 border border-stone-200 flex items-center justify-center text-stone-700 shadow-none rounded-none">
+          /* ─── Empty State ─── */
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-4 select-none">
+            <div className="w-16 h-16 bg-stone-100 border border-stone-200 flex items-center justify-center text-stone-400 rounded-2xl">
               <MessageSquareOff className="w-7 h-7" />
             </div>
             <div>
-              <h4 className="font-bold text-stone-950 text-xs uppercase tracking-widest">No Active Conversation</h4>
-              <p className="text-stone-500 text-xs mt-1.5 max-w-[280px] leading-relaxed">Select a support ledger lead from the active panel to initiate chat history routing.</p>
+              <h4 className="font-bold text-stone-900 text-sm">No Conversation Selected</h4>
+              <p className="text-stone-500 text-xs mt-1.5 max-w-[280px] leading-relaxed">Select a contact from the list to view their conversation.</p>
             </div>
           </div>
         )}
       </div>
 
-      {/* 3. Right CRM Profile Panel Drawer */}
+      {/* ═══════════════════════════════════════════════════════════════
+          COLUMN 3 — CRM Profile Panel / Drawer
+          Desktop: static sidebar (w-72, always visible)
+          Mobile: full-screen overlay drawer, toggled via showMobileProfile
+       ═══════════════════════════════════════════════════════════════ */}
       {activeContact && (
         <>
-          {/* Backdrop for mobile CRM drawer */}
+          {/* Mobile backdrop overlay */}
           {showMobileProfile && (
             <div 
-              onClick={() => setShowMobileProfile(false)}
-              className="fixed inset-0 bg-[#fafaf9]/85 z-30 lg:hidden backdrop-blur-xs transition-opacity duration-300 cursor-pointer"
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] lg:hidden animate-fade-in"
+              onClick={closeMobileProfile}
+              role="button"
+              tabIndex={0}
+              aria-label="Close profile panel"
             />
           )}
 
-          <div className={`fixed inset-y-0 right-0 z-40 lg:static w-80 lg:w-72 border-l border-stone-200 bg-white flex flex-col h-full overflow-y-auto custom-scrollbar shrink-0 p-6 space-y-6 transition-transform duration-350 ease-in-out lg:translate-x-0 ${
-            showMobileProfile ? "translate-x-0" : "translate-x-full lg:translate-x-0"
-          }`}>
-            {/* Header close button inside mobile CRM drawer */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-stone-200 lg:hidden select-none">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-stone-400">Customer Profile</span>
-              <button
-                type="button"
-                onClick={() => setShowMobileProfile(false)}
-                className="p-1.5 rounded-none hover:bg-stone-100 text-stone-600 cursor-pointer transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="text-center pb-4 border-b border-stone-200 select-none">
-              <div className="w-16 h-16 bg-stone-950 text-white flex items-center justify-center text-xl font-bold mx-auto mb-3 border border-stone-950 uppercase rounded-none">
-                {activeContact.name.split(" ").map(n => n[0]).join("")}
-              </div>
-              <h3 className="font-bold text-stone-900 tracking-tight text-xs uppercase tracking-wider">{activeContact.name}</h3>
-              <span className="text-[9px] font-bold uppercase tracking-wider bg-stone-100 text-stone-900 px-2.5 py-1.5 border border-stone-300 mt-2.5 inline-block rounded-none">
-                {activeContact.status} lead
-              </span>
-            </div>
+          {/* Profile panel container */}
+          <div
+            className="lg:relative lg:z-auto"
+            style={{
+              // Desktop: render inline as a static sidebar
+              // Mobile: render as a fixed overlay drawer
+            }}
+          >
+            <div
+              data-mobile-open={showMobileProfile ? "true" : "false"}
+              className={[
+                // Desktop: static sidebar
+                "max-lg:fixed max-lg:inset-y-0 max-lg:right-0 max-lg:z-[70]",
+                "lg:static lg:flex",
+                // Sizing
+                "w-[85%] sm:w-96 lg:w-72",
+                // Common styling
+                "flex flex-col h-full bg-white border-l border-stone-200 overflow-y-auto custom-scrollbar shrink-0",
+                // Mobile transition
+                "transition-transform duration-300 ease-in-out",
+                "inbox-profile-drawer",
+                "lg:translate-x-0",
+              ].join(" ")}
+            >
+              {/* ─── Drawer Content ─── */}
+              <div className="p-6 space-y-6">
 
-            {/* CRM Info Fields */}
-            <div className="space-y-4">
-              <h4 className="text-[9px] font-bold uppercase tracking-wider text-stone-500">Lead Metadata</h4>
-              <div className="space-y-3 text-[10px] font-bold text-stone-600 select-text uppercase tracking-wider">
-                <div className="flex items-center gap-3">
-                  <Phone className="w-4 h-4 text-stone-400 shrink-0" />
-                  <span className="truncate">{activeContact.phone}</span>
+                {/* Mobile close header */}
+                <div className="flex items-center justify-between lg:hidden">
+                  <span className="text-xs font-bold uppercase tracking-wider text-stone-400">Customer Profile</span>
+                  <button
+                    type="button"
+                    onClick={closeMobileProfile}
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 cursor-pointer transition-colors active:scale-95"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <div className="flex items-center gap-3 lowercase normal-case select-all">
-                  <Mail className="w-4 h-4 text-stone-400 shrink-0" />
-                  <span className="truncate">{activeContact.email}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <ShoppingBag className="w-4 h-4 text-stone-400 shrink-0" />
-                  <span>Source: <strong className="text-stone-900 uppercase font-bold">{activeContact.source}</strong></span>
-                </div>
-              </div>
-            </div>
 
-            {/* Agent Assignment */}
-            <div className="space-y-2 select-none">
-              <h4 className="text-[9px] font-bold uppercase tracking-wider text-stone-500">Assigned Agent</h4>
-              <select
-                value={activeContact.assignedAgent}
-                onChange={handleAgentChange}
-                className="w-full bg-stone-50 border border-stone-200 rounded-none p-2.5 text-xs font-semibold focus:outline-none focus:border-stone-950 transition-all select-none uppercase tracking-wider"
-              >
-                {members.map((m) => (
-                  <option key={m.id} value={m.name}>{m.name}</option>
-                ))}
-                <option value="Bot">Bot (Auto AI)</option>
-                <option value="None">Unassigned</option>
-              </select>
-            </div>
+                {/* Profile avatar & status */}
+                <div className="text-center pb-4 border-b border-stone-100 select-none">
+                  <div className="w-20 h-20 bg-gradient-to-br from-stone-700 to-stone-900 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-3 rounded-full shadow-lg">
+                    {activeContact.name.split(" ").map(n => n[0]).join("")}
+                  </div>
+                  <h3 className="font-bold text-stone-900 text-sm">{activeContact.name}</h3>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider bg-stone-50 text-stone-700 px-3 py-1 border border-stone-200 mt-2 inline-block rounded-full">
+                    {activeContact.status} lead
+                  </span>
+                </div>
 
-            {/* Custom Tags Manager */}
-            <div className="space-y-4 pt-2">
-              <h4 className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-2 select-none">
-                <Tag className="w-3.5 h-3.5" />
-                Segmentation Tags
-              </h4>
-              
-              {/* Tag pills */}
-              <div className="flex flex-wrap gap-1.5 select-none">
-                {activeContact.tags.length === 0 ? (
-                  <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">No active segment tags.</span>
-                ) : (
-                  activeContact.tags.map((t, idx) => (
-                    <span 
-                      key={idx} 
-                      className="text-[9px] font-bold bg-stone-100 text-stone-800 pl-2.5 pr-1.5 py-1.5 flex items-center gap-1.5 border border-stone-200 rounded-none uppercase tracking-wider"
+                {/* Lead Metadata */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Lead Metadata</h4>
+                  <div className="space-y-3 text-xs font-medium text-stone-600 select-text">
+                    <div className="flex items-center gap-3">
+                      <Phone className="w-4 h-4 text-stone-400 shrink-0" />
+                      <span className="truncate">{activeContact.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Mail className="w-4 h-4 text-stone-400 shrink-0" />
+                      <span className="truncate">{activeContact.email}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <ShoppingBag className="w-4 h-4 text-stone-400 shrink-0" />
+                      <span>Source: <strong className="text-stone-900">{activeContact.source}</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Agent Assignment */}
+                <div className="space-y-2 select-none">
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Assigned Agent</h4>
+                  <select
+                    value={activeContact.assignedAgent}
+                    onChange={handleAgentChange}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs font-semibold focus:outline-none focus:border-stone-900 transition-all"
+                  >
+                    {members.map((m) => (
+                      <option key={m.id} value={m.name}>{m.name}</option>
+                    ))}
+                    <option value="Bot">Bot (Auto AI)</option>
+                    <option value="None">Unassigned</option>
+                  </select>
+                </div>
+
+                {/* Segmentation Tags */}
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 flex items-center gap-2 select-none">
+                    <Tag className="w-3.5 h-3.5" />
+                    Segmentation Tags
+                  </h4>
+                  
+                  <div className="flex flex-wrap gap-2 select-none">
+                    {activeContact.tags.length === 0 ? (
+                      <span className="text-xs text-stone-400 font-medium">No tags yet</span>
+                    ) : (
+                      activeContact.tags.map((t, idx) => (
+                        <span 
+                          key={idx} 
+                          className="text-[11px] font-semibold bg-stone-50 text-stone-700 pl-3 pr-2 py-1.5 flex items-center gap-1.5 border border-stone-200 rounded-full hover:bg-stone-100 transition-colors"
+                        >
+                          <span>{t}</span>
+                          <button 
+                            onClick={() => handleRemoveTag(t)}
+                            className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-stone-200 cursor-pointer transition-colors"
+                          >
+                            <X className="w-3 h-3 text-stone-500" />
+                          </button>
+                        </span>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Add tag form */}
+                  <form onSubmit={handleAddTag} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Create tag..."
+                      value={newTagInput}
+                      onChange={(e) => setNewTagInput(e.target.value)}
+                      className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-medium focus:outline-none focus:border-stone-900 placeholder:text-stone-400"
+                    />
+                    <button
+                      type="submit"
+                      className="bg-stone-950 text-white border border-stone-950 rounded-xl px-3 py-2.5 transition-all cursor-pointer shrink-0 flex items-center justify-center hover:bg-stone-800 active:scale-95"
                     >
-                      <span>{t}</span>
-                      <button 
-                        onClick={() => handleRemoveTag(t)}
-                        className="hover:bg-stone-200 p-0.5 rounded-none cursor-pointer transition-colors"
-                      >
-                        <X className="w-2.5 h-2.5 text-stone-500" />
-                      </button>
-                    </span>
-                  ))
-                )}
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </form>
+                </div>
+
+                {/* Delete Contact */}
+                <div className="pt-4 border-t border-stone-100 select-none">
+                  <button
+                    onClick={() => {
+                      deleteContact(activeContact.id);
+                      closeMobileProfile();
+                    }}
+                    className="w-full text-center py-3 text-xs font-bold text-red-500 hover:bg-red-50 border border-red-200 rounded-xl transition-all duration-200 cursor-pointer active:scale-[0.98]"
+                  >
+                    Delete Lead Profile
+                  </button>
+                </div>
               </div>
-
-              {/* Add tag form */}
-              <form onSubmit={handleAddTag} className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Create tag..."
-                  value={newTagInput}
-                  onChange={(e) => setNewTagInput(e.target.value)}
-                  className="flex-1 bg-stone-50 border border-stone-200 rounded-none px-3 py-2 text-xs font-semibold focus:outline-none focus:border-stone-950 uppercase tracking-wider"
-                />
-                <button
-                  type="submit"
-                  className="bg-stone-950 hover:bg-white hover:text-stone-950 text-white border border-stone-950 rounded-none px-3 py-2 transition-all cursor-pointer shrink-0 flex items-center justify-center"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </form>
-            </div>
-
-            {/* Delete Contact */}
-            <div className="pt-6 border-t border-stone-200 select-none">
-              <button
-                onClick={() => {
-                  deleteContact(activeContact.id);
-                  setShowMobileProfile(false);
-                }}
-                className="w-full text-center py-3.5 text-xs font-bold uppercase tracking-wider text-stone-500 hover:bg-stone-100 border border-stone-200 rounded-none transition-all cursor-pointer"
-              >
-                Delete Lead Profile
-              </button>
             </div>
           </div>
         </>

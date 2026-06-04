@@ -227,7 +227,7 @@ export default function LandingPage() {
             <span className="font-sans font-extrabold text-xl tracking-tight text-[#1D211F]">WappFlow</span>
           </div>
 
-          <nav className="hidden md:flex items-center gap-10">
+          <nav className="max-md:hidden md:flex items-center gap-10">
             <a href="#features" className="text-xs font-semibold tracking-wider text-[#1D211F]/60 hover:text-[#1D211F] transition-colors uppercase">Features</a>
             <a href="#simulator" className="text-xs font-semibold tracking-wider text-[#1D211F]/60 hover:text-[#1D211F] transition-colors uppercase">Workspace Sim</a>
             <a href="#pricing" className="text-xs font-semibold tracking-wider text-[#1D211F]/60 hover:text-[#1D211F] transition-colors uppercase">Pricing</a>

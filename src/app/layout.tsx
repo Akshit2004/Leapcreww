@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import "@uploadthing/react/styles.css";
 import { AppProvider } from "@/shared/context/AppContext";
 import { AuthProvider } from "@/features/auth/context/AuthProvider";
 

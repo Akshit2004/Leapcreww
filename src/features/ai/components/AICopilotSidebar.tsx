@@ -467,7 +467,7 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="hidden lg:flex fixed bottom-6 right-6 z-50 items-center gap-2 px-4 py-3 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-600/30 hover:bg-emerald-500 transition-all duration-200 cursor-pointer group"
+        className="max-lg:hidden lg:flex fixed bottom-6 right-6 z-50 items-center gap-2 px-4 py-3 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-600/30 hover:bg-emerald-500 transition-all duration-200 cursor-pointer group"
       >
         <Sparkles className="w-5 h-5" />
         <span className="text-sm font-semibold">AI Copilot</span>
