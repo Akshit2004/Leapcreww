@@ -14,6 +14,7 @@ import {
   Users,
   Sparkles,
   Plug,
+  Target,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useApp } from "../../context/AppContext";
@@ -70,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "analytics", label: "Analytics", icon: BarChart3 },
     { id: "inbox", label: "Team Inbox", icon: MessageSquare, badge: totalUnread > 0 ? totalUnread : undefined },
     { id: "customers", label: "Customers", icon: Users },
+    { id: "ads", label: "Ads Manager", icon: Target },
     { id: "campaigns", label: "Campaigns", icon: Megaphone },
     { id: "templates", label: "Templates", icon: FileText },
     { id: "chatbot", label: "Bot Builder", icon: Cpu, hideOnMobile: true },

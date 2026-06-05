@@ -84,19 +84,21 @@ export const CustomersTab: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#f4f6f5] relative animate-fade-in p-4 lg:p-8">
+    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-[#f4f6f5] relative animate-fade-in p-4 lg:p-8 items-stretch justify-start text-left">
       {/* Header */}
-      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-2xl font-black tracking-tight text-stone-900 flex items-center gap-2">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 w-full text-left items-start md:items-center">
+        <div className="flex flex-col items-start text-left">
+          <div className="flex items-center gap-2 mb-1">
             <Users className="w-6 h-6 text-wa-green" />
-            Customers
-          </h2>
-          <p className="text-stone-500 text-sm mt-1 font-medium">
+            <h2 className="text-2xl font-black tracking-tight text-stone-900">
+              Customers
+            </h2>
+          </div>
+          <p className="text-stone-500 text-sm font-medium text-left">
             Manage your contacts, apply tags, and segment your audience.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 justify-start md:justify-end">
           <button className="flex items-center gap-2 bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm">
             <Filter className="w-4 h-4" />
             More Filters
@@ -193,17 +195,17 @@ export const CustomersTab: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col min-w-0 bg-transparent">
+        <div className="flex-1 flex flex-col min-w-0 bg-transparent w-full text-left items-stretch">
           {/* Toolbar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-            <div className="relative flex-1 max-w-md">
+          <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 items-start sm:items-center">
+            <div className="relative flex-1 max-w-md w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
               <input
                 type="text"
                 placeholder="Search customers by name, phone or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white border border-stone-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-wa-green/20 focus:border-wa-green transition-all shadow-sm"
+                className="w-full bg-white border border-stone-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-wa-green/20 focus:border-wa-green transition-all shadow-sm text-left"
               />
             </div>
             

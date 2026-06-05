@@ -15,6 +15,7 @@ import { MarketplaceTab } from "@/features/marketplace/components/MarketplaceTab
 import { SettingsTab } from "@/features/settings/components/SettingsTab";
 import { IntegrationsTab } from "@/features/integrations/components/IntegrationsTab";
 import { AnalyticsTab } from "@/features/analytics/components/AnalyticsTab";
+import { AdsTab } from "@/features/ads/components/AdsTab";
 import { AICopilotSidebar } from "@/features/ai/components/AICopilotSidebar";
 import { Loader, AlertCircle, Bot } from "lucide-react";
 
@@ -83,6 +84,8 @@ export default function TenantDashboard() {
         return <InboxTab />;
       case "customers":
         return <CustomersTab />;
+      case "ads":
+        return <AdsTab />;
       case "campaigns":
         return <CampaignsTab />;
       case "templates":

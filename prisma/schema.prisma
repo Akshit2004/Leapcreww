@@ -59,6 +59,8 @@ model Organization {
   messages     Message[]
   products     Product[]
   orders       Order[]
+  adCampaigns  AdCampaign[]
+  ads          Ad[]
 }
 
 enum Role {
@@ -98,6 +100,7 @@ model Contact {
   messages       Message[]
   cart           Cart?
   orders         Order[]
+  sourceAdId     String?      // Tracks the Meta Ad ID that originated this contact
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 }
@@ -289,5 +292,33 @@ model ChatbotAnalytics {
   action         String   // "impression" | "response" | "dropoff"
   organizationId String
   createdAt      DateTime @default(now())
+}
+
+model AdCampaign {
+  id             String       @id @default(uuid())
+  name           String
+  objective      String       // e.g., "MESSAGES"
+  budget         Float        // Daily or lifetime budget amount
+  status         String       // "ACTIVE", "PAUSED", "COMPLETED"
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ads            Ad[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Ad {
+  id             String       @id @default(uuid())
+  name           String
+  status         String       // "ACTIVE", "PAUSED", "REJECTED"
+  creative       Json         // Stores headline, primary text, image prompt/url
+  ctwaClid       String?      // Click-to-WhatsApp Click ID or unique reference
+  linkedTemplate String?      // The template name/ID linked to this ad for the welcome message
+  campaignId     String
+  campaign       AdCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
