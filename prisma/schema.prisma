@@ -63,7 +63,6 @@ model Organization {
   messages     Message[]
   products     Product[]
   orders       Order[]
-
   // Roadmap relations
   ads                  Ad[]
   adCampaigns          AdCampaign[]
@@ -117,6 +116,7 @@ model Contact {
   cart           Cart?
   orders         Order[]
   enrollments    SequenceEnrollment[]
+  sourceAdId     String?      // Tracks the Meta Ad ID that originated this contact
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 }
@@ -320,6 +320,7 @@ model AdCampaign {
   id             String       @id @default(uuid())
   name           String
   objective      String       @default("LEADS") // Meta campaign objective
+  budget         Float        @default(0.0)      // daily budget in float units (from master)
   budgetMinor    Int          @default(0)        // daily budget in minor units
   status         String       @default("draft")  // "draft" | "active" | "paused" | "completed"
   metaCampaignId String?                          // Meta Marketing API campaign id
@@ -332,16 +333,21 @@ model AdCampaign {
 
 model Ad {
   id              String       @id @default(uuid())
-  headline        String
-  primaryText     String       @db.Text
+  name            String       @default("")      // from master
+  status          String       @default("draft") // "draft" | "active" | "paused" (unified)
+  creative        Json?                          // from master (headline, primaryText, imagePrompt, imageUrl)
+  ctwaClid        String?                        // Click-to-WhatsApp Click ID or unique reference
+  linkedTemplate  String?                        // from master
+  welcomeTemplate String?                        // from HEAD
+
+  headline        String       @default("")
+  primaryText     String       @default("") @db.Text
   imageUrl        String?
-  ctwaClid        String?      // Click-to-WhatsApp click id matched from inbound referral
-  welcomeTemplate String?      // template/flow shown when the lead lands in chat
-  status          String       @default("draft") // "draft" | "active" | "paused"
   metaAdId        String?
   leads           Int          @default(0)
+  
   adCampaignId    String?
-  adCampaign      AdCampaign?  @relation(fields: [adCampaignId], references: [id], onDelete: SetNull)
+  adCampaign      AdCampaign?  @relation(fields: [adCampaignId], references: [id], onDelete: Cascade)
   organizationId  String
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt       DateTime     @default(now())
@@ -484,4 +490,3 @@ model Partner {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
-

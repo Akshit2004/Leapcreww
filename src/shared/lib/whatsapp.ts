@@ -57,6 +57,12 @@ export interface WhatsAppWebhookPayload {
             button_reply?: { id: string; title: string };
             list_reply?: { id: string; title: string; description?: string };
           };
+          referral?: {
+            source_url: string;
+            source_id: string;
+            headline: string;
+            body: string;
+          };
           order?: {
             catalog_id: string;
             text?: string;
@@ -74,6 +80,7 @@ export interface WhatsAppWebhookPayload {
           timestamp: string;
           recipient_id: string;
           conversation?: { id: string };
+          errors?: { code: number; title: string; message?: string; error_data?: any }[];
         }[];
       };
       field: "messages";

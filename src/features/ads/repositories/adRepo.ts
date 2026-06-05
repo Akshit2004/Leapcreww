@@ -18,3 +18,11 @@ export function incrementLeads(adId: string) {
 export function findByCtwaClid(organizationId: string, ctwaClid: string) {
   return prisma.ad.findFirst({ where: { organizationId, ctwaClid } });
 }
+
+/** Get the organization's brand profile for AI copywriting. */
+export function getOrganizationBrandProfile(organizationId: string) {
+  return prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { brandProfile: true },
+  });
+}

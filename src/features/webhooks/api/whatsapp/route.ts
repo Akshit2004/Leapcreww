@@ -57,6 +57,38 @@ export async function POST(req: NextRequest) {
                   data: { status: status.status },
                 });
 
+                // If message failed to deliver, log the details
+                if (status.status === "failed") {
+                  const errorDetail = status.errors?.[0];
+                  const code = errorDetail?.code || "unknown";
+                  const reason = errorDetail?.message || errorDetail?.title || "No error details provided by Meta";
+                  console.error(`[Webhook Status] Message ${status.id} delivery failed: Code ${code} - ${reason}`);
+
+                  // Find message to associate with campaign and organization
+                  const msg = await prisma.message.findFirst({
+                    where: { waMessageId: status.id },
+                    select: {
+                      organizationId: true,
+                      campaignId: true,
+                      contact: { select: { name: true, phone: true } }
+                    }
+                  });
+
+                  if (msg) {
+                    const d = new Date();
+                    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                    await prisma.systemLog.create({
+                      data: {
+                        timestamp: timeStr,
+                        type: "campaign",
+                        message: `Delivery failed to ${msg.contact.name} (${msg.contact.phone}): ${reason} (Code ${code})`,
+                        organizationId: msg.organizationId,
+                        campaignId: msg.campaignId
+                      }
+                    });
+                  }
+                }
+
                 // Update campaign metrics for delivery tracking
                 if (status.status === "delivered" || status.status === "read") {
                   const msg = await prisma.message.findFirst({
@@ -132,11 +164,11 @@ export async function POST(req: NextRequest) {
               }
 
               // Process with fallback org
-              await processInboundMessage(orgFallback.id, waFrom, text, profileName, msg.id, msg.order);
+              await processInboundMessage(orgFallback.id, waFrom, text, profileName, msg.id, msg.order, msg.referral);
               continue;
             }
 
-            await processInboundMessage(org.id, waFrom, text, profileName, msg.id, msg.order);
+            await processInboundMessage(org.id, waFrom, text, profileName, msg.id, msg.order, msg.referral);
           }
         }
       }
@@ -155,7 +187,8 @@ async function processInboundMessage(
   text: string,
   profileName: string,
   waMessageId?: string,
-  orderData?: { catalog_id: string; product_items: { product_retailer_id: string; quantity: string; item_price: string; currency: string }[]; text?: string }
+  orderData?: { catalog_id: string; product_items: { product_retailer_id: string; quantity: string; item_price: string; currency: string }[]; text?: string },
+  referralData?: { source_id: string; source_url: string; headline: string; body: string }
 ) {
   const normalizedPhone = `+${waFrom.replace(/[^0-9]/g, "")}`;
 
@@ -171,13 +204,18 @@ async function processInboundMessage(
   const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
   if (contact) {
+    const updateData: any = {
+      lastMessage: text,
+      lastMessageTime: timeStr,
+      unreadCount: { increment: 1 },
+    };
+    if (referralData?.source_id) {
+      updateData.sourceAdId = referralData.source_id;
+    }
+
     contact = await prisma.contact.update({
       where: { id: contact.id },
-      data: {
-        lastMessage: text,
-        lastMessageTime: timeStr,
-        unreadCount: { increment: 1 },
-      },
+      data: updateData,
     });
   } else {
     contact = await prisma.contact.create({
@@ -193,6 +231,7 @@ async function processInboundMessage(
         unreadCount: 1,
         assignedAgent: "Bot",
         organizationId: orgId,
+        sourceAdId: referralData?.source_id || null,
       },
     });
   }

@@ -26,7 +26,7 @@ import { CampaignReportDrawer } from "./CampaignReportDrawer";
 import { UploadButton } from "@/shared/lib/uploadthing";
 
 export const CampaignsTab: React.FC = () => {
-  const { campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign, addSystemLog } = useApp();
+  const { campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign, addSystemLog, refreshWorkspace } = useApp();
   const params = useParams();
   const orgId = params.orgId as string;
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,7 +42,20 @@ export const CampaignsTab: React.FC = () => {
       document.body.style.overflow = "";
     };
   }, [isModalOpen]);
-  
+
+  // Poll workspace data to keep campaign delivery metrics and statuses updated in real-time when sending
+  useEffect(() => {
+    if (!orgId) return;
+    const hasActiveSending = campaigns.some(c => c.status === "Sending" || c.status === "Active");
+    if (!hasActiveSending) return;
+
+    const interval = setInterval(() => {
+      refreshWorkspace(orgId);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [campaigns, orgId, refreshWorkspace]);
+
   // Status filtering
   const [statusFilter, setStatusFilter] = useState<"all" | "Completed" | "Sending" | "Scheduled">("all");
 

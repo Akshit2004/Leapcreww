@@ -1,10 +1,8 @@
 /** Ads feature types (T-01 — Click-to-WhatsApp Ads). */
 
 export interface AdCreativeRequest {
-  product: string;
-  audience?: string;
-  offer?: string;
-  tone?: string;
+  topic: string;
+  orgId: string;
 }
 
 export interface AdCreative {
