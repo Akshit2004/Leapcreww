@@ -1,0 +1,106 @@
+/** inboxService.ts — Team Inbox business logic (send, edit, import contacts). */
+import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
+import * as repo from "../repositories/contactRepo";
+import { CONTACT_EDITABLE_FIELDS, type ImportContactRow, type SendMessageInput } from "../types";
+
+const hhmm = (d = new Date()) =>
+  `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+const preview = (text: string) => (text.length > 35 ? text.substring(0, 32) + "..." : text);
+
+/**
+ * Persist an agent message, update the contact (with bot→agent takeover),
+ * then dispatch via Meta. Falls back to a sandbox result if WA isn't configured.
+ */
+export async function sendAgentMessage(input: SendMessageInput, agentName: string) {
+  const ts = hhmm();
+  const dbMsg = await repo.createMessage({
+    sender: "agent",
+    text: input.text,
+    timestamp: ts,
+    contactId: input.contactId,
+    organizationId: input.orgId,
+  });
+
+  const contact = await repo.findContact(input.contactId);
+  if (contact && contact.assignedAgent === "Bot") {
+    await repo.updateContact(input.contactId, {
+      assignedAgent: agentName,
+      lastMessage: preview(input.text),
+      lastMessageTime: ts,
+    });
+    await repo.createLog({
+      timestamp: ts,
+      type: "crm",
+      message: `Agent ${agentName} took over conversation from AI Bot for contact ${contact.name}`,
+      organizationId: input.orgId,
+    });
+  } else {
+    await repo.updateContact(input.contactId, {
+      lastMessage: preview(input.text),
+      lastMessageTime: ts,
+    });
+  }
+
+  const result = await sendWhatsAppMessage(
+    { to: formatPhoneNumber(input.to), text: input.text },
+    input.orgId
+  );
+
+  if (!result.ok) {
+    await repo.createLog({
+      timestamp: ts,
+      type: "chat",
+      message: `Agent sent sandbox message: "${input.text.slice(0, 45)}" (Meta: ${result.error})`,
+      organizationId: input.orgId,
+    });
+    return { status: "sandbox_sent", message: dbMsg, metaStatus: "skipped", metaError: result.error };
+  }
+
+  await repo.createLog({
+    timestamp: ts,
+    type: "chat",
+    message: `Agent sent WhatsApp message: "${input.text.slice(0, 50)}"`,
+    organizationId: input.orgId,
+  });
+  return { status: "sent", message: dbMsg, waMessageId: result.data?.messages?.[0]?.id || null };
+}
+
+export function deleteContact(contactId: string) {
+  return repo.deleteContactCascade(contactId);
+}
+
+/** Apply a whitelisted partial update to a contact. */
+export function updateContactFields(contactId: string, body: Record<string, unknown>) {
+  const updates: Record<string, unknown> = {};
+  for (const key of CONTACT_EDITABLE_FIELDS) {
+    if (body[key] !== undefined) updates[key] = body[key];
+  }
+  return repo.updateContact(contactId, updates);
+}
+
+/** Bulk import contacts for an org after verifying membership. Returns inserted count. */
+export async function importContacts(
+  userId: string,
+  orgId: string,
+  rows: ImportContactRow[]
+): Promise<number> {
+  const membership = await repo.findMembership(userId, orgId);
+  if (!membership) throw new Error("Forbidden");
+
+  const valid = rows
+    .map((c) => ({
+      name: c.name || "Unknown",
+      phone: c.phone,
+      email: c.email || "",
+      source: c.source || "Imported CSV",
+      tags: c.tags || ["imported"],
+      status: c.status || "Active",
+      organizationId: orgId,
+    }))
+    .filter((c) => c.phone);
+
+  if (valid.length === 0) throw new Error("No valid contacts to import");
+  const result = await repo.bulkCreateContacts(valid);
+  return result.count;
+}

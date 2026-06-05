@@ -1,0 +1,146 @@
+/**
+ * metaTemplateService.ts — Submit message templates to Meta and persist them.
+ *
+ * Extracted verbatim from the old create-template route so the route stays thin.
+ * Includes the Resumable Upload dance required for media header example handles.
+ */
+import { ApiError } from "@/shared/lib/api";
+import * as repo from "../repositories/templateRepo";
+import { formatTemplateName, type CreateTemplateInput } from "../types";
+
+const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
+
+const hhmm = (d = new Date()) =>
+  `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+/**
+ * Meta requires a media HEADER to carry an example asset handle at template
+ * creation time. Obtain it via the Resumable Upload API and return the `h` handle.
+ */
+async function uploadMediaForHeaderHandle(
+  mediaUrl: string,
+  systemToken: string,
+  appId: string
+): Promise<string> {
+  const fileRes = await fetch(mediaUrl);
+  if (!fileRes.ok) throw new ApiError(`Could not fetch sample media from URL (HTTP ${fileRes.status}).`, 400);
+  const contentType = fileRes.headers.get("content-type") || "application/octet-stream";
+  const buffer = Buffer.from(await fileRes.arrayBuffer());
+  if (buffer.byteLength === 0) throw new ApiError("The sample media URL returned an empty file.", 400);
+
+  const sessionUrl =
+    `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${appId}/uploads` +
+    `?file_length=${buffer.byteLength}&file_type=${encodeURIComponent(contentType)}` +
+    `&access_token=${systemToken}`;
+  const sessionRes = await fetch(sessionUrl, { method: "POST" });
+  const sessionData = await sessionRes.json();
+  if (!sessionRes.ok || !sessionData.id) {
+    throw new ApiError(sessionData.error?.message || "Failed to open a Meta upload session.", 400);
+  }
+
+  const uploadRes = await fetch(`https://graph.facebook.com/${WHATSAPP_API_VERSION}/${sessionData.id}`, {
+    method: "POST",
+    headers: { Authorization: `OAuth ${systemToken}`, file_offset: "0", "Content-Type": contentType },
+    body: buffer,
+  });
+  const uploadData = await uploadRes.json();
+  if (!uploadRes.ok || !uploadData.h) {
+    throw new ApiError(uploadData.error?.message || "Failed to upload sample media to Meta.", 400);
+  }
+  return uploadData.h;
+}
+
+/** Build Meta `components`, submit the template, persist it, and log. */
+export async function createTemplate(input: CreateTemplateInput) {
+  const { category, body, buttons = [], mediaType = "none", mediaUrl = null, organizationId } = input;
+  const hasMediaHeader = !!mediaType && mediaType !== "none";
+
+  if (hasMediaHeader && (!mediaUrl || !String(mediaUrl).trim())) {
+    throw new ApiError("A sample media URL is required when an optional media header is selected.", 400);
+  }
+
+  const formattedName = formatTemplateName(input.name);
+  if (!formattedName) throw new ApiError("Invalid template name format", 400);
+
+  const org = await repo.findOrgWaba(organizationId);
+  const systemToken = process.env.WHATSAPP_SYSTEM_USER_TOKEN;
+  const wabaId = org?.whatsappBusinessAccountId;
+
+  if (!systemToken || !wabaId || !org?.whatsappConnected) {
+    throw new ApiError("WhatsApp not configured. Complete Embedded Signup first.", 400);
+  }
+
+  // Build components: HEADER (optional) → BODY → BUTTONS (optional).
+  const varRegex = /\{\{(\d+)\}\}/g;
+  const matches = (Array.from(body.matchAll(varRegex)) as RegExpExecArray[]).map((m) => parseInt(m[1]));
+  const uniqueVarCount = new Set(matches).size;
+
+  interface BodyComponent {
+    type: string;
+    text: string;
+    example?: { body_text: string[][] };
+  }
+  const bodyComponent: BodyComponent = { type: "BODY", text: body };
+  if (uniqueVarCount > 0) {
+    bodyComponent.example = {
+      body_text: [Array.from({ length: uniqueVarCount }, (_, i) => `[Sample ${i + 1}]`)],
+    };
+  }
+
+  const components: unknown[] = [];
+  if (hasMediaHeader) {
+    const appId = process.env.META_APP_ID || process.env.NEXT_PUBLIC_META_APP_ID;
+    if (!appId) throw new ApiError("Media headers require META_APP_ID to be configured on the server.", 500);
+    const headerHandle = await uploadMediaForHeaderHandle(mediaUrl as string, systemToken, appId);
+    components.push({ type: "HEADER", format: mediaType.toUpperCase(), example: { header_handle: [headerHandle] } });
+  }
+  components.push(bodyComponent);
+  if (buttons.length > 0) {
+    components.push({
+      type: "BUTTONS",
+      buttons: buttons.map((text: string) => ({ type: "QUICK_REPLY", text })),
+    });
+  }
+
+  let metaId: string | null = null;
+  let metaStatus = "pending";
+  try {
+    const url = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${wabaId}/message_templates`;
+    const metaRes = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${systemToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: formattedName, category: category.toUpperCase(), language: "en_US", components }),
+    });
+    const metaData = await metaRes.json();
+    if (metaRes.ok && metaData.id) {
+      metaId = metaData.id;
+      metaStatus = metaData.status?.toLowerCase() || "pending";
+    } else {
+      throw new ApiError(`Meta rejected template: ${metaData.error?.message || "Unknown error"}`, 400);
+    }
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError("Failed to communicate with Meta API", 502);
+  }
+
+  const template = await repo.createTemplate({
+    name: formattedName,
+    body,
+    category,
+    buttons,
+    mediaType,
+    mediaUrl: hasMediaHeader ? String(mediaUrl).trim() : null,
+    metaStatus,
+    metaId,
+    organizationId,
+  });
+
+  await repo.createLog({
+    timestamp: hhmm(),
+    type: "crm",
+    message: `Template submitted for approval: "${formattedName}" (${category}) - Status: ${metaStatus}`,
+    organizationId,
+  });
+
+  return template;
+}

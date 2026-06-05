@@ -1,5 +1,11 @@
 # WappFlow (AiSennsy Clone) Project Context
 
+> ⚖️ **MANDATORY:** All development MUST comply with [`CONSTITUTION.md`](CONSTITUTION.md).
+> Read it before writing or changing code. It defines the layering (`api/ services/ repositories/`),
+> security/multi-tenancy gates, and the verification gates (`prisma validate` · `tsc --noEmit` · `next build`)
+> that MUST pass before any change is considered done. Where this file and the constitution conflict, the
+> **constitution wins**. Architecture details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
 ## Overview
 **WappFlow** is an advanced SaaS application designed as a clone of AiSennsy. It operates as a WhatsApp Marketing, CRM, and Chatbot automation platform. Users can broadcast campaigns, build conversational chatbot flows using a visual node editor, manage CRM contacts, and process Meta-approved templates.
 

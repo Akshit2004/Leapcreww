@@ -49,6 +49,10 @@ model Organization {
   // Brand-Aware AI content generation profile ({ name, industry, toneOfVoice })
   brandProfile             Json?
 
+  // White-label / agency reseller link (T-09)
+  partnerId                String?
+  partner                  Partner?   @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+
   memberships  Membership[]
   contacts     Contact[]
   campaigns    Campaign[]
@@ -59,6 +63,18 @@ model Organization {
   messages     Message[]
   products     Product[]
   orders       Order[]
+
+  // Roadmap relations
+  ads                  Ad[]
+  adCampaigns          AdCampaign[]
+  flows                Flow[]
+  sequences            Sequence[]
+  sequenceEnrollments  SequenceEnrollment[]
+  segments             Segment[]
+  routingRules         RoutingRule[]
+  usageEvents          UsageEvent[]
+  apiKeys              ApiKey[]
+  webhookSubscriptions WebhookSubscription[]
 }
 
 enum Role {
@@ -93,11 +109,14 @@ model Contact {
   unreadCount    Int          @default(0)
   assignedAgent  String       @default("None")
   currentNodeId  String?      // Tracks position in chatbot flow tree
+  attributes     Json?        // Custom attributes (key/value) for segmentation (T-04)
+  lastActiveAt   DateTime?    // Last inbound activity, drives "active within N days" segments (T-04)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   messages       Message[]
   cart           Cart?
   orders         Order[]
+  enrollments    SequenceEnrollment[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 }
@@ -137,6 +156,9 @@ model Campaign {
   mediaUrl       String?
   variables      Json?
   delay          Int?         @default(1)
+  segmentId      String?      // Target a saved segment instead of a single tag (T-04)
+  timezone       String?      // IANA tz for timezone-aware scheduling (T-11)
+  recurrence     String?      // null | "daily" | "weekly" | "monthly" (T-11)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
@@ -289,5 +311,177 @@ model ChatbotAnalytics {
   action         String   // "impression" | "response" | "dropoff"
   organizationId String
   createdAt      DateTime @default(now())
+}
+
+// ─── Roadmap models (see docs/PRODUCT_COMPARISON_AISENSY.md) ──────────────────
+
+// T-01 — Click-to-WhatsApp Ads
+model AdCampaign {
+  id             String       @id @default(uuid())
+  name           String
+  objective      String       @default("LEADS") // Meta campaign objective
+  budgetMinor    Int          @default(0)        // daily budget in minor units
+  status         String       @default("draft")  // "draft" | "active" | "paused" | "completed"
+  metaCampaignId String?                          // Meta Marketing API campaign id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ads            Ad[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Ad {
+  id              String       @id @default(uuid())
+  headline        String
+  primaryText     String       @db.Text
+  imageUrl        String?
+  ctwaClid        String?      // Click-to-WhatsApp click id matched from inbound referral
+  welcomeTemplate String?      // template/flow shown when the lead lands in chat
+  status          String       @default("draft") // "draft" | "active" | "paused"
+  metaAdId        String?
+  leads           Int          @default(0)
+  adCampaignId    String?
+  adCampaign      AdCampaign?  @relation(fields: [adCampaignId], references: [id], onDelete: SetNull)
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+// T-02 — WhatsApp Flows & Forms
+model Flow {
+  id             String       @id @default(uuid())
+  name           String
+  category       String       @default("LEAD_GENERATION") // Meta flow category
+  flowJson       Json                                       // Meta Flow JSON definition
+  metaFlowId     String?
+  status         String       @default("draft") // "draft" | "published"
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+// T-03 — Drip / Sequence / Journey automation
+model Sequence {
+  id             String         @id @default(uuid())
+  name           String
+  trigger        String         // "tag_added" | "form_submit" | "ad_click" | "cart_abandoned" | "signup"
+  triggerConfig  Json?          // e.g. { tag: "vip" }
+  status         String         @default("active") // "active" | "paused"
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  steps          SequenceStep[]
+  enrollments    SequenceEnrollment[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model SequenceStep {
+  id           String   @id @default(uuid())
+  sequenceId   String
+  sequence     Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  order        Int                                   // 0-based position
+  delayMinutes Int      @default(0)                  // wait before running this step
+  actionType   String   @default("send_template")   // "send_template" | "send_message" | "add_tag" | "branch"
+  templateName String?
+  message      String?  @db.Text
+  conditions   Json?                                 // optional gate, e.g. { ifNoReply: true }
+  createdAt    DateTime @default(now())
+}
+
+model SequenceEnrollment {
+  id             String       @id @default(uuid())
+  sequenceId     String
+  sequence       Sequence     @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  currentStep    Int          @default(0)
+  status         String       @default("active") // "active" | "completed" | "cancelled"
+  nextRunAt      DateTime?                        // cron wakes enrollments due now
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([nextRunAt, status])
+}
+
+// T-04 — Smart segments
+model Segment {
+  id             String       @id @default(uuid())
+  name           String
+  rules          Json         // { all: [{ field, op, value }], any: [...] }
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+// T-05 — Multi-agent routing
+model RoutingRule {
+  id             String       @id @default(uuid())
+  name           String
+  condition      Json         // { field, op, value } evaluated against inbound contact
+  assignTo       String       // membershipId / "round_robin" / team key
+  priority       Int          @default(0)
+  enabled        Boolean      @default(true)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+// T-06 — Conversation billing & cost ledger
+model UsageEvent {
+  id             String       @id @default(uuid())
+  type           String       // "message" | "template" | "conversation"
+  category       String?      // "marketing" | "utility" | "authentication" | "service"
+  units          Int          @default(1)
+  costMinor      Int          @default(0) // charged amount in minor currency units
+  campaignId     String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
+// T-08 — Public Project API + webhooks
+model ApiKey {
+  id             String       @id @default(uuid())
+  name           String
+  hashedKey      String       @unique
+  prefix         String       // non-secret display prefix, e.g. "wf_live_ab12"
+  scopes         String[]
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+model WebhookSubscription {
+  id             String       @id @default(uuid())
+  url            String       @db.Text
+  events         String[]     // "message.received" | "message.status" | "order.placed" | ...
+  secret         String       // HMAC signing secret
+  enabled        Boolean      @default(true)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+}
+
+// T-09 — White-label / partner / agency
+model Partner {
+  id            String         @id @default(uuid())
+  name          String
+  slug          String         @unique
+  logoUrl       String?
+  primaryColor  String?
+  customDomain  String?        @unique
+  pricingMarkup Float          @default(0.0) // multiplier applied over base conversation cost
+  organizations Organization[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
