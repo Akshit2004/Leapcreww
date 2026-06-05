@@ -74,6 +74,7 @@ export interface WhatsAppWebhookPayload {
           timestamp: string;
           recipient_id: string;
           conversation?: { id: string };
+          errors?: { code: number; title: string; message?: string; error_data?: any }[];
         }[];
       };
       field: "messages";

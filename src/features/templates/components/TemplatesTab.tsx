@@ -26,7 +26,7 @@ import { useParams } from "next/navigation";
 import { UploadButton } from "@/shared/lib/uploadthing";
 
 export const TemplatesTab: React.FC = () => {
-  const { templates, submitMetaTemplate, deleteTemplate, addSystemLog } = useApp();
+  const { templates, submitMetaTemplate, deleteTemplate, addSystemLog, refreshWorkspace } = useApp();
   
   const params = useParams();
   const orgId = params.orgId as string;
@@ -246,6 +246,7 @@ export const TemplatesTab: React.FC = () => {
             const data = await res.json();
             if (data.metaStatus !== "pending") {
               addSystemLog("crm", `Template "${t.name}" status updated to: ${data.metaStatus}`);
+              refreshWorkspace(orgId);
             }
           }
         } catch { }
