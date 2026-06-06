@@ -13,3 +13,7 @@ export function createFlow(data: Prisma.FlowUncheckedCreateInput) {
 export function setPublished(id: string, metaFlowId: string) {
   return prisma.flow.update({ where: { id }, data: { status: "published", metaFlowId } });
 }
+
+export function getFlowById(id: string, organizationId: string) {
+  return prisma.flow.findUnique({ where: { id, organizationId } });
+}

@@ -600,7 +600,7 @@ export const InboxTab: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Lead Metadata */}
+                 {/* Lead Metadata */}
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Lead Metadata</h4>
                   <div className="space-y-3 text-xs font-medium text-stone-600 select-text">
@@ -618,6 +618,27 @@ export const InboxTab: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Form Submissions / Custom Attributes */}
+                {activeContact.attributes && Object.keys(activeContact.attributes).length > 0 && (
+                  <div className="space-y-2.5 pt-1">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 select-none">
+                      Form Submissions
+                    </h4>
+                    <div className="bg-stone-50 border border-stone-200 p-3 space-y-2.5 rounded-xl select-text text-xs">
+                      {Object.entries(activeContact.attributes).map(([key, val]) => (
+                        <div key={key} className="flex justify-between items-start">
+                          <span className="font-bold text-stone-500 uppercase text-[9px] tracking-wider pt-0.5 truncate max-w-[120px]">
+                            {key.replace(/_/g, " ")}
+                          </span>
+                          <span className="text-stone-900 text-right font-semibold break-all pl-2">
+                            {String(val)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Agent Assignment */}
                 <div className="space-y-2 select-none">

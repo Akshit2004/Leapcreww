@@ -9,7 +9,8 @@ export interface CampaignVariable {
 export interface LaunchCampaignInput {
   name: string;
   targetTag: string;
-  templateName: string;
+  templateName?: string;
+  flowId?: string;
   organizationId: string;
   variables?: CampaignVariable[];
   delay?: number;

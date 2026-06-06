@@ -9,7 +9,10 @@ import type { SegmentRule, SegmentRules } from "../types";
 function ruleToWhere(rule: SegmentRule): Prisma.ContactWhereInput {
   switch (rule.field) {
     case "tags": {
-      const tags = Array.isArray(rule.value) ? rule.value : [String(rule.value)];
+      const tags = Array.isArray(rule.value)
+        ? rule.value
+        : String(rule.value || "").split(",").map(t => t.trim()).filter(Boolean);
+      if (tags.length === 0) return {};
       if (rule.op === "in") return { tags: { hasSome: tags } };
       if (rule.op === "neq") return { NOT: { tags: { hasSome: tags } } };
       return { tags: { hasEvery: tags } }; // eq / contains => must have all

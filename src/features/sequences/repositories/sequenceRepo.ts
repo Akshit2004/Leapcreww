@@ -5,7 +5,7 @@ import type { Prisma } from "@prisma/client";
 export function listSequences(organizationId: string) {
   return prisma.sequence.findMany({
     where: { organizationId },
-    include: { steps: { orderBy: { order: "asc" } } },
+    include: { steps: { orderBy: { order: "asc" } }, segment: true },
     orderBy: { createdAt: "desc" },
   });
 }

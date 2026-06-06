@@ -51,38 +51,85 @@ export function buildTemplatePayload(
 }
 
 /**
- * Send a template campaign to a list of contacts, updating delivered metrics,
+ * Send a campaign (template or flow) to a list of contacts, updating delivered metrics,
  * system logs and CRM message bubbles as it goes. Returns delivered count.
  */
 export async function runBroadcast(campaign: Campaign, contacts: Contact[]): Promise<number> {
-  const { id: campaignId, name, templateName, mediaType, mediaUrl, organizationId } = campaign;
-  const variables = (campaign.variables as unknown as CampaignVariable[]) || [];
+  const { id: campaignId, name, templateName, mediaType, mediaUrl, organizationId, flowId } = campaign;
   const delaySeconds = campaign.delay ?? 1;
 
   await repo.updateCampaign(campaignId, { sent: contacts.length });
 
+  // If this is a Flow broadcast, fetch flow configuration
+  let flow: any = null;
+  let screenId = "WELCOME_SCREEN";
+  if (flowId) {
+    const { prisma } = await import("@/shared/lib/prisma");
+    flow = await prisma.flow.findUnique({ where: { id: flowId } });
+    if (!flow || !flow.metaFlowId) {
+      await repo.updateCampaign(campaignId, { status: "Failed" });
+      await repo.logCampaignEvent(
+        organizationId,
+        campaignId,
+        `Failed to run flow broadcast: Flow or Meta Flow ID not found for Flow ID ${flowId}.`,
+        hhmm()
+      );
+      return 0;
+    }
+    const flowJson = flow.flowJson as any;
+    screenId = flowJson?.screens?.[0]?.id || "WELCOME_SCREEN";
+  }
+
   let delivered = 0;
   for (const contact of contacts) {
     const phone = formatPhoneNumber(contact.phone);
-    const { payload, parameters } = buildTemplatePayload(
-      templateName,
-      variables,
-      contact,
-      mediaType,
-      mediaUrl
-    );
+    let result;
+    let preview = "";
 
-    const result = await sendWhatsAppMessage(
-      {
-        to: phone,
-        template: payload as unknown as {
-          name: string;
-          language: { code: string };
-          components?: Record<string, unknown>[];
+    if (flowId && flow) {
+      // Send interactive Flow message
+      const flowVars = (campaign.variables as any) || {};
+      result = await sendWhatsAppMessage(
+        {
+          to: phone,
+          flow: {
+            flowId: flow.metaFlowId,
+            flowToken: `campaign-token-${campaignId}-${contact.id}`,
+            flowCta: flowVars.ctaText || "Open Form",
+            screen: screenId,
+            title: flowVars.title || `Flow: ${flow.name}`,
+            footer: flowVars.footer || "Sent via Campaign",
+          }
         },
-      },
-      organizationId
-    );
+        organizationId
+      );
+      preview = `[Flow: ${flow.name}] | CTA: ${flowVars.ctaText || "Open Form"}`;
+    } else {
+      // Send template message (original path)
+      const variables = (campaign.variables as unknown as CampaignVariable[]) || [];
+      const { payload, parameters } = buildTemplatePayload(
+        templateName || "",
+        variables,
+        contact,
+        mediaType,
+        mediaUrl
+      );
+      result = await sendWhatsAppMessage(
+        {
+          to: phone,
+          template: payload as unknown as {
+            name: string;
+            language: { code: string };
+            components?: Record<string, unknown>[];
+          },
+        },
+        organizationId
+      );
+      preview =
+        parameters.length > 0
+          ? `[Template: ${templateName}] | Params: ${parameters.map((p) => p.text).join(", ")}`
+          : `[Template Message: ${templateName}]`;
+    }
 
     const ts = hhmm();
     if (!result.ok) {
@@ -100,10 +147,6 @@ export async function runBroadcast(campaign: Campaign, contacts: Contact[]): Pro
         `Broadcast successfully sent to ${contact.name} (${phone})`,
         ts
       );
-      const preview =
-        parameters.length > 0
-          ? `[Template: ${templateName}] | Params: ${parameters.map((p) => p.text).join(", ")}`
-          : `[Template Message: ${templateName}]`;
       await repo.recordOutboundMessage({
         organizationId,
         campaignId,
@@ -133,14 +176,20 @@ export async function runBroadcast(campaign: Campaign, contacts: Contact[]): Pro
  * pick up. Otherwise fires the broadcast in the background and returns the record.
  */
 export async function launchCampaign(input: LaunchCampaignInput): Promise<Campaign> {
-  const contacts = await repo.findTargetContacts(input.organizationId, input.targetTag, input.excludeTag);
+  const contacts = await repo.findTargetContacts(
+    input.organizationId,
+    input.targetTag,
+    input.excludeTag,
+    input.segmentId
+  );
   const isScheduled = !!input.scheduledAt;
 
   const campaign = await repo.createCampaign({
     name: input.name,
     targetTag: input.targetTag,
     excludeTag: input.excludeTag,
-    templateName: input.templateName,
+    templateName: input.templateName || null,
+    flowId: input.flowId || null,
     mediaType: input.mediaType,
     mediaUrl: input.mediaUrl,
     variables: (input.variables as unknown as object) || [],
@@ -187,7 +236,8 @@ export async function processScheduledCampaigns() {
       const contacts = await repo.findTargetContacts(
         campaign.organizationId,
         campaign.targetTag,
-        campaign.excludeTag ?? undefined
+        campaign.excludeTag ?? undefined,
+        campaign.segmentId
       );
       const delivered = await runBroadcast(campaign, contacts);
       results.push({ campaignId: campaign.id, name: campaign.name, recipients: contacts.length, delivered, status: "Completed" });

@@ -10,6 +10,7 @@ import { InboxTab } from "@/features/inbox/components/InboxTab";
 import { CustomersTab } from "../customers/components/CustomersTab";
 import { CampaignsTab } from "@/features/campaigns/components/CampaignsTab";
 import { TemplatesTab } from "@/features/templates/components/TemplatesTab";
+import { FlowsTab } from "@/features/flows/components/FlowsTab";
 import { ChatbotTab } from "@/features/chatbot/components/ChatbotTab";
 import { MarketplaceTab } from "@/features/marketplace/components/MarketplaceTab";
 import { SettingsTab } from "@/features/settings/components/SettingsTab";
@@ -90,6 +91,8 @@ export default function TenantDashboard() {
         return <CampaignsTab />;
       case "templates":
         return <TemplatesTab />;
+      case "flows":
+        return <FlowsTab />;
       case "chatbot":
         return <ChatbotTab />;
       case "marketplace":

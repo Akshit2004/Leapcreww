@@ -49,7 +49,6 @@ export const AdsTab: React.FC = () => {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [metaWarning, setMetaWarning] = useState("");
 
   // Wizard State variables
   const [campaignName, setCampaignName] = useState("");
@@ -134,7 +133,6 @@ export const AdsTab: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setError("");
-    setMetaWarning("");
 
     try {
       const res = await fetch(`/api/org/${orgId}/ads/campaigns`, {
@@ -153,10 +151,6 @@ export const AdsTab: React.FC = () => {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to publish campaign");
-
-      if (data.metaError) {
-        setMetaWarning(`Live Facebook publishing failed. Campaign saved locally in Sandbox Mode. Error: ${data.metaError}`);
-      }
 
       await fetchCampaigns();
       
@@ -240,15 +234,6 @@ export const AdsTab: React.FC = () => {
       </div>
 
       {/* Warning Alert Banner (if any) */}
-      {metaWarning && (
-        <div className="p-4 bg-orange-50 text-orange-700 rounded-xl text-xs border border-orange-100 font-medium animate-slide-up flex items-start gap-2">
-          <span className="font-extrabold uppercase shrink-0 bg-orange-100 px-1.5 py-0.5 rounded text-[9px] mt-0.5">Sandbox Mode</span>
-          <span>{metaWarning}</span>
-          <button onClick={() => setMetaWarning("")} className="ml-auto text-orange-400 hover:text-orange-950">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       {/* Campaigns Listing */}
       {isLoadingList ? (
@@ -279,7 +264,6 @@ export const AdsTab: React.FC = () => {
           {campaigns.map((camp) => {
             const metrics = getMockMetrics(camp.id, camp.status);
             const activeAd = camp.ads[0];
-            const hasMockIcon = camp.id.startsWith("camp_");
 
             return (
               <div key={camp.id} className="p-6 rounded-none flex flex-col justify-between space-y-6 bg-white border border-stone-200 relative overflow-hidden shadow-sm">
@@ -289,9 +273,6 @@ export const AdsTab: React.FC = () => {
                   <div className="space-y-1 flex-1">
                     <div className="flex items-center gap-2">
                       <h4 className="font-bold text-sm text-stone-900 leading-none">{camp.name}</h4>
-                      {hasMockIcon && (
-                        <span className="text-[8px] bg-stone-100 text-stone-500 font-black uppercase px-1 py-0.5 border border-stone-200">Sandbox</span>
-                      )}
                     </div>
                     <span className="text-[10px] text-stone-500 block mt-1">Linked template: {activeAd?.linkedTemplate || "None (Inbound Text)"}</span>
                   </div>

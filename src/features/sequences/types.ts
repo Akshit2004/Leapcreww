@@ -24,4 +24,5 @@ export interface SequenceInput {
   triggerConfig?: Record<string, unknown>;
   organizationId: string;
   steps: SequenceStepInput[];
+  segmentId?: string;
 }

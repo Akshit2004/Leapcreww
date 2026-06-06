@@ -5,7 +5,23 @@
 import { prisma } from "@/shared/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
-export function findTargetContacts(organizationId: string, targetTag: string, excludeTag?: string) {
+export async function findTargetContacts(
+  organizationId: string,
+  targetTag: string,
+  excludeTag?: string,
+  segmentId?: string | null
+) {
+  if (segmentId) {
+    const segment = await prisma.segment.findUnique({
+      where: { id: segmentId },
+    });
+    if (segment) {
+      const { buildSegmentWhere } = await import("@/features/segments/services/segmentRules");
+      const where = buildSegmentWhere(organizationId, segment.rules as any);
+      return prisma.contact.findMany({ where });
+    }
+  }
+
   const where: Prisma.ContactWhereInput =
     targetTag === "all" ? { organizationId } : { organizationId, tags: { has: targetTag } };
   return prisma.contact.findMany({ where }).then((contacts) =>

@@ -1,6 +1,6 @@
 import { route, ok, requireOrg, requireFields, body } from "@/shared/lib/api";
-import { listSegments, createSegment, previewCount } from "../../services/segmentService";
-import type { SegmentInput } from "../../types";
+import { listSegments, createSegment, previewCount } from "@/features/segments/services/segmentService";
+import type { SegmentInput } from "@/features/segments/types";
 
 export const GET = route(async (_req, { params }) => {
   const orgId = params?.orgId as string;

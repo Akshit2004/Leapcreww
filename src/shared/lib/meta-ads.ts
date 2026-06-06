@@ -60,7 +60,7 @@ async function callMetaApi(path: string, method: string, payload: any, token: st
 
 /**
  * Publishes a Click-to-WhatsApp Campaign, Ad Set, Creative, and Ad to Meta.
- * Falls back to Sandbox Simulation Mode if the token or permissions are missing/invalid.
+ * Requires valid Meta token and permissions.
  */
 export async function publishMetaAdCampaign(orgId: string, details: {
   name: string;
@@ -77,20 +77,14 @@ export async function publishMetaAdCampaign(orgId: string, details: {
   linkedTemplate?: string;
 }) {
   const config = await getMetaAdsConfig(orgId);
-  const useRealApi = config && details.adAccountId && !details.adAccountId.startsWith("mock");
-
-  if (!useRealApi) {
-    console.log("[Meta Ads] Running in Sandbox Simulation Mode for org", orgId);
-    const mockCampaignId = `camp_${Math.random().toString(36).substring(2, 9)}`;
-    const mockAdId = `ad_${Math.random().toString(36).substring(2, 9)}`;
-    return {
-      campaignId: mockCampaignId,
-      adId: mockAdId,
-      simulated: true,
-    };
+  if (!config) {
+    throw new Error("Meta Ads configuration is missing or incomplete for this organization.");
+  }
+  if (!details.adAccountId || details.adAccountId.startsWith("mock")) {
+    throw new Error("A valid Live Meta Ad Account ID is required.");
   }
 
-  const token = config!.accessToken;
+  const token = config.accessToken;
   const cleanAdAccountId = details.adAccountId.replace("act_", "");
 
   try {
@@ -163,14 +157,7 @@ export async function publishMetaAdCampaign(orgId: string, details: {
       simulated: false,
     };
   } catch (err: any) {
-    console.warn("[Meta Ads] Live publishing failed, falling back to Sandbox Simulation. Error:", err.message);
-    const mockCampaignId = `camp_${Math.random().toString(36).substring(2, 9)}`;
-    const mockAdId = `ad_${Math.random().toString(36).substring(2, 9)}`;
-    return {
-      campaignId: mockCampaignId,
-      adId: mockAdId,
-      simulated: true,
-      error: err.message,
-    };
+    console.error("[Meta Ads] Live publishing failed. Error:", err.message);
+    throw new Error(`Live Meta API publishing failed: ${err.message}`);
   }
 }

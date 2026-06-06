@@ -117,7 +117,7 @@ export async function POST(
 
     return NextResponse.json({
       campaign: newCampaign,
-      metaError: publishRes.error || null,
+      metaError: (publishRes as any).error || null,
       simulated: publishRes.simulated,
     });
   } catch (err: any) {

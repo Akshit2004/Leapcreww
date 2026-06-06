@@ -268,7 +268,7 @@ D-01 (AI strategist + inbox assist) → D-03 (commerce automations) → D-04 (re
 ## 7. Schema changes summary (single migration view)
 
 New models to add: `Ad`, `AdCampaign`, `Flow`, `Sequence`, `SequenceStep`, `SequenceEnrollment`, `Segment`, `RoutingRule`, `UsageEvent`, `ApiKey`, `WebhookSubscription`, `Partner`.
-Field additions: `Contact.attributes Json?`, `Contact.lastActiveAt DateTime?`, `Campaign.segmentId`, `Campaign.timezone`, `Campaign.recurrence`, `Organization.partnerId?`.
+Field additions: `Contact.attributes Json?`, `Contact.lastActiveAt DateTime?`, `Campaign.segmentId`, `Campaign.timezone`, `Campaign.recurrence`, `Organization.partnerId?`, `Template.flowId?`, `ChatbotNode.flowId?`.
 
 ---
 

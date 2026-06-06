@@ -27,6 +27,7 @@ export const useCampaignState = ({
     excludeTag?: string;
     mediaType?: string;
     mediaUrl?: string;
+    segmentId?: string;
   }) => {
     try {
       const isScheduled = !!campaignData.scheduledAt;

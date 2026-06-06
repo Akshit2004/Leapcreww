@@ -23,6 +23,7 @@ export function createSequence(input: SequenceInput) {
       trigger: input.trigger,
       triggerConfig: (input.triggerConfig as object) ?? undefined,
       organizationId: input.organizationId,
+      segmentId: input.segmentId || null,
     },
     input.steps.map((s) => ({
       order: s.order,
@@ -47,6 +48,27 @@ export async function enrollOnTrigger(
   const sequences = await repo.findActiveSequencesByTrigger(organizationId, trigger);
   for (const seq of sequences) {
     if (!seq.steps.length) continue;
+
+    // Check segment restrictions if defined
+    if (seq.segmentId) {
+      const { prisma } = await import("@/shared/lib/prisma");
+      const segment = await prisma.segment.findUnique({
+        where: { id: seq.segmentId },
+      });
+      if (!segment) continue;
+
+      const { buildSegmentWhere } = await import("@/features/segments/services/segmentRules");
+      const where = buildSegmentWhere(organizationId, segment.rules as any);
+
+      const match = await prisma.contact.findFirst({
+        where: {
+          id: contactId,
+          ...where,
+        },
+      });
+      if (!match) continue;
+    }
+
     const existing = await repo.findExistingEnrollment(seq.id, contactId);
     if (existing) continue;
     await repo.createEnrollment({

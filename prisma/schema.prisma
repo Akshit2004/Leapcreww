@@ -67,6 +67,7 @@ model Organization {
   ads                  Ad[]
   adCampaigns          AdCampaign[]
   flows                Flow[]
+  flowResponses        FlowResponse[]
   sequences            Sequence[]
   sequenceEnrollments  SequenceEnrollment[]
   segments             Segment[]
@@ -74,6 +75,10 @@ model Organization {
   usageEvents          UsageEvent[]
   apiKeys              ApiKey[]
   webhookSubscriptions WebhookSubscription[]
+
+  // Flow Encryption automation state
+  flowsPrivateKey      String?    @db.Text
+  flowsPublicKeyUploaded Boolean  @default(false)
 }
 
 enum Role {
@@ -116,6 +121,7 @@ model Contact {
   cart           Cart?
   orders         Order[]
   enrollments    SequenceEnrollment[]
+  flowResponses  FlowResponse[]
   sourceAdId     String?      // Tracks the Meta Ad ID that originated this contact
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -141,7 +147,9 @@ model Campaign {
   id             String       @id @default(uuid())
   name           String
   targetTag      String
-  templateName   String
+  templateName   String?
+  flowId         String?
+  flow           Flow?        @relation(fields: [flowId], references: [id], onDelete: SetNull)
   sent           Int          @default(0)
   delivered      Int          @default(0)
   read           Int          @default(0)
@@ -157,6 +165,7 @@ model Campaign {
   variables      Json?
   delay          Int?         @default(1)
   segmentId      String?      // Target a saved segment instead of a single tag (T-04)
+  segment        Segment?     @relation(fields: [segmentId], references: [id], onDelete: SetNull)
   timezone       String?      // IANA tz for timezone-aware scheduling (T-11)
   recurrence     String?      // null | "daily" | "weekly" | "monthly" (T-11)
   organizationId String
@@ -175,6 +184,8 @@ model Template {
   metaStatus     String       @default("pending") // "pending" | "approved" | "rejected"
   metaId         String?      // Meta template ID for status polling
   isShared       Boolean      @default(false) // visible to all orgs
+  flowId         String?
+  flow           Flow?        @relation(fields: [flowId], references: [id], onDelete: SetNull)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
@@ -189,6 +200,8 @@ model ChatbotNode {
   delayTime      Int?
   nextId         String?
   routes         Json?        // Stores options routing dynamically
+  flowId         String?
+  flow           Flow?        @relation(fields: [flowId], references: [id], onDelete: SetNull)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
@@ -364,8 +377,24 @@ model Flow {
   status         String       @default("draft") // "draft" | "published"
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  templates      Template[]
+  chatbotNodes   ChatbotNode[]
+  campaigns      Campaign[]
+  responses      FlowResponse[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+}
+
+model FlowResponse {
+  id             String       @id @default(uuid())
+  flowId         String
+  flow           Flow         @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  submittedData  Json
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
 }
 
 // T-03 — Drip / Sequence / Journey automation
@@ -379,6 +408,8 @@ model Sequence {
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   steps          SequenceStep[]
   enrollments    SequenceEnrollment[]
+  segmentId      String?
+  segment        Segment?       @relation(fields: [segmentId], references: [id], onDelete: SetNull)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 }
@@ -420,6 +451,8 @@ model Segment {
   rules          Json         // { all: [{ field, op, value }], any: [...] }
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sequences      Sequence[]
+  campaigns      Campaign[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 }

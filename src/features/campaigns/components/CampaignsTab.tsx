@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Send, 
   Megaphone, 
@@ -24,6 +24,78 @@ import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
 import { CampaignReportDrawer } from "./CampaignReportDrawer";
 import { UploadButton } from "@/shared/lib/uploadthing";
+
+// Client-side rule matching helpers for dynamic segment campaign previews (T-04)
+interface SegmentRule {
+  field: "tags" | "status" | "source" | "attribute" | "lastActive";
+  op: "eq" | "neq" | "contains" | "in" | "active_within_days";
+  value: any;
+  key?: string;
+}
+
+interface SegmentRules {
+  all?: SegmentRule[];
+  any?: SegmentRule[];
+}
+
+function evaluateRule(contact: any, rule: SegmentRule): boolean {
+  switch (rule.field) {
+    case "tags": {
+      const tags = Array.isArray(rule.value)
+        ? rule.value
+        : String(rule.value || "").split(",").map((t) => t.trim()).filter(Boolean);
+      if (tags.length === 0) return true;
+      const hasSome = tags.some((t) => contact.tags?.includes(t));
+      if (rule.op === "in") return hasSome;
+      if (rule.op === "neq") return !hasSome;
+      const hasEvery = tags.every((t) => contact.tags?.includes(t));
+      return hasEvery;
+    }
+    case "status": {
+      const matchesStatus = contact.status === rule.value;
+      return rule.op === "neq" ? !matchesStatus : matchesStatus;
+    }
+    case "source": {
+      const contactSource = contact.source || "";
+      if (rule.op === "contains") {
+        return contactSource.toLowerCase().includes(String(rule.value).toLowerCase());
+      }
+      return contactSource.toLowerCase() === String(rule.value).toLowerCase();
+    }
+    case "attribute": {
+      if (!rule.key) return false;
+      const val = contact.attributes?.[rule.key];
+      if (val === undefined || val === null) return false;
+      return String(val).toLowerCase() === String(rule.value).toLowerCase();
+    }
+    case "lastActive": {
+      if (rule.op === "active_within_days" && contact.lastActiveAt) {
+        const since = Date.now() - Number(rule.value) * 24 * 60 * 60 * 1000;
+        const lastActiveTime = new Date(contact.lastActiveAt).getTime();
+        return lastActiveTime >= since;
+      }
+      return false;
+    }
+    default:
+      return false;
+  }
+}
+
+function evaluateSegmentRules(contact: any, rules: SegmentRules): boolean {
+  if (!rules) return true;
+  
+  if (rules.all && rules.all.length > 0) {
+    const allMatch = rules.all.every((rule) => evaluateRule(contact, rule));
+    if (!allMatch) return false;
+  }
+  
+  if (rules.any && rules.any.length > 0) {
+    const anyMatch = rules.any.some((rule) => evaluateRule(contact, rule));
+    if (!anyMatch) return false;
+  }
+  
+  return true;
+}
 
 export const CampaignsTab: React.FC = () => {
   const { campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign, addSystemLog, refreshWorkspace } = useApp();
@@ -65,13 +137,17 @@ export const CampaignsTab: React.FC = () => {
 
   // Campaign Form States
   const [campaignName, setCampaignName] = useState("");
-  const [targetTag, setTargetTag] = useState("Shopify");
   const [excludeTag, setExcludeTag] = useState("None");
   const [templateName, setTemplateName] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
   const [broadcastMode, setBroadcastMode] = useState<"template" | "session">("template");
   const [sessionText, setSessionText] = useState("");
   
+  // Dynamic segments targeting states
+  const [segments, setSegments] = useState<any[]>([]);
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string>("");
+  const [loadingSegments, setLoadingSegments] = useState(false);
+
   // Advanced Delivery States
   const [runMode, setRunMode] = useState<"immediate" | "scheduled">("immediate");
   const [scheduledDate, setScheduledDate] = useState("");
@@ -81,6 +157,33 @@ export const CampaignsTab: React.FC = () => {
   // Dynamic Variable Mappings
   // Store variable name (e.g. "{{1}}") mapped to its type and chosen value
   const [variablesMapping, setVariablesMapping] = useState<Record<string, { type: "contact_field" | "static"; value: string }>>({});
+
+  // Load Saved Segments
+  useEffect(() => {
+    if (!orgId) return;
+    const fetchSegments = async () => {
+      setLoadingSegments(true);
+      try {
+        const res = await fetch(`/api/org/${orgId}/segments`);
+        if (res.ok) {
+          const data = await res.json();
+          setSegments(data.segments || []);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingSegments(false);
+      }
+    };
+    fetchSegments();
+  }, [orgId]);
+
+  // Initialize selectedSegmentId once segments load
+  useEffect(() => {
+    if (!selectedSegmentId && segments.length > 0) {
+      setSelectedSegmentId("all_contacts");
+    }
+  }, [segments, selectedSegmentId]);
 
   // Auto-initialize template choice and variables
   useEffect(() => {
@@ -117,22 +220,38 @@ export const CampaignsTab: React.FC = () => {
     };
   }, [templateName, templates]);
 
-  // Calculate target audience size in real-time
-  const targetAudienceSize = contacts.filter((c) => {
-    const hasTarget = targetTag === "all" || c.tags.includes(targetTag);
-    const isExcluded = excludeTag !== "None" && c.tags.includes(excludeTag);
-    return hasTarget && !isExcluded;
-  }).length;
+  // Calculate target audience size in real-time using segment rules evaluation
+  const targetAudienceSize = useMemo(() => {
+    const isExcluded = excludeTag !== "None";
+    if (!selectedSegmentId || selectedSegmentId === "all_contacts") {
+      return contacts.filter((c) => {
+        const matchesExclusion = isExcluded && c.tags.includes(excludeTag);
+        return !matchesExclusion;
+      }).length;
+    }
+    
+    const activeSeg = segments.find((s) => s.id === selectedSegmentId);
+    if (!activeSeg) return 0;
+
+    return contacts.filter((c) => {
+      const matchesSeg = evaluateSegmentRules(c, activeSeg.rules as SegmentRules);
+      const matchesExclusion = isExcluded && c.tags.includes(excludeTag);
+      return matchesSeg && !matchesExclusion;
+    }).length;
+  }, [contacts, selectedSegmentId, segments, excludeTag]);
 
   const handleLaunchCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!campaignName.trim() || !targetTag || !orgId) return;
+    if (!campaignName.trim() || !orgId) return;
     if (broadcastMode === "template" && !templateName) return;
     if (broadcastMode === "session" && !sessionText.trim()) return;
 
     const scheduledAtStr = runMode === "scheduled" && scheduledDate && scheduledTime
       ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
       : undefined;
+
+    const targetTagValue = selectedSegmentId === "all_contacts" ? "all" : "";
+    const segmentIdValue = selectedSegmentId === "all_contacts" ? undefined : selectedSegmentId;
 
     if (broadcastMode === "session") {
       try {
@@ -142,7 +261,8 @@ export const CampaignsTab: React.FC = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: campaignName.trim(),
-            targetTag,
+            targetTag: targetTagValue,
+            segmentId: segmentIdValue,
             text: sessionText.trim(),
             organizationId: orgId,
             delay: sendDelay,
@@ -168,7 +288,8 @@ export const CampaignsTab: React.FC = () => {
 
       sendBroadcast({
         name: campaignName.trim(),
-        targetTag,
+        targetTag: targetTagValue,
+        segmentId: segmentIdValue,
         templateName,
         organizationId: orgId,
         variables: variablesPayload,
@@ -187,6 +308,7 @@ export const CampaignsTab: React.FC = () => {
     setSendDelay(1);
     setSessionText("");
     setMediaUrl("");
+    setSelectedSegmentId("all_contacts");
     setIsModalOpen(false);
   };
 
@@ -351,7 +473,12 @@ export const CampaignsTab: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4 bg-stone-50 p-3 rounded-none border border-stone-200 text-[11px] text-stone-500 font-medium">
                     <div className="flex items-center gap-1.5">
                       <Users className="w-3.5 h-3.5 text-stone-400" />
-                      <span>Target Tag: <strong className="text-stone-800">{camp.targetTag}</strong></span>
+                      <span>
+                        {camp.segment ? "Target Segment: " : "Target Tag: "}
+                        <strong className="text-stone-800">
+                          {camp.segment ? (camp.segment as any).name : camp.targetTag}
+                        </strong>
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5 justify-end">
                       <TrendingUp className="w-3.5 h-3.5 text-stone-400" />
@@ -480,19 +607,19 @@ export const CampaignsTab: React.FC = () => {
                   <span className="text-[10px] text-stone-500 font-normal normal-case">Match: {targetAudienceSize} leads</span>
                 </label>
                 <select
-                  value={targetTag}
-                  onChange={(e) => setTargetTag(e.target.value)}
+                  value={selectedSegmentId}
+                  onChange={(e) => setSelectedSegmentId(e.target.value)}
                   className="w-full bg-white text-stone-900 border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
                 >
-                  <option value="all">All Contacts</option>
-                  {allUniqueTags.map((tag) => (
-                    <option key={tag} value={tag}>{tag}</option>
+                  <option value="all_contacts">All Contacts</option>
+                  {segments.map((seg) => (
+                    <option key={seg.id} value={seg.id}>{seg.name}</option>
                   ))}
                 </select>
                 {targetAudienceSize === 0 && (
                   <div className="text-[10px] text-stone-900 font-semibold flex items-center gap-1.5 mt-1 bg-stone-50 px-2.5 py-1.5 rounded-none border border-stone-300">
                     <AlertCircle className="w-3.5 h-3.5 text-stone-900" />
-                    No active CRM contacts match this segment tag. Fired broadcasts will sent to 0 users.
+                    No active CRM contacts match this segment. Fired broadcasts will be sent to 0 users.
                   </div>
                 )}
               </div>

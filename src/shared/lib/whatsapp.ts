@@ -34,6 +34,15 @@ export interface WhatsAppMessage {
     catalogId: string;
     productRetailerId: string;
   };
+  flow?: {
+    flowId: string;
+    flowToken: string;
+    flowCta: string;
+    screen: string;
+    data?: Record<string, unknown>;
+    title?: string;
+    footer?: string;
+  };
 }
 
 export interface WhatsAppWebhookPayload {
@@ -54,8 +63,10 @@ export interface WhatsAppWebhookPayload {
           image?: { id: string; mime_type: string };
           button?: { payload: string; text: string };
           interactive?: {
+            type?: string;
             button_reply?: { id: string; title: string };
             list_reply?: { id: string; title: string; description?: string };
+            nfm_reply?: { response_json: string; body: string; name: string };
           };
           referral?: {
             source_url: string;
@@ -233,6 +244,30 @@ export async function sendWhatsAppMessage(
         catalog_id: message.product.catalogId,
         product_retailer_id: message.product.productRetailerId,
       },
+    };
+  } else if (message.flow) {
+    // Native WhatsApp Flow
+    body.type = "interactive";
+    body.interactive = {
+      type: "flow",
+      body: { text: message.flow.title || message.text || "Please fill out this form" },
+      footer: message.flow.footer ? { text: message.flow.footer } : undefined,
+      action: {
+        name: "flow",
+        parameters: {
+          flow_message_version: "3",
+          flow_token: message.flow.flowToken,
+          flow_id: message.flow.flowId,
+          flow_cta: message.flow.flowCta,
+          flow_action: "navigate",
+          flow_action_payload: {
+            screen: message.flow.screen,
+            ...(message.flow.data && Object.keys(message.flow.data).length > 0
+              ? { data: message.flow.data }
+              : {})
+          }
+        }
+      }
     };
   } else {
     // Plain text message

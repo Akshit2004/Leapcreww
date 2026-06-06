@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
         if (value.messages) {
           for (const msg of value.messages) {
             const waFrom = msg.from;
-            const text = msg.text?.body || msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || msg.button?.text || (msg.order ? "WhatsApp Native Order" : "");
+            const text = msg.text?.body || msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || msg.button?.text || (msg.order ? "WhatsApp Native Order" : (msg.interactive?.type === "nfm_reply" ? "WhatsApp Flow Response" : ""));
             const profileName = value.contacts?.[0]?.profile?.name || `Customer ${waFrom.slice(-4)}`;
 
             console.log(`WhatsApp message from ${waFrom} (${profileName}): ${text}`);
@@ -164,11 +164,11 @@ export async function POST(req: NextRequest) {
               }
 
               // Process with fallback org
-              await processInboundMessage(orgFallback.id, waFrom, text, profileName, msg.id, msg.order, msg.referral);
+              await processInboundMessage(orgFallback.id, waFrom, text, profileName, msg.id, msg.order, msg.referral, msg.interactive);
               continue;
             }
 
-            await processInboundMessage(org.id, waFrom, text, profileName, msg.id, msg.order, msg.referral);
+            await processInboundMessage(org.id, waFrom, text, profileName, msg.id, msg.order, msg.referral, msg.interactive);
           }
         }
       }
@@ -188,7 +188,8 @@ async function processInboundMessage(
   profileName: string,
   waMessageId?: string,
   orderData?: { catalog_id: string; product_items: { product_retailer_id: string; quantity: string; item_price: string; currency: string }[]; text?: string },
-  referralData?: { source_id: string; source_url: string; headline: string; body: string }
+  referralData?: { source_id: string; source_url: string; headline: string; body: string },
+  interactiveData?: { type?: string; nfm_reply?: { response_json: string; body: string; name: string } }
 ) {
   const normalizedPhone = `+${waFrom.replace(/[^0-9]/g, "")}`;
 
@@ -208,6 +209,7 @@ async function processInboundMessage(
       lastMessage: text,
       lastMessageTime: timeStr,
       unreadCount: { increment: 1 },
+      lastActiveAt: new Date(),
     };
     if (referralData?.source_id) {
       updateData.sourceAdId = referralData.source_id;
@@ -232,6 +234,7 @@ async function processInboundMessage(
         assignedAgent: "Bot",
         organizationId: orgId,
         sourceAdId: referralData?.source_id || null,
+        lastActiveAt: new Date(),
       },
     });
   }
@@ -255,6 +258,15 @@ async function processInboundMessage(
       organizationId: orgId,
     },
   });
+
+  // Handle Native Flow Reply
+  if (interactiveData?.type === "nfm_reply" && interactiveData.nfm_reply) {
+    const { handleNfmReply } = await import("../../services/webhookService");
+    await handleNfmReply(contact.id, orgId, {
+      responseJson: interactiveData.nfm_reply.response_json,
+      flowName: interactiveData.nfm_reply.name,
+    });
+  }
 
   // Handle Native WhatsApp Order
   if (orderData) {

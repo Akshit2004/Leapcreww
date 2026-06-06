@@ -26,6 +26,8 @@ export interface Contact {
   lastMessageTime?: string;
   unreadCount?: number;
   assignedAgent?: string;
+  attributes?: Record<string, any> | null;
+  lastActiveAt?: string | null;
 }
 
 export interface Message {
@@ -60,6 +62,8 @@ export interface Campaign {
   delay?: number;
   organizationId?: string;
   createdAt?: string;
+  segmentId?: string | null;
+  segment?: { id: string; name: string; rules: any } | null;
 }
 
 export interface Template {
@@ -139,6 +143,7 @@ export interface AppContextType {
     excludeTag?: string;
     mediaType?: string;
     mediaUrl?: string;
+    segmentId?: string;
   }) => Promise<void>;
   sendLiveChatMessage: (contactId: string, text: string, sender?: "user" | "agent" | "system", buttons?: string[]) => void;
   updateChatbotNodes: (nodes: ChatbotNode[], organizationId: string) => Promise<void>;

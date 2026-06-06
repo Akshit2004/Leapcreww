@@ -23,4 +23,6 @@ export const CONTACT_EDITABLE_FIELDS = [
   "tags",
   "assignedAgent",
   "unreadCount",
+  "attributes",
+  "lastActiveAt",
 ] as const;
