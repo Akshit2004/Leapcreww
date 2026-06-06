@@ -20,6 +20,11 @@ export async function syncProductToMetaCatalog(productId: string) {
   const retailerId = product.sku || product.id;
   const url = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${catalogId}/products`;
 
+  // Safe fallback image if the product doesn't have a valid image URL (Unsplash shopping mockup)
+  const imageUrl = (product.images && product.images.length > 0 && product.images[0])
+    ? product.images[0]
+    : "https://images.unsplash.com/photo-1560343090-f0409e92791a";
+
   // WhatsApp/Meta Commerce products usually require: retailer_id, name, description, price, currency, url, image_url, brand
   const formData = new URLSearchParams();
   formData.append("retailer_id", retailerId);
@@ -28,7 +33,7 @@ export async function syncProductToMetaCatalog(productId: string) {
   formData.append("price", Math.floor(product.price).toString()); // Price is typically in cents/paise for API
   formData.append("currency", "INR"); // Hardcoded to INR for now as in marketplace.ts
   formData.append("url", "https://wappflow.com"); // Dummy URL if not provided
-  formData.append("image_url", product.images?.[0] || "https://wappflow.com/placeholder.png");
+  formData.append("image_url", imageUrl);
   formData.append("brand", "WappFlow");
 
   try {
@@ -52,6 +57,37 @@ export async function syncProductToMetaCatalog(productId: string) {
   }
 }
 
+/**
+ * Batch syncs all active products of an organization to Meta Catalog
+ */
+export async function syncAllProductsToMeta(organizationId: string) {
+  try {
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { metaCatalogId: true }
+    });
+
+    if (!org || !org.metaCatalogId) {
+      console.warn(`[Meta Catalog Sync] Cannot sync all products: organization ${organizationId} has no metaCatalogId`);
+      return;
+    }
+
+    const products = await prisma.product.findMany({
+      where: { organizationId, isActive: true }
+    });
+
+    console.log(`[Meta Catalog Sync] Batch syncing ${products.length} products for org ${organizationId}...`);
+
+    for (const product of products) {
+      await syncProductToMetaCatalog(product.id);
+    }
+    
+    console.log(`[Meta Catalog Sync] Batch sync completed for org ${organizationId}`);
+  } catch (err) {
+    console.error("[Meta Catalog Sync] Error during batch sync:", err);
+  }
+}
+
 export async function deleteProductFromMetaCatalog(productId: string, organizationId: string, sku?: string | null) {
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
@@ -70,6 +106,7 @@ export async function deleteProductFromMetaCatalog(productId: string, organizati
   const batchUrl = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${org.metaCatalogId}/items_batch`;
   
   const payload = {
+    item_type: "PRODUCT_ITEM",
     requests: [
       {
         method: "DELETE",

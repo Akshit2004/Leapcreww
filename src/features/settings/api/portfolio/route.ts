@@ -109,6 +109,13 @@ export async function POST(request: NextRequest) {
       data: dataToUpdate
     });
 
+    // Trigger background sync of all active products to the new Meta catalog if connected
+    if (metaCatalogId) {
+      import("@/shared/lib/meta-catalog")
+        .then((m) => m.syncAllProductsToMeta(orgId))
+        .catch((e) => console.error("[Portfolio] Product background sync trigger failed:", e));
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });

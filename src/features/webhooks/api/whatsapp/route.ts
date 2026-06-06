@@ -331,10 +331,22 @@ async function processInboundMessage(
         .join(", ");
       const existingAttrs = (contact.attributes as Record<string, any>) || {};
       const updatedCartTags = Array.from(new Set([...contact.tags, "WhatsApp-Cart"]));
+
+      const { sendWhatsAppMessage, formatPhoneNumber } = await import("@/shared/lib/whatsapp");
+      const CURRENCY_SYMBOL = "₹";
+      const totalFormatted = `${CURRENCY_SYMBOL}${(totalCents / 100).toFixed(2)}`;
+      let summaryText = `🧾 *Order Received!*\n\n━━━━━━━━━━━━━━━━━━━\n`;
+      orderItemsToCreate.forEach((item) => {
+        summaryText += `*${item.name}* x${item.quantity} — ${CURRENCY_SYMBOL}${(item.price * item.quantity / 100).toFixed(2)}\n`;
+      });
+      summaryText += `━━━━━━━━━━━━━━━━━━━\n*Total: ${totalFormatted}*\n*Order ID:* ${orderIdStr}\n\n💳 *Pay online:*\n${rzpLink.short_url}\n\nOr reply *CONFIRM* after payment to verify your order.`;
+
       await prisma.contact.update({
         where: { id: contact.id },
         data: {
           tags: updatedCartTags,
+          lastMessage: summaryText.length > 35 ? summaryText.substring(0, 32) + "..." : summaryText,
+          lastMessageTime: timeStr,
           attributes: {
             ...existingAttrs,
             cart_total: (totalCents / 100).toFixed(2),
@@ -347,16 +359,7 @@ async function processInboundMessage(
         },
       });
 
-      const { sendWhatsAppMessage, formatPhoneNumber } = await import("@/shared/lib/whatsapp");
-      const CURRENCY_SYMBOL = "₹";
-      const totalFormatted = `${CURRENCY_SYMBOL}${(totalCents / 100).toFixed(2)}`;
-      let summaryText = `🧾 *Order Received!*\n\n━━━━━━━━━━━━━━━━━━━\n`;
-      orderItemsToCreate.forEach((item) => {
-        summaryText += `*${item.name}* x${item.quantity} — ${CURRENCY_SYMBOL}${(item.price * item.quantity / 100).toFixed(2)}\n`;
-      });
-      summaryText += `━━━━━━━━━━━━━━━━━━━\n*Total: ${totalFormatted}*\n*Order ID:* ${orderIdStr}\n\n💳 *Pay online:*\n${rzpLink.short_url}\n\nOr reply *CONFIRM* after payment to verify your order.`;
-
-      await sendWhatsAppMessage({
+      const result = await sendWhatsAppMessage({
         to: formatPhoneNumber(contact.phone),
         text: summaryText,
         buttons: [
@@ -364,6 +367,17 @@ async function processInboundMessage(
           { type: "reply", reply: { id: "menu", title: "🏠 Menu" } },
         ],
       }, orgId);
+
+      await prisma.message.create({
+        data: {
+          sender: "agent",
+          text: summaryText,
+          timestamp: timeStr,
+          contactId: contact.id,
+          organizationId: orgId,
+          waMessageId: result.data?.messages?.[0]?.id || null,
+        },
+      });
     }
     return;
   }

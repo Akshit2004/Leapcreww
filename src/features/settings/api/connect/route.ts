@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ─── Fetch Catalogs ──────────────────────────────────────────────────────
+    // ─── Fetch / Create Catalogs ──────────────────────────────────────────────
     let metaCatalogId = null;
     if (businessId) {
       try {
@@ -122,8 +122,57 @@ export async function POST(request: NextRequest) {
             metaCatalogId = clientCatData.data[0].id;
           }
         }
+
+        // If no catalog was found, automatically create and link one
+        if (!metaCatalogId) {
+          console.log(`[Connect] No catalog found. Creating new catalog programmatically under business ${businessId}...`);
+          const orgRecord = await prisma.organization.findUnique({
+            where: { id: orgId },
+            select: { name: true }
+          });
+          const newCatName = orgRecord ? `${orgRecord.name} Store Catalog` : "WappFlow Store Catalog";
+
+          const createCatRes = await fetch(
+            `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${businessId}/owned_product_catalogs`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                access_token: shortLivedToken,
+                name: newCatName
+              })
+            }
+          );
+          const createCatData = await createCatRes.json();
+          if (createCatRes.ok && createCatData.id) {
+            metaCatalogId = createCatData.id;
+            console.log(`[Connect] Programmatic catalog created: ${metaCatalogId}`);
+
+            // Link the new catalog to all discovered WABAs
+            for (const wabaId of wabaIds) {
+              try {
+                console.log(`[Connect] Linking catalog ${metaCatalogId} to WABA ${wabaId}...`);
+                await fetch(
+                  `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${wabaId}/product_catalogs`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({
+                      access_token: shortLivedToken,
+                      catalog_id: metaCatalogId
+                    })
+                  }
+                );
+              } catch (linkErr) {
+                console.error(`[Connect] Failed to link catalog to WABA ${wabaId}:`, linkErr);
+              }
+            }
+          } else {
+            console.error("[Connect] Programmatic catalog creation failed:", createCatData);
+          }
+        }
       } catch (err) {
-        console.error("[Connect] Failed to fetch catalogs:", err);
+        console.error("[Connect] Failed to fetch/create catalogs:", err);
       }
     }
 
@@ -173,6 +222,13 @@ export async function POST(request: NextRequest) {
           whatsappConnected: true,
         },
       });
+
+      // Trigger background sync of all active products to the new Meta catalog if connected
+      if (metaCatalogId) {
+        import("@/shared/lib/meta-catalog")
+          .then((m) => m.syncAllProductsToMeta(orgId))
+          .catch((e) => console.error("[Connect] Product background sync trigger failed:", e));
+      }
 
       // Log the connection
       const d = new Date();

@@ -9,7 +9,29 @@ function formatPrice(paise: number): string {
   return `${CURRENCY_SYMBOL}${(paise / 100).toFixed(2)}`;
 }
 
-export async function sendMainMenu(phone: string, _contactId: string, orgId: string) {
+async function logBotMessage(contactId: string, orgId: string, text: string, waMessageId?: string | null) {
+  const d = new Date();
+  const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  
+  await prisma.message.create({
+    data: {
+      sender: "agent",
+      text,
+      timestamp: timeStr,
+      contactId,
+      organizationId: orgId,
+      waMessageId: waMessageId || null,
+    },
+  });
+
+  const preview = text.length > 35 ? text.substring(0, 32) + "..." : text;
+  await prisma.contact.update({
+    where: { id: contactId },
+    data: { lastMessage: preview, lastMessageTime: timeStr },
+  });
+}
+
+export async function sendMainMenu(phone: string, contactId: string, orgId: string) {
   const text = `🛍️ Welcome to *${SHOP_NAME}*!
 
 What would you like to do?
@@ -19,7 +41,7 @@ What would you like to do?
 3️⃣ *Help* — Get assistance
 
 Reply with a number or just say what you need! 😊`;
-  await sendWhatsAppMessage({
+  const result = await sendWhatsAppMessage({
     to: formatPhoneNumber(phone),
     text,
     buttons: [
@@ -27,16 +49,20 @@ Reply with a number or just say what you need! 😊`;
       { type: "reply", reply: { id: "orders", title: "📋 My Orders" } },
     ],
   }, orgId);
+
+  await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
 }
 
-export async function sendCatalog(phone: string, orgId: string) {
+export async function sendCatalog(phone: string, contactId: string, orgId: string) {
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
     select: { metaCatalogId: true },
   });
 
   if (!org?.metaCatalogId) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Catalog is not configured. Please contact support! 😊" }, orgId);
+    const text = "Catalog is not configured. Please contact support! 😊";
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
+    await logBotMessage(contactId, orgId, text);
     return;
   }
 
@@ -47,7 +73,9 @@ export async function sendCatalog(phone: string, orgId: string) {
   });
 
   if (products.length === 0) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "Sorry, no products available right now. Please check back later! 😊" }, orgId);
+    const text = "Sorry, no products available right now. Please check back later! 😊";
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
+    await logBotMessage(contactId, orgId, text);
     return;
   }
 
@@ -67,15 +95,18 @@ export async function sendCatalog(phone: string, orgId: string) {
     })),
   }));
 
-  await sendWhatsAppMessage({
+  const bodyText = "Browse our products and add them to your cart. Click the catalog button below!";
+  const result = await sendWhatsAppMessage({
     to: formatPhoneNumber(phone),
     catalogList: {
       headerText: SHOP_NAME,
-      bodyText: "Browse our products and add them to your cart. Click the catalog button below!",
+      bodyText,
       catalogId: org.metaCatalogId,
       sections,
     }
   }, orgId);
+
+  await logBotMessage(contactId, orgId, `Sent Catalog: ${bodyText}`, result.data?.messages?.[0]?.id);
 }
 
 export async function sendOrderStatus(phone: string, contactId: string, orgId: string) {
@@ -85,7 +116,9 @@ export async function sendOrderStatus(phone: string, contactId: string, orgId: s
     take: 5,
   });
   if (orders.length === 0) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: "You haven't placed any orders yet. Browse our catalog! 😊" }, orgId);
+    const text = "You haven't placed any orders yet. Browse our catalog! 😊";
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
+    await logBotMessage(contactId, orgId, text);
     return;
   }
   let text = `📋 *Your Orders*\n\n`;
@@ -95,7 +128,8 @@ export async function sendOrderStatus(phone: string, contactId: string, orgId: s
     text += `Date: ${o.createdAt.toLocaleDateString()}\n\n`;
   });
   text += `Reply *ORDER <ID>* for details.\nE.g. *ORDER ${orders[0].orderId}*`;
-  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
+  const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
+  await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
 }
 
 export async function sendSingleOrderStatus(phone: string, contactId: string, orderId: string, orgId: string) {
@@ -104,7 +138,9 @@ export async function sendSingleOrderStatus(phone: string, contactId: string, or
     include: { items: true },
   });
   if (!order) {
-    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: `Order *${orderId}* not found.` }, orgId);
+    const text = `Order *${orderId}* not found.`;
+    await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
+    await logBotMessage(contactId, orgId, text);
     return;
   }
   let text = `📋 *Order ${order.orderId}*\n\n`;
@@ -118,7 +154,8 @@ export async function sendSingleOrderStatus(phone: string, contactId: string, or
     text += `\n*Address:* ${(order.address as { address: string }).address}`;
   }
   text += `\n*Date:* ${order.createdAt.toLocaleDateString()}`;
-  await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
+  const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
+  await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
 }
 
 export async function handleMarketplaceMessage(
@@ -132,7 +169,7 @@ export async function handleMarketplaceMessage(
   if (lower === "1" || lower === "2" || lower === "3") {
     const map: Record<string, string> = { "1": "catalog", "2": "orders", "3": "menu" };
     const action = map[lower];
-    if (action === "catalog") { await sendCatalog(phone, orgId); return true; }
+    if (action === "catalog") { await sendCatalog(phone, contactId, orgId); return true; }
     if (action === "orders") { await sendOrderStatus(phone, contactId, orgId); return true; }
     if (action === "menu") { await sendMainMenu(phone, contactId, orgId); return true; }
   }
@@ -141,7 +178,7 @@ export async function handleMarketplaceMessage(
     return true;
   }
   if (["catalog", "products", "shop", "browse"].includes(lower) || lower.includes("browse")) {
-    await sendCatalog(phone, orgId);
+    await sendCatalog(phone, contactId, orgId);
     return true;
   }
   if (["orders", "my orders"].includes(lower)) {
@@ -162,18 +199,22 @@ export async function handleMarketplaceMessage(
     });
 
     if (!latestOrder) {
-      await sendWhatsAppMessage({
+      const text = "You don't have any pending orders. Reply *CATALOG* to browse products.";
+      const result = await sendWhatsAppMessage({
         to: formatPhoneNumber(phone),
-        text: "You don't have any pending orders. Reply *CATALOG* to browse products.",
+        text,
       }, orgId);
+      await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
       return true;
     }
 
     if (latestOrder.paymentStatus === "paid") {
-      await sendWhatsAppMessage({
+      const text = `✅ Payment verified! Your order *${latestOrder.orderId}* is confirmed.\n\nReply *ORDERS* to check status anytime.`;
+      const result = await sendWhatsAppMessage({
         to: formatPhoneNumber(phone),
-        text: `✅ Payment verified! Your order *${latestOrder.orderId}* is confirmed.\n\nReply *ORDERS* to check status anytime.`,
+        text,
       }, orgId);
+      await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
     } else {
       let linkStr = "";
       if (latestOrder.razorpayOrderId && latestOrder.razorpayOrderId.startsWith("plink_")) {
@@ -190,11 +231,13 @@ export async function handleMarketplaceMessage(
         }
       }
 
-      await sendWhatsAppMessage({
+      const text = `⚠️ Your payment for order *${latestOrder.orderId}* has not been cleared yet.${linkStr}\n\nOnce paid, please reply *CONFIRM* again.`;
+      const result = await sendWhatsAppMessage({
         to: formatPhoneNumber(phone),
-        text: `⚠️ Your payment for order *${latestOrder.orderId}* has not been cleared yet.${linkStr}\n\nOnce paid, please reply *CONFIRM* again.`,
+        text,
         buttons: linkStr ? [{ type: "reply", reply: { id: "confirm_order", title: "✅ Paid" } }] : undefined
       }, orgId);
+      await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
     }
     return true;
   }

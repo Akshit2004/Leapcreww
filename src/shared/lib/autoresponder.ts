@@ -286,18 +286,7 @@ Response guidelines:
 
   if (botReplyText.includes("[SHOW_CATALOG]")) {
     const { sendCatalog } = await import("./marketplace");
-    await sendCatalog(contact.phone, orgId);
-    
-    // Record that we sent the catalog in the conversation history
-    await prisma.message.create({
-      data: {
-        sender: "agent",
-        text: "Sent Catalog",
-        timestamp: timeStr,
-        contactId: contact.id,
-        organizationId: orgId,
-      },
-    });
+    await sendCatalog(contact.phone, contact.id, orgId);
   } else {
     await sendReply(botReplyText, contact.id, orgId, timeStr, contact.name, contact.phone);
   }

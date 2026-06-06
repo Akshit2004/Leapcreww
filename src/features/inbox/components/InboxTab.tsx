@@ -199,7 +199,10 @@ export const InboxTab: React.FC = () => {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         })
       });
-      setTimeout(() => fetchReplySuggestions(), 800);
+      setTimeout(() => {
+        refreshWorkspace(orgId);
+        fetchReplySuggestions();
+      }, 800);
     } catch (err) {
       console.error(err);
     } finally {
