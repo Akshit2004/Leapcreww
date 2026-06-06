@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
+import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
+import { resolveAttribution } from "@/features/analytics/services/attribution";
+import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
 
 // ─── 1. HANDLE CATALOG SYNCHRONIZATION (GET) ──────────────────────────
 export async function GET(request: NextRequest) {
@@ -200,6 +203,7 @@ interface ShopifyWebhookPayload {
   financial_status?: string;
   order_number?: string | number;
   fulfillments?: ShopifyFulfillment[];
+  abandoned_checkout_url?: string;
 }
 
 // ─── 3. CORE WEBHOOK EVENT PARSER & HANDLER ────────────────────────────
@@ -242,21 +246,81 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       },
     });
 
+    // Sync line items to Cart / CartItem tables
+    const lineItems = payload.line_items || [];
+    let cart = await prisma.cart.findUnique({
+      where: { contactId: contact.id },
+    });
+    if (!cart) {
+      cart = await prisma.cart.create({
+        data: { contactId: contact.id },
+      });
+    }
+
+    // Delete existing cart items
+    await prisma.cartItem.deleteMany({
+      where: { cartId: cart.id },
+    });
+
+    // Insert new cart items & sync with Product catalog
+    for (const item of lineItems) {
+      const itemPriceInPaise = Math.round(parseFloat(item.price || "0") * 100);
+      let product = await prisma.product.findFirst({
+        where: { name: item.title, organizationId: orgId },
+      });
+      if (!product) {
+        product = await prisma.product.create({
+          data: {
+            name: item.title,
+            description: "Shopify catalog item",
+            price: itemPriceInPaise,
+            images: ["https://images.unsplash.com/photo-1472851294608-062f824d29cc?q=80&w=300"],
+            category: "Shopify",
+            stock: 50,
+            organizationId: orgId,
+          },
+        });
+      }
+      await prisma.cartItem.create({
+        data: {
+          cartId: cart.id,
+          productId: product.id,
+          quantity: item.quantity || 1,
+        },
+      });
+    }
+
+    // Save checkout attributes in contact profile
+    const contactAttributes = (contact.attributes as Record<string, any>) || {};
+    contactAttributes.shopify_checkout_url = payload.abandoned_checkout_url || "";
+    contactAttributes.cart_total = payload.total_price || "0.00";
+    contactAttributes.cart_items = lineItems.map((i) => `${i.title} (x${i.quantity || 1})`).join(", ");
+    contactAttributes.cart_abandoned_at = timestampStr;
+    contactAttributes.cart_recovered = false;
+
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: { attributes: contactAttributes },
+    });
+
     // 2. Log event in DB system log
     await prisma.systemLog.create({
       data: {
         timestamp: timeStr,
         type: "integration",
-        message: `Shopify Webhook: checkouts/create - Cart abandoned by ${name} (${phone}). Added tag "Shopify-Cart" and scheduled WhatsApp alert.`,
+        message: `Shopify Webhook: checkouts/create - Cart abandoned by ${name} (₹${payload.total_price || "0.00"}). Saved to database, scheduling drip recovery sequence.`,
         organizationId: orgId,
       },
     });
 
-    // 3. Create simulated autoresponder message
+    // Enroll in drip sequence
+    await enrollOnTrigger(orgId, "cart_abandoned", contact.id);
+
+    // 3. Create message bubble
     await prisma.message.create({
       data: {
         sender: "system",
-        text: `[Shopify Automations] Abandoned checkout recovered! Sent WhatsApp recovery notification template welcome_verification to ${name} (${phone}).`,
+        text: `[Shopify Automations] Cart abandoned by ${name} (₹${payload.total_price || "0.00"}). Enrolled contact into Cart Recovery sequence.`,
         timestamp: timestampStr,
         contactId: contact.id,
         organizationId: orgId,
@@ -290,9 +354,36 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       },
     });
 
+    // Update attributes to mark cart as recovered
+    const contactAttributes = (contact.attributes as Record<string, any>) || {};
+    contactAttributes.cart_recovered = true;
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: { attributes: contactAttributes },
+    });
+
+    // Cancel active abandoned cart sequence enrollments
+    const activeEnrollments = await prisma.sequenceEnrollment.findMany({
+      where: {
+        contactId: contact.id,
+        status: "active",
+        sequence: {
+          trigger: "cart_abandoned",
+        },
+      },
+    });
+    for (const enrollment of activeEnrollments) {
+      await prisma.sequenceEnrollment.update({
+        where: { id: enrollment.id },
+        data: { status: "completed", nextRunAt: null },
+      });
+    }
+
     // 2. Fetch or create Product placeholders if they don't exist yet
     const orderItems = payload.line_items || [];
     const totalPriceInPaise = Math.round(parseFloat(payload.total_price || "0") * 100);
+
+    const attribution = await resolveAttribution(orgId, contact);
 
     const savedOrder = await prisma.order.create({
       data: {
@@ -303,6 +394,7 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
         paymentStatus: payload.financial_status === "paid" ? "paid" : "pending",
         phone: phone,
         organizationId: orgId,
+        ...attribution,
       },
     });
 
@@ -352,11 +444,55 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       },
     });
 
-    // 4. Create simulated message
+    // 4. Dispatch Receipt / WhatsApp Confirmation Notification
+    const lastActive = contact.lastActiveAt ? new Date(contact.lastActiveAt).getTime() : 0;
+    const isSessionActive = (Date.now() - lastActive) <= 24 * 60 * 60 * 1000;
+    const formattedPrice = (totalPriceInPaise / 100).toFixed(2);
+    
+    const dbTemplate = await prisma.template.findFirst({
+      where: { name: "order_confirmation", organizationId: orgId, metaStatus: "approved" },
+    });
+
+    let sentSuccessfully = false;
+    let textSent = "";
+
+    if (dbTemplate || !isSessionActive) {
+      const templateName = dbTemplate?.name || "order_confirmation";
+      textSent = `[Template: ${templateName}] Confirmed Order #${payload.order_number || payload.id} for ₹${formattedPrice}`;
+      const r = await sendWhatsAppMessage({
+        to: formatPhoneNumber(phone),
+        template: {
+          name: templateName,
+          language: { code: "en_US" },
+          components: [
+            {
+              type: "body",
+              parameters: [
+                { type: "text", text: name },
+                { type: "text", text: `SHPFY-${payload.order_number || payload.id}` },
+                { type: "text", text: `₹${formattedPrice}` },
+              ],
+            },
+          ],
+        },
+      }, orgId);
+      sentSuccessfully = r.ok;
+    }
+
+    if (!sentSuccessfully) {
+      // Send text message receipt if session is active or template failed
+      const receiptText = `🛍️ *Order Confirmed!*\n\nHi ${name}, thank you for your purchase. We have received your order #${payload.order_number || payload.id}.\n\n*Items Purchased:*\n` +
+        orderItems.map(item => `- ${item.title} (x${item.quantity || 1})`).join("\n") +
+        `\n\n*Total Amount:* ₹${formattedPrice}\n\nWe will update you as soon as your items are shipped! 🚚`;
+      textSent = receiptText;
+      await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: receiptText }, orgId);
+    }
+
+    // Create message bubble in WappFlow chat screen
     await prisma.message.create({
       data: {
         sender: "system",
-        text: `[Shopify Automations] Order confirmed! Dispatched receipt template welcome_verification via WhatsApp to ${name} (${phone}).`,
+        text: `[Shopify Automations] Order confirmed! Dispatched confirmation alert: "${textSent.slice(0, 80)}..."`,
         timestamp: timestampStr,
         contactId: contact.id,
         organizationId: orgId,
@@ -371,6 +507,7 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
     const orderNumberStr = `SHPFY-${payload.id || Date.now()}`;
     const trackingCompany = payload.fulfillments?.[0]?.tracking_company || "DHL";
     const trackingNumber = payload.fulfillments?.[0]?.tracking_number || "TRACK1234567";
+    const trackingUrl = `https://www.google.com/search?q=tracking+${trackingCompany}+${trackingNumber}`;
 
     // 1. Locate Order
     const existingOrder = await prisma.order.findFirst({
@@ -378,13 +515,78 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
         orderId: orderNumberStr,
         organizationId: orgId,
       },
+      include: { contact: true },
     });
 
     if (existingOrder) {
+      const contact = existingOrder.contact;
       await prisma.order.update({
         where: { id: existingOrder.id },
         data: {
           status: "shipped",
+        },
+      });
+
+      // Update Contact attributes with shipping info
+      const contactAttributes = (contact.attributes as Record<string, any>) || {};
+      contactAttributes.last_tracking_carrier = trackingCompany;
+      contactAttributes.last_tracking_number = trackingNumber;
+      contactAttributes.last_tracking_url = trackingUrl;
+
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: { attributes: contactAttributes },
+      });
+
+      // 24-hour session window check
+      const lastActive = contact.lastActiveAt ? new Date(contact.lastActiveAt).getTime() : 0;
+      const isSessionActive = (Date.now() - lastActive) <= 24 * 60 * 60 * 1000;
+      
+      const dbTemplate = await prisma.template.findFirst({
+        where: { name: "order_shipped", organizationId: orgId, metaStatus: "approved" },
+      });
+
+      let sentSuccessfully = false;
+      let textSent = "";
+
+      if (dbTemplate || !isSessionActive) {
+        const templateName = dbTemplate?.name || "order_shipped";
+        textSent = `[Template: ${templateName}] Shipped Order ${orderNumberStr} via ${trackingCompany}`;
+        const r = await sendWhatsAppMessage({
+          to: formatPhoneNumber(contact.phone),
+          template: {
+            name: templateName,
+            language: { code: "en_US" },
+            components: [
+              {
+                type: "body",
+                parameters: [
+                  { type: "text", text: contact.name },
+                  { type: "text", text: orderNumberStr },
+                  { type: "text", text: trackingCompany },
+                  { type: "text", text: trackingUrl },
+                ],
+              },
+            ],
+          },
+        }, orgId);
+        sentSuccessfully = r.ok;
+      }
+
+      if (!sentSuccessfully) {
+        const shippingText = `📦 *Your Order has shipped!*\n\nHi ${contact.name}, your order ${orderNumberStr} has been handed over to *${trackingCompany}*.\n\n🔢 *Tracking Number:* ${trackingNumber}\n🚚 *Track here:* ${trackingUrl}\n\nThank you for shopping with us! 😊`;
+        textSent = shippingText;
+        await sendWhatsAppMessage({ to: formatPhoneNumber(contact.phone), text: shippingText }, orgId);
+      }
+
+      // Create message bubble in live chat
+      await prisma.message.create({
+        data: {
+          sender: "system",
+          text: `[Shopify Automations] Order shipped notification: "${textSent.slice(0, 80)}..."`,
+          timestamp: timestampStr,
+          contactId: contact.id,
+          organizationId: orgId,
         },
       });
     }

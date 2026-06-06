@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { createRazorpayOrder } from "@/shared/lib/razorpay";
+import { resolveAttribution } from "@/features/analytics/services/attribution";
 
 function generateOrderId(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -38,6 +39,8 @@ export async function POST(req: NextRequest) {
 
     const razorpayOrder = await createRazorpayOrder(total, orderId);
 
+    const attribution = await resolveAttribution(orgId, contact);
+
     const order = await prisma.order.create({
       data: {
         orderId,
@@ -49,6 +52,7 @@ export async function POST(req: NextRequest) {
         phone: contact.phone,
         organizationId: orgId,
         address: { address: address || "pending" },
+        ...attribution,
         items: {
           create: cart.items.map((item) => ({
             productId: item.product.id,

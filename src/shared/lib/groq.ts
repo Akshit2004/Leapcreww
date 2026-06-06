@@ -1,9 +1,12 @@
-export async function getGroqChatCompletion(messages: { role: string; content: string }[]) {
+export async function getGroqChatCompletion(
+  messages: { role: string; content: string }[],
+  modelOverride?: string
+) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error("Groq API key not configured (missing GROQ_API_KEY environment variable)");
   }
-  const model = "llama-3.1-8b-instant";
+  const model = modelOverride || "llama-3.3-70b-versatile";
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",

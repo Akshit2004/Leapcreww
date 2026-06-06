@@ -94,7 +94,7 @@ If just chatting (no action needed), omit "action" or set to null.
     const resultString = await getGroqChatCompletion([
       { role: "system", content: systemPrompt },
       { role: "user", content: prompt }
-    ]);
+    ], "llama-3.3-70b-versatile");
 
     const parsed = extractJsonFromString(resultString);
 

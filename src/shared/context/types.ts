@@ -125,6 +125,7 @@ export interface AppContextType {
   integrations: Integration[];
   systemLogs: SystemLog[];
   members: Member[];
+  orders: any[];
   activeContactId: string | null;
   setActiveContactId: (id: string | null) => void;
   // Actions
@@ -175,5 +176,6 @@ export interface AppContextType {
     integrations: Integration[];
     systemLogs: SystemLog[];
     members: Member[];
+    orders?: any[];
   }) => void;
 }

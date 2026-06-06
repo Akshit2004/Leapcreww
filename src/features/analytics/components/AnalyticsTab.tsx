@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import {
   BarChart3,
@@ -15,6 +15,10 @@ import {
   FileText,
   Clock,
   Zap,
+  Sparkles,
+  Loader2,
+  RefreshCw,
+  ShoppingBag,
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 
@@ -100,20 +104,46 @@ export const AnalyticsTab: React.FC = () => {
   const params = useParams();
   const orgId = params.orgId as string;
 
-  const [activeSection, setActiveSection] = useState<"campaigns" | "agents" | "roi">("campaigns");
-  const [agentMetrics, setAgentMetrics] = useState<Array<{ agent: string; avgLatencyMinutes: number; replies: number; conversations: number; resolutionRate: number }>>([]);
+  const [activeSection, setActiveSection] = useState<"campaigns" | "agents" | "roi" | "commerce">("campaigns");
+  const [agentMetrics, setAgentMetrics] = useState<Array<{ agent: string; avgLatencyMinutes: number; replies: number; conversations: number; resolutionRate: number; attributedSales: number; attributedRevenuePaise: number }>>([]);
   const [roiLedger, setRoiLedger] = useState<Array<{ id: string; name: string; templateName: string; sent: number; delivered: number; costPaise: number; attributedRevenuePaise: number; conversions: number; roi: number; status: string; date: string }>>([]);
   const [roiSummary, setRoiSummary] = useState<{ totalCostPaise: number; totalRevenuePaise: number; totalConversions: number; overallRoi: number }>({ totalCostPaise: 0, totalRevenuePaise: 0, totalConversions: 0, overallRoi: 0 });
+  const [roiView, setRoiView] = useState<"campaigns" | "sequences">("campaigns");
+  const [seqLedger, setSeqLedger] = useState<Array<{ id: string; name: string; trigger: string; sends: number; costPaise: number; attributedRevenuePaise: number; conversions: number; roi: number; status: string }>>([]);
+  const [seqSummary, setSeqSummary] = useState<{ totalCostPaise: number; totalRevenuePaise: number; totalConversions: number; overallRoi: number }>({ totalCostPaise: 0, totalRevenuePaise: 0, totalConversions: 0, overallRoi: 0 });
   const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [narration, setNarration] = useState("");
+  const [loadingNarration, setLoadingNarration] = useState(false);
+
+  const fetchNarration = useCallback(async () => {
+    if (!orgId) return;
+    setLoadingNarration(true);
+    try {
+      const res = await fetch(`/api/ai/analytics-narrator?orgId=${orgId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setNarration(data.narration || "");
+      }
+    } catch (err) {
+      console.error("Narrator error:", err);
+    } finally {
+      setLoadingNarration(false);
+    }
+  }, [orgId]);
+
+  useEffect(() => {
+    fetchNarration();
+  }, [fetchNarration]);
 
   useEffect(() => {
     if (!orgId) return;
     const fetchPerformanceStats = async () => {
       setLoadingMetrics(true);
       try {
-        const [resAgents, resRoi] = await Promise.all([
+        const [resAgents, resRoi, resSeq] = await Promise.all([
           fetch(`/api/org/${orgId}/analytics/agent-metrics`),
           fetch(`/api/org/${orgId}/analytics/roi-ledger`),
+          fetch(`/api/org/${orgId}/analytics/sequence-roi`),
         ]);
         if (resAgents.ok) {
           const data = await resAgents.json();
@@ -123,6 +153,11 @@ export const AnalyticsTab: React.FC = () => {
           const data = await resRoi.json();
           if (data.ledger) setRoiLedger(data.ledger);
           if (data.summary) setRoiSummary(data.summary);
+        }
+        if (resSeq.ok) {
+          const data = await resSeq.json();
+          if (data.ledger) setSeqLedger(data.ledger);
+          if (data.summary) setSeqSummary(data.summary);
         }
       } catch (err) {
         console.error("Failed to load operational analytics", err);
@@ -335,9 +370,44 @@ export const AnalyticsTab: React.FC = () => {
         </div>
       </div>
 
+      {/* AI Analytics Narrator Briefing */}
+      <div className="bg-stone-50 border border-stone-200 p-6 rounded-none space-y-4 hover:border-stone-400 transition-all select-none">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-emerald-600 animate-pulse" />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-stone-900">
+              AI Analytics Narrator & Diagnostic Brief
+            </h3>
+          </div>
+          <button
+            onClick={fetchNarration}
+            disabled={loadingNarration}
+            className="p-1.5 rounded-none text-stone-400 hover:text-stone-950 transition-colors border border-transparent cursor-pointer disabled:opacity-50"
+            title="Recalculate Brief"
+          >
+            <RefreshCw className={`w-4 h-4 ${loadingNarration ? 'animate-spin text-stone-600' : ''}`} />
+          </button>
+        </div>
+
+        {loadingNarration ? (
+          <div className="space-y-2.5 animate-pulse">
+            <div className="h-3.5 bg-stone-200 w-1/3" />
+            <div className="h-3 bg-stone-200 w-full" />
+            <div className="h-3 bg-stone-200 w-5/6" />
+            <div className="h-3 bg-stone-200 w-4/5" />
+          </div>
+        ) : narration ? (
+          <div className="text-xs text-stone-700 font-semibold leading-relaxed whitespace-pre-wrap select-text max-w-4xl text-left">
+            {narration}
+          </div>
+        ) : (
+          <p className="text-xs text-stone-400 italic">No telemetry briefing generated yet. Click refresh to narrate.</p>
+        )}
+      </div>
+
       {/* ─── Sub-Navigation Tabs ─── */}
       <div className="flex items-center gap-2 border-b border-stone-200 pb-1.5 select-none shrink-0">
-        {(["campaigns", "agents", "roi"] as const).map((sec) => (
+        {(["campaigns", "agents", "roi", "commerce"] as const).map((sec) => (
           <button
             key={sec}
             onClick={() => setActiveSection(sec)}
@@ -347,7 +417,13 @@ export const AnalyticsTab: React.FC = () => {
                 : "border-transparent text-stone-400 hover:text-stone-600"
             }`}
           >
-            {sec === "campaigns" ? "Campaign Performance" : sec === "agents" ? "Agent Latency Matrix" : "Attribution & ROI Ledger"}
+            {sec === "campaigns"
+              ? "Campaign Performance"
+              : sec === "agents"
+              ? "Agent Latency Matrix"
+              : sec === "roi"
+              ? "Attribution & ROI Ledger"
+              : "E-Commerce & Abandoned Carts"}
           </button>
         ))}
       </div>
@@ -702,7 +778,7 @@ export const AnalyticsTab: React.FC = () => {
       {/* ─── SECTION: AGENT PERFORMANCE MATRIX ─── */}
       {activeSection === "agents" && (
         <div className="space-y-8 animate-slide-up">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard
               title="Active Team Handlers"
               value={agentMetrics.length.toString()}
@@ -716,10 +792,16 @@ export const AnalyticsTab: React.FC = () => {
               icon={<Clock className="w-5 h-5 text-stone-950" />}
             />
             <StatCard
-              title="Total Reply Transactions"
-              value={fmt(agentMetrics.reduce((acc, a) => acc + a.replies, 0))}
-              subtitle="Bot & manual conversational events"
+              title="Agent-Attributed Sales"
+              value={fmt(agentMetrics.reduce((acc, a) => acc + (a.attributedSales || 0), 0))}
+              subtitle="Paid orders credited to agents"
               icon={<Zap className="w-5 h-5 text-stone-950" />}
+            />
+            <StatCard
+              title="Agent-Attributed Revenue"
+              value={`₹${(agentMetrics.reduce((acc, a) => acc + (a.attributedRevenuePaise || 0), 0) / 100).toFixed(2)}`}
+              subtitle="Revenue driven by handlers"
+              icon={<Tag className="w-5 h-5 text-stone-950" />}
             />
           </div>
 
@@ -740,30 +822,35 @@ export const AnalyticsTab: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-6">
-                {agentMetrics.map((ag) => (
-                  <div key={ag.agent} className="space-y-2 border-b border-stone-100 pb-4 last:border-b-0 last:pb-0">
-                    <div className="flex items-center justify-between text-xs font-bold">
-                      <span className="text-stone-900 uppercase tracking-wide flex items-center gap-1.5">
-                        <span className="w-2 h-2 bg-stone-950" />
-                        {ag.agent}
-                      </span>
-                      <span className="text-stone-500 uppercase tracking-wider">{ag.replies} Replies | {ag.avgLatencyMinutes}m avg latency</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 h-3 bg-stone-100 border border-stone-200/50 rounded-none overflow-hidden relative">
-                        <div
-                          className="h-full bg-stone-900 rounded-none transition-all duration-1000 ease-out"
-                          style={{
-                            width: `${Math.min(100, Math.max(8, (ag.replies / Math.max(...agentMetrics.map(a => a.replies), 1)) * 100))}%`
-                          }}
-                        />
+                {agentMetrics.map((ag) => {
+                  const displayName = ag.agent === "Bot" || ag.agent === "None" ? "Automation" : ag.agent;
+                  const maxRevenue = Math.max(...agentMetrics.map((a) => a.attributedRevenuePaise || 0), 1);
+                  const revenuePct = Math.min(100, Math.max(4, ((ag.attributedRevenuePaise || 0) / maxRevenue) * 100));
+                  return (
+                    <div key={ag.agent} className="space-y-2 border-b border-stone-100 pb-4 last:border-b-0 last:pb-0">
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-stone-900 uppercase tracking-wide flex items-center gap-1.5">
+                          <span className="w-2 h-2 bg-stone-950" />
+                          {displayName}
+                        </span>
+                        <span className="text-stone-500 uppercase tracking-wider">
+                          {ag.attributedSales || 0} Sales | {ag.replies} Replies | {ag.avgLatencyMinutes}m latency
+                        </span>
                       </div>
-                      <span className="text-[10px] font-bold text-stone-950 w-16 text-right uppercase tracking-widest">
-                        {ag.resolutionRate}% Res
-                      </span>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 h-3 bg-stone-100 border border-stone-200/50 rounded-none overflow-hidden relative">
+                          <div
+                            className="h-full bg-stone-900 rounded-none transition-all duration-1000 ease-out"
+                            style={{ width: `${revenuePct}%` }}
+                          />
+                        </div>
+                        <span className="text-[11px] font-bold text-stone-950 w-24 text-right tracking-tight">
+                          ₹{((ag.attributedRevenuePaise || 0) / 100).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -771,43 +858,61 @@ export const AnalyticsTab: React.FC = () => {
       )}
 
       {/* ─── SECTION: ROI ATTRIBUTION LEDGER ─── */}
-      {activeSection === "roi" && (
+      {activeSection === "roi" && (() => {
+        const activeSummary = roiView === "campaigns" ? roiSummary : seqSummary;
+        return (
         <div className="space-y-8 animate-slide-up">
+          {/* Campaigns | Sequences toggle */}
+          <div className="flex items-center gap-2 bg-stone-100 p-1 rounded-none border border-stone-200 w-fit select-none">
+            {(["campaigns", "sequences"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setRoiView(v)}
+                className={`text-[10px] font-bold uppercase tracking-wider px-4 py-1.5 rounded-none transition-all cursor-pointer ${
+                  roiView === v ? "bg-stone-950 text-white" : "text-stone-500 hover:text-stone-900"
+                }`}
+              >
+                {v === "campaigns" ? "Campaigns" : "Sequences"}
+              </button>
+            ))}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
             <StatCard
               title="Attributed Sales Revenue"
-              value={`₹${(roiSummary.totalRevenuePaise / 100).toFixed(2)}`}
-              subtitle="Driven by campaigns (72h window)"
+              value={`₹${(activeSummary.totalRevenuePaise / 100).toFixed(2)}`}
+              subtitle="Last-touch revenue attribution"
               icon={<Tag className="w-5 h-5 text-stone-950" />}
             />
             <StatCard
-              title="Simulated Ad Costs"
-              value={`₹${(roiSummary.totalCostPaise / 100).toFixed(2)}`}
-              subtitle="Delivered templates flat cost index"
+              title="Simulated Send Costs"
+              value={`₹${(activeSummary.totalCostPaise / 100).toFixed(2)}`}
+              subtitle="Centralized per-message rate"
               icon={<Clock className="w-5 h-5 text-stone-950" />}
             />
             <StatCard
               title="Ledger Conversion Events"
-              value={roiSummary.totalConversions.toString()}
-              subtitle="Campaign driven order checkouts"
+              value={activeSummary.totalConversions.toString()}
+              subtitle={roiView === "campaigns" ? "Campaign driven checkouts" : "Sequence driven checkouts"}
               icon={<Zap className="w-5 h-5 text-stone-950" />}
             />
             <StatCard
-              title="Aggregate Campaign ROI"
-              value={`${roiSummary.overallRoi}x`}
+              title={roiView === "campaigns" ? "Aggregate Campaign ROI" : "Aggregate Sequence ROI"}
+              value={`${activeSummary.overallRoi}x`}
               subtitle="Revenue-to-spend multiplier ratio"
               icon={<TrendingUp className="w-5 h-5 text-stone-950" />}
-              trend={roiSummary.overallRoi > 1 ? 1 : -1}
+              trend={activeSummary.overallRoi > 1 ? 1 : -1}
             />
           </div>
 
+          {roiView === "campaigns" && (
           <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
             <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
               <FileText className="w-4 h-4 text-stone-950" />
               Campaign Attribution & ROI Performance Matrix
             </h3>
             <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Waba campaign spend audit ledgers</p>
-            
+
             {loadingMetrics ? (
               <div className="h-48 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest animate-pulse">
                 AUDITING CAMPAIGN BALANCES...
@@ -858,8 +963,194 @@ export const AnalyticsTab: React.FC = () => {
               </div>
             )}
           </div>
+          )}
+
+          {roiView === "sequences" && (
+          <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
+            <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
+              <FileText className="w-4 h-4 text-stone-950" />
+              Sequence Attribution & ROI Performance Matrix
+            </h3>
+            <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Drip / journey revenue audit ledgers</p>
+
+            {loadingMetrics ? (
+              <div className="h-48 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest animate-pulse">
+                AUDITING SEQUENCE BALANCES...
+              </div>
+            ) : seqLedger.length === 0 ? (
+              <div className="h-48 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
+                NO SEQUENCE AUTOMATION DATA RECORDED YET
+              </div>
+            ) : (
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-stone-200">
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4">Sequence</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Sends</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Conversions</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Cost</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4 text-center">Attributed Revenue</th>
+                      <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 text-center">ROI Multiplier</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {seqLedger.map((sl) => (
+                      <tr key={sl.id} className="border-b border-stone-100 hover:bg-[#fafaf9]/80 transition-colors">
+                        <td className="py-3 pr-4">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-stone-800 uppercase tracking-wider">{sl.name}</span>
+                            <span className="text-[9px] text-stone-400 uppercase tracking-wider mt-0.5">{sl.trigger}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4 text-center text-xs font-bold text-stone-600">{sl.sends}</td>
+                        <td className="py-3 pr-4 text-center text-xs font-bold text-stone-850">{sl.conversions}</td>
+                        <td className="py-3 pr-4 text-center text-xs font-bold text-stone-600">₹{(sl.costPaise / 100).toFixed(2)}</td>
+                        <td className="py-3 pr-4 text-center text-xs font-bold text-stone-900">₹{(sl.attributedRevenuePaise / 100).toFixed(2)}</td>
+                        <td className="py-3 text-center">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase border ${
+                            sl.roi > 2
+                              ? "bg-stone-900 text-white border-stone-950"
+                              : sl.roi > 0
+                              ? "bg-stone-100 text-stone-900 border-stone-300"
+                              : "bg-stone-50 text-stone-400 border-stone-200"
+                          }`}>
+                            {sl.roi > 0 ? `${sl.roi}x ROI` : "0.0x ROI"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          )}
         </div>
-      )}
+        );
+      })()}
+
+      {/* ─── SECTION: E-COMMERCE & ABANDONED CARTS ─── */}
+      {activeSection === "commerce" && (() => {
+        const abandonedContacts = contacts.filter((c) => c.tags.includes("Shopify-Cart") || c.tags.includes("WhatsApp-Cart"));
+        const totalAbandonedCount = abandonedContacts.length;
+        const recoveredContacts = abandonedContacts.filter((c) => {
+          const attrs = (c.attributes as Record<string, any>) || {};
+          return attrs.cart_recovered === true;
+        });
+        const totalRecoveredCount = recoveredContacts.length;
+        const recoveryRate = totalAbandonedCount > 0 ? Math.round((totalRecoveredCount / totalAbandonedCount) * 100) : 0;
+
+        const recoveredRevenuePaise = recoveredContacts.reduce((sum, c) => {
+          const attrs = (c.attributes as Record<string, any>) || {};
+          const value = parseFloat(attrs.cart_total || "0");
+          return sum + Math.round(value * 100);
+        }, 0);
+
+        return (
+          <div className="space-y-8 animate-slide-up">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+              <StatCard
+                title="Carts Abandoned"
+                value={totalAbandonedCount.toString()}
+                subtitle="Shopify + WhatsApp checkouts"
+                icon={<ShoppingBag className="w-5 h-5 text-stone-950" />}
+              />
+              <StatCard
+                title="Carts Recovered"
+                value={totalRecoveredCount.toString()}
+                subtitle="Drip recovery conversions"
+                icon={<CheckCheck className="w-5 h-5 text-stone-950" />}
+                trend={recoveryRate > 15 ? 1 : -1}
+              />
+              <StatCard
+                title="Recovery Rate"
+                value={`${recoveryRate}%`}
+                subtitle="Average conversion rate"
+                icon={<TrendingUp className="w-5 h-5 text-stone-950" />}
+                trend={recoveryRate > 15 ? 1 : -1}
+              />
+              <StatCard
+                title="Recovered Revenue"
+                value={`₹${(recoveredRevenuePaise / 100).toFixed(2)}`}
+                subtitle="Saved sales value index"
+                icon={<Tag className="w-5 h-5 text-stone-950" />}
+              />
+            </div>
+
+            <div className="bg-white border border-stone-200 p-6 sm:p-8 hover:border-stone-400 transition-colors duration-300">
+              <h3 className="text-lg font-light text-stone-950 flex items-center gap-2 mb-1">
+                <ShoppingBag className="w-4 h-4 text-stone-950" />
+                Abandoned Checkout Recovery Ledger
+              </h3>
+              <p className="text-xs text-stone-500 tracking-wider uppercase mt-1 mb-6">Real-time Shopify &amp; WhatsApp marketplace telemetry</p>
+
+              {abandonedContacts.length === 0 ? (
+                <div className="h-48 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
+                  NO ABANDONED CHECKOUT RECORDS DETECTED
+                </div>
+              ) : (
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-stone-200">
+                        <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4">Contact</th>
+                        <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4">Source</th>
+                        <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4">Cart Total</th>
+                        <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4">Items Summary</th>
+                        <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 pr-4">Abandoned At</th>
+                        <th className="text-[10px] font-bold text-stone-400 uppercase tracking-widest pb-3 text-center">Recovery Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {abandonedContacts.map((c) => {
+                        const attrs = (c.attributes as Record<string, any>) || {};
+                        const isRecovered = attrs.cart_recovered === true;
+                        const isWhatsAppCart = c.tags.includes("WhatsApp-Cart");
+                        const sourceLabel = isWhatsAppCart ? "WhatsApp" : "Shopify";
+
+                        return (
+                          <tr key={c.id} className="border-b border-stone-100 hover:bg-[#fafaf9]/80 transition-colors text-xs font-medium">
+                            <td className="py-3 pr-4">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-stone-800 uppercase tracking-wider">{c.name}</span>
+                                <span className="text-[9px] text-stone-450 tracking-wide mt-0.5">{c.phone}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 pr-4">
+                              <span className={`inline-flex items-center px-2 py-0.5 text-[8px] font-black tracking-widest uppercase border ${
+                                isWhatsAppCart
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-stone-50 text-stone-600 border-stone-200"
+                              }`}>
+                                {sourceLabel}
+                              </span>
+                            </td>
+                            <td className="py-3 pr-4 font-bold text-stone-900">₹{attrs.cart_total || "0.00"}</td>
+                            <td className="py-3 pr-4 text-stone-600 truncate max-w-[240px]" title={attrs.cart_items}>
+                              {attrs.cart_items || "Line items not synced"}
+                            </td>
+                            <td className="py-3 pr-4 text-stone-400 text-[10px] uppercase tracking-wide">{attrs.cart_abandoned_at || "Recent"}</td>
+                            <td className="py-3 text-center">
+                              <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[8px] font-black tracking-widest uppercase border ${
+                                isRecovered
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}>
+                                {isRecovered ? "Recovered" : "Active Recovery"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

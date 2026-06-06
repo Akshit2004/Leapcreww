@@ -1,5 +1,5 @@
 import { route, ok, fail } from "@/shared/lib/api";
-import { processDueEnrollments } from "../../services/sequenceService";
+import { processDueEnrollments, sweepAbandonedCarts } from "../../services/sequenceService";
 
 /** Cron-secret guard (mirrors campaigns/process-broadcasts). */
 function guardCron(req: Request) {
@@ -16,7 +16,11 @@ function guardCron(req: Request) {
 async function handle(req: Request) {
   const denied = guardCron(req);
   if (denied) return denied;
-  return ok({ ok: true, ...(await processDueEnrollments()) });
+  // Detect WhatsApp marketplace carts left unpaid past the 60-min threshold and
+  // enroll them into recovery, then advance all due enrollments one step.
+  const abandonedCartSweep = await sweepAbandonedCarts(60);
+  const processed = await processDueEnrollments();
+  return ok({ ok: true, ...processed, abandonedCartSweep });
 }
 
 export const GET = route(handle);

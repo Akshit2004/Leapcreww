@@ -65,8 +65,48 @@ export async function GET(
         replies: stats.replyCount || (agentName === "Bot" ? 124 : 45),
         conversations: stats.conversationsCount,
         resolutionRate: agentName === "Bot" ? 95 : resolutionRate,
+        attributedSales: 0,
+        attributedRevenuePaise: 0,
       };
     });
+
+    // 3. Attribute paid-order revenue to the agent snapshotted on each Order (D-04).
+    const paidOrders = await prisma.order.findMany({
+      where: { organizationId: orgId, paymentStatus: "paid" },
+      select: { attributedAgent: true, total: true },
+    });
+
+    const revenueByAgent: Record<string, { sales: number; revenue: number }> = {};
+    for (const order of paidOrders) {
+      const key = order.attributedAgent || "None";
+      const entry = (revenueByAgent[key] ??= { sales: 0, revenue: 0 });
+      entry.sales += 1;
+      entry.revenue += order.total;
+    }
+
+    for (const m of metrics) {
+      const rev = revenueByAgent[m.agent];
+      if (rev) {
+        m.attributedSales = rev.sales;
+        m.attributedRevenuePaise = rev.revenue;
+      }
+    }
+
+    // Surface agents that have attributed sales but no chat rows yet.
+    const knownAgents = new Set(metrics.map((m) => m.agent));
+    for (const [agent, rev] of Object.entries(revenueByAgent)) {
+      if (!knownAgents.has(agent)) {
+        metrics.push({
+          agent,
+          avgLatencyMinutes: 0,
+          replies: 0,
+          conversations: 0,
+          resolutionRate: 0,
+          attributedSales: rev.sales,
+          attributedRevenuePaise: rev.revenue,
+        });
+      }
+    }
 
     return NextResponse.json({ metrics });
   } catch (error) {

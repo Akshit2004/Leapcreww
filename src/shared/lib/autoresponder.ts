@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { getGroqChatCompletion } from "./groq";
 import { sendWhatsAppMessage } from "./whatsapp";
+import { resolveAttribution } from "@/features/analytics/services/attribution";
 
 interface BotMessage {
   role: "user" | "assistant" | "system";
@@ -394,6 +395,103 @@ async function applyCrmAnalysis(analysis: CrmAnalysis, contact: BotContact, orgI
   }
 }
 
+async function handleReorderFlow(contact: any, orgId: string, timeStr: string): Promise<boolean> {
+  const latestOrder = await prisma.order.findFirst({
+    where: {
+      contactId: contact.id,
+      organizationId: orgId,
+    },
+    orderBy: { createdAt: "desc" },
+    include: { items: true },
+  });
+
+  if (!latestOrder || latestOrder.items.length === 0) {
+    await sendReply(
+      "🔍 I couldn't find any previous orders for you. Feel free to type *catalog* to browse our products and place a new order!",
+      contact.id,
+      orgId,
+      timeStr,
+      contact.name,
+      contact.phone
+    );
+    return true;
+  }
+
+  // Create a new Order in the DB based on the old order items
+  const orderItemsToCreate = latestOrder.items.map((item) => ({
+    productId: item.productId,
+    name: item.name,
+    price: item.price,
+    quantity: item.quantity,
+  }));
+
+  const total = latestOrder.total;
+  const newOrderId = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+  try {
+    let paymentShortUrl = `https://wappflow.com/pay/sandbox/${newOrderId}?amount=${total}&phone=${contact.phone}`;
+    let rzpOrderId = `plink_sim_${Math.random().toString(36).substring(2, 10)}`;
+
+    const { getRazorpayInstance, createRazorpayPaymentLink } = await import("@/shared/lib/razorpay");
+    const rzp = getRazorpayInstance();
+    if (rzp) {
+      try {
+        const rzpLink = await createRazorpayPaymentLink(total, newOrderId, contact.phone, contact.name);
+        paymentShortUrl = rzpLink.short_url;
+        rzpOrderId = rzpLink.id;
+      } catch (rzpErr) {
+        console.warn("[Razorpay] Failed to create payment link, falling back to sandbox link:", rzpErr);
+      }
+    }
+
+    const attribution = await resolveAttribution(orgId, contact);
+
+    await prisma.order.create({
+      data: {
+        orderId: newOrderId,
+        contactId: contact.id,
+        total,
+        status: "pending",
+        paymentStatus: "pending",
+        razorpayOrderId: rzpOrderId,
+        phone: contact.phone,
+        organizationId: orgId,
+        address: latestOrder.address || { address: "reorder" },
+        ...attribution,
+        items: {
+          create: orderItemsToCreate,
+        },
+      },
+    });
+
+    const CURRENCY_SYMBOL = "₹";
+    const totalFormatted = `${CURRENCY_SYMBOL}${(total / 100).toFixed(2)}`;
+    let summaryText = `🛍️ *Repurchase Last Order!*\n\nI found your previous order with these items:\n━━━━━━━━━━━━━━━━━━━\n`;
+    orderItemsToCreate.forEach((item) => {
+      summaryText += `*${item.name}* x${item.quantity} — ${CURRENCY_SYMBOL}${(item.price * item.quantity / 100).toFixed(2)}\n`;
+    });
+    summaryText += `━━━━━━━━━━━━━━━━━━━\n*Total: ${totalFormatted}*\n*Order ID:* ${newOrderId}\n\n💳 *Pay online to place your order:*\n${paymentShortUrl}\n\nSimply click the link above to pay and place your order immediately!`;
+
+    await sendReply(summaryText, contact.id, orgId, timeStr, contact.name, contact.phone, [
+      { type: "reply", reply: { id: "confirm_order", title: "✅ Paid" } },
+      { type: "reply", reply: { id: "menu", title: "🏠 Menu" } },
+    ]);
+
+    return true;
+  } catch (err) {
+    console.error("Error creating re-order payment link:", err);
+    await sendReply(
+      "⚠️ Sorry, I ran into an error setting up your payment link. Please try again in a moment or contact our support.",
+      contact.id,
+      orgId,
+      timeStr,
+      contact.name,
+      contact.phone
+    );
+    return true;
+  }
+}
+
 // ─── Main Entry Point ───────────────────────────────────────────────────────
 
 export async function handleAutoResponder(contactId: string, orgId: string) {
@@ -408,6 +506,44 @@ export async function handleAutoResponder(contactId: string, orgId: string) {
     const orgName = contact.organization.name;
     const d = new Date();
     const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+    // Intercept buy again / reorder intent
+    const lastMsg = await prisma.message.findFirst({
+      where: { contactId: contact.id, sender: "user" },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (lastMsg) {
+      const incomingText = lastMsg.text.trim().toLowerCase();
+      let isReorderIntent = ["buy again", "reorder", "order again", "repurchase"].some((kw) =>
+        incomingText.includes(kw)
+      ) || lastMsg.text === "buy_again" || lastMsg.text === "reorder";
+
+      if (!isReorderIntent) {
+        try {
+          const intentPrompt = [
+            {
+              role: "system",
+              content: `You are an intent classification engine. Does the following user message represent a clear desire to buy their previous order again, repurchase items they bought before, or reorder?
+              Reply ONLY with the exact word "true" or "false". No explanations.`
+            },
+            {
+              role: "user",
+              content: `User message: "${incomingText}"`
+            }
+          ];
+          const response = await getGroqChatCompletion(intentPrompt);
+          isReorderIntent = response.toLowerCase().includes("true");
+        } catch (err) {
+          console.error("Semantic reorder intent classification failed:", err);
+        }
+      }
+
+      if (isReorderIntent) {
+        const handled = await handleReorderFlow(contact, orgId, timeStr);
+        if (handled) return;
+      }
+    }
 
     // 1. Try chatbot node tree flow if builder is enabled
     if (contact.organization.chatbotBuilderEnabled) {

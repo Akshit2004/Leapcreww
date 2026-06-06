@@ -33,6 +33,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Cart paid → mark recovered and stop any active abandoned-cart drip.
+    const { markCartRecovered } = await import("@/features/sequences/services/sequenceService");
+    await markCartRecovered(order.organizationId, order.contactId);
+
     return NextResponse.json({ status: "verified", orderId: order.orderId });
   } catch (err: unknown) {
     console.error("Payment verification error:", err);

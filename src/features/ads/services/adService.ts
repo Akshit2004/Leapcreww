@@ -69,7 +69,7 @@ Do not include any other text, markdown formatting, or code fences around the JS
     },
   ];
 
-  const resultString = await getGroqChatCompletion(prompt);
+  const resultString = await getGroqChatCompletion(prompt, "llama-3.3-70b-versatile");
   const generatedText = (resultString || "")
     .replace(/^```[a-z]*\n?/i, "")
     .replace(/```$/i, "")

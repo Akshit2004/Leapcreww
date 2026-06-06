@@ -6,6 +6,7 @@
  */
 import type { Campaign, Contact } from "@prisma/client";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
+import { recordTouch } from "@/features/analytics/services/attribution";
 import * as repo from "../repositories/campaignRepo";
 import type {
   CampaignVariable,
@@ -155,6 +156,8 @@ export async function runBroadcast(campaign: Campaign, contacts: Contact[]): Pro
         timestamp: ts,
         waMessageId: result.data?.messages?.[0]?.id,
       });
+      // D-04: record a campaign touch for last-touch revenue attribution.
+      await recordTouch({ organizationId, contactId: contact.id, channel: "campaign", campaignId });
     }
 
     await repo.updateCampaign(campaignId, { delivered });

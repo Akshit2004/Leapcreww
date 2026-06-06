@@ -18,7 +18,11 @@ import {
   Sliders,
   Filter,
   BarChart4,
-  Maximize2
+  Maximize2,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+  ChevronRight
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
@@ -98,10 +102,92 @@ function evaluateSegmentRules(contact: any, rules: SegmentRules): boolean {
 }
 
 export const CampaignsTab: React.FC = () => {
-  const { campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign, addSystemLog, refreshWorkspace } = useApp();
+  const { organization, campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign, addSystemLog, refreshWorkspace } = useApp();
   const params = useParams();
   const orgId = params.orgId as string;
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isStrategistOpen, setIsStrategistOpen] = useState(false);
+  const [strategistPrompt, setStrategistPrompt] = useState("");
+  const [isGeneratingStrategy, setIsGeneratingStrategy] = useState(false);
+  const [strategistStrategy, setStrategistStrategy] = useState<any>(null);
+  const [strategistError, setStrategistError] = useState("");
+  const [connectingWaba, setConnectingWaba] = useState(false);
+  const [loadingStepText, setLoadingStepText] = useState("Analyzing market positioning...");
+  const [isApplyingStrategy, setIsApplyingStrategy] = useState(false);
+
+  // Load FB SDK for embedded WABA connection within strategist modal
+  useEffect(() => {
+    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+    if (!appId) return;
+    if (document.getElementById("facebook-jssdk")) return;
+
+    (window as any).fbAsyncInit = function () {
+      (window as any).FB?.init({
+        appId,
+        cookie: true,
+        xfbml: true,
+        version: "v21.0",
+      });
+    };
+
+    const script = document.createElement("script");
+    script.id = "facebook-jssdk";
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.async = true;
+    script.defer = true;
+    script.crossOrigin = "anonymous";
+    document.body.appendChild(script);
+  }, []);
+
+  const launchEmbeddedSignup = () => {
+    const fb = (window as any).FB;
+    if (!fb) {
+      alert("Facebook SDK not loaded. Please refresh and try again.");
+      return;
+    }
+    setConnectingWaba(true);
+    fb.login(
+      (response: any) => {
+        if (response.authResponse?.code) {
+          handleSignupCallback(response.authResponse.code);
+        } else {
+          setConnectingWaba(false);
+          alert("Signup was cancelled or failed. Please try again.");
+        }
+      },
+      {
+        config_id: process.env.NEXT_PUBLIC_META_CONFIG_ID || "",
+        response_type: "code",
+        override_default_response_type: true,
+        extras: {
+          setup: {},
+          featureType: "",
+          sessionInfoVersion: "3",
+        },
+      }
+    );
+  };
+
+  const handleSignupCallback = async (code: string) => {
+    try {
+      const res = await fetch("/api/whatsapp/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId, code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Connection failed");
+        return;
+      }
+      alert("WhatsApp Business Account connected successfully!");
+      if (orgId) await refreshWorkspace(orgId);
+    } catch {
+      alert("Network error during connection. Please try again.");
+    } finally {
+      setConnectingWaba(false);
+    }
+  };
 
   // Lock body scroll when launch campaign modal is open
   useEffect(() => {
@@ -389,13 +475,22 @@ export const CampaignsTab: React.FC = () => {
           <h2 className="text-xl font-bold tracking-tight text-stone-900 uppercase">Campaigns & Broadcasts</h2>
           <p className="text-stone-500 text-xs mt-1">Broadcast WhatsApp bulk templates, track dynamic click metrics, and filter target leads.</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-stone-950 hover:bg-stone-900 text-white font-bold text-xs px-4 py-2.5 rounded-none flex items-center gap-2 cursor-pointer border border-stone-950 transition-all"
-        >
-          <Megaphone className="w-4 h-4" />
-          LAUNCH BROADCAST
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setIsStrategistOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2.5 rounded-none flex items-center gap-2 cursor-pointer border border-emerald-600 transition-all shadow-md shadow-emerald-600/10"
+          >
+            <Sparkles className="w-4 h-4" />
+            AI CAMPAIGN STRATEGIST
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-stone-950 hover:bg-stone-900 text-white font-bold text-xs px-4 py-2.5 rounded-none flex items-center gap-2 cursor-pointer border border-stone-950 transition-all"
+          >
+            <Megaphone className="w-4 h-4" />
+            LAUNCH BROADCAST
+          </button>
+        </div>
       </div>
 
       {/* Filter and Overview Controls */}
@@ -932,6 +1027,436 @@ export const CampaignsTab: React.FC = () => {
         contacts={contacts}
         systemLogs={systemLogs}
       />
+
+      {/* AI CAMPAIGN STRATEGIST MODAL */}
+      {isStrategistOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl rounded-none flex flex-col overflow-hidden bg-white border border-stone-300 shadow-2xl h-[90vh]">
+            {/* Header */}
+            <div className="p-6 border-b border-stone-200 flex items-center justify-between shrink-0 bg-[#fafaf9]">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-emerald-600 animate-pulse" />
+                <h3 className="font-bold text-xs uppercase tracking-wider text-stone-950">
+                  AI Campaign Strategist & Copywriter
+                </h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsStrategistOpen(false);
+                  setStrategistStrategy(null);
+                  setStrategistError("");
+                }}
+                className="p-1 rounded-none hover:bg-stone-200 text-stone-500 transition-colors border border-transparent cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+              
+              {!strategistStrategy ? (
+                /* Generating/Prompt State */
+                <div className="max-w-xl mx-auto py-12 space-y-6 text-center">
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-light text-stone-950 uppercase tracking-wide">
+                      What are you selling / promoting?
+                    </h4>
+                    <p className="text-xs text-stone-500">
+                      WappFlow AI will draft a complete marketing template, target segment, broadcast schedule, and a 3-step follow-up drip sequence.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <textarea
+                      placeholder="e.g. It's Diwali, I sell handwoven Banarasi sarees. Give a 15% discount code DIWALI15 to past buyers."
+                      value={strategistPrompt}
+                      onChange={(e) => setStrategistPrompt(e.target.value)}
+                      className="w-full bg-[#fafaf9] border border-stone-200 rounded-none p-4 text-xs font-semibold focus:outline-none focus:border-stone-950 resize-none min-h-[120px] text-stone-850 placeholder:text-stone-400 focus:bg-white transition-all shadow-inner"
+                      disabled={isGeneratingStrategy}
+                    />
+
+                    {strategistError && (
+                      <div className="p-4 bg-red-50 text-red-600 rounded-none text-xs border border-red-150 font-semibold text-left">
+                        {strategistError}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={isGeneratingStrategy || !strategistPrompt.trim()}
+                      onClick={async () => {
+                        setIsGeneratingStrategy(true);
+                        setStrategistError("");
+                        
+                        // Micro-animation step text cycling
+                        const steps = [
+                          "Analyzing customer purchase telemetry...",
+                          "Drafting high-converting template copy...",
+                          "Defining target segment matching rules...",
+                          "Designing 3-step follow-up drip sequence...",
+                          "Structuring campaign schedule reasoning..."
+                        ];
+                        let stepIdx = 0;
+                        setLoadingStepText(steps[0]);
+                        const stepInterval = setInterval(() => {
+                          stepIdx = (stepIdx + 1) % steps.length;
+                          setLoadingStepText(steps[stepIdx]);
+                        }, 1800);
+
+                        try {
+                          const res = await fetch("/api/ai/campaign-strategist", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              action: "generate",
+                              orgId,
+                              prompt: strategistPrompt
+                            })
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.error || "Failed to generate strategy");
+                          setStrategistStrategy(data.strategy);
+                        } catch (err: any) {
+                          setStrategistError(err.message || "An unexpected error occurred.");
+                        } finally {
+                          clearInterval(stepInterval);
+                          setIsGeneratingStrategy(false);
+                        }
+                      }}
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold text-xs rounded-none cursor-pointer flex items-center justify-center gap-2 border border-emerald-600 transition-all shadow-md shadow-emerald-600/20"
+                    >
+                      {isGeneratingStrategy ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          <span>{loadingStepText}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>GENERATE CAMPAIGN STRATEGY</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Strategy Review Deck */
+                <div className="space-y-6">
+                  
+                  {/* Meta Signup / WABA warning button inline */}
+                  {!organization?.whatsappConnected && (
+                    <div className="bg-red-50 border border-red-200 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-red-700 flex items-center gap-1.5 uppercase">
+                          <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                          WhatsApp Business Account is not Connected
+                        </span>
+                        <p className="text-[11px] text-red-600">
+                          Active broadcast launches require Meta connection. You can connect directly below or launch as local mock.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={launchEmbeddedSignup}
+                        disabled={connectingWaba}
+                        className="bg-[#1877F2] hover:bg-[#166FE5] text-white font-extrabold text-[10px] uppercase py-2 px-3 tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shrink-0 disabled:opacity-50"
+                      >
+                        {connectingWaba ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5" />
+                        )}
+                        Connect with Facebook
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                    
+                    {/* LEFT COLUMN: Template and Segment Editing */}
+                    <div className="space-y-6">
+                      
+                      {/* Draft Template Card */}
+                      <div className="bg-stone-50 border border-stone-200 p-5 rounded-none space-y-4">
+                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 flex justify-between border-b border-stone-200 pb-2">
+                          <span>1. Draft Template Payload</span>
+                          <span className="text-[9px] text-stone-400 lowercase">{strategistStrategy.template.category}</span>
+                        </h4>
+
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-stone-400 uppercase">Template Name</label>
+                            <input
+                              type="text"
+                              value={strategistStrategy.template.name}
+                              onChange={(e) => setStrategistStrategy({
+                                ...strategistStrategy,
+                                template: { ...strategistStrategy.template, name: e.target.value }
+                              })}
+                              className="w-full bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-950 font-bold"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-stone-400 uppercase">Message Body</label>
+                            <textarea
+                              rows={5}
+                              value={strategistStrategy.template.body}
+                              onChange={(e) => setStrategistStrategy({
+                                ...strategistStrategy,
+                                template: { ...strategistStrategy.template, body: e.target.value }
+                              })}
+                              className="w-full bg-white border border-stone-200 rounded-none p-3 text-xs focus:outline-none focus:border-stone-950 resize-none font-medium leading-relaxed text-stone-800"
+                            />
+                          </div>
+
+                          {strategistStrategy.template.buttons && (
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-bold text-stone-400 uppercase">Call-to-Action Buttons</label>
+                              <div className="flex flex-wrap gap-2">
+                                {strategistStrategy.template.buttons.map((btn: string, bIdx: number) => (
+                                  <input
+                                    key={bIdx}
+                                    type="text"
+                                    value={btn}
+                                    onChange={(e) => {
+                                      const nextBtns = [...strategistStrategy.template.buttons];
+                                      nextBtns[bIdx] = e.target.value;
+                                      setStrategistStrategy({
+                                        ...strategistStrategy,
+                                        template: { ...strategistStrategy.template, buttons: nextBtns }
+                                      });
+                                    }}
+                                    className="bg-white border border-stone-200 rounded-none py-1.5 px-3 text-[10px] focus:outline-none focus:border-stone-950 font-bold text-stone-700"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Target Audience Segment Card */}
+                      <div className="bg-stone-50 border border-stone-200 p-5 rounded-none space-y-4">
+                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 border-b border-stone-200 pb-2">
+                          2. Target Audience Segment
+                        </h4>
+
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-stone-400 uppercase">Segment Name</label>
+                            <input
+                              type="text"
+                              value={strategistStrategy.segment.name}
+                              onChange={(e) => setStrategistStrategy({
+                                ...strategistStrategy,
+                                segment: { ...strategistStrategy.segment, name: e.target.value }
+                              })}
+                              className="w-full bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-950 font-bold text-stone-850"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-stone-400 uppercase">Segment Filtering Rules</label>
+                            <div className="space-y-2">
+                              {strategistStrategy.segment.rules.all?.map((rule: any, rIdx: number) => (
+                                <div key={rIdx} className="bg-white border border-stone-200 p-3 flex justify-between items-center text-xs">
+                                  <span className="font-semibold text-stone-600">
+                                    Target contacts where <strong className="text-stone-900 uppercase">{rule.field}</strong> is <strong className="text-stone-900 uppercase">{rule.op}</strong>
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={rule.value}
+                                    onChange={(e) => {
+                                      const nextRules = { ...strategistStrategy.segment.rules };
+                                      nextRules.all[rIdx].value = e.target.value;
+                                      setStrategistStrategy({
+                                        ...strategistStrategy,
+                                        segment: { ...strategistStrategy.segment, rules: nextRules }
+                                      });
+                                    }}
+                                    className="bg-stone-50 border border-stone-200 rounded-none p-1.5 text-[11px] text-right font-bold w-28 focus:outline-none"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* RIGHT COLUMN: Drip Sequence & Schedule */}
+                    <div className="space-y-6">
+                      
+                      {/* Schedule Settings */}
+                      <div className="bg-stone-50 border border-stone-200 p-5 rounded-none space-y-4">
+                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 border-b border-stone-200 pb-2">
+                          3. Launch Schedule
+                        </h4>
+                        
+                        <div className="space-y-3">
+                          <p className="text-[11px] text-stone-600 leading-relaxed font-semibold italic bg-white p-3 border border-stone-200/50">
+                            💡 AI Reasoning: {strategistStrategy.schedule.reasoning}
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold text-stone-400 uppercase">Target DateTime</label>
+                              <input
+                                type="datetime-local"
+                                value={strategistStrategy.schedule.scheduledAt ? strategistStrategy.schedule.scheduledAt.substring(0, 16) : ""}
+                                onChange={(e) => setStrategistStrategy({
+                                  ...strategistStrategy,
+                                  schedule: { ...strategistStrategy.schedule, scheduledAt: new Date(e.target.value).toISOString() }
+                                })}
+                                className="w-full bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-950 font-bold"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold text-stone-400 uppercase">Spam Delay (s)</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="5"
+                                value={strategistStrategy.schedule.delay}
+                                onChange={(e) => setStrategistStrategy({
+                                  ...strategistStrategy,
+                                  schedule: { ...strategistStrategy.schedule, delay: parseInt(e.target.value) }
+                                })}
+                                className="w-full bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-950 font-bold"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 3-Step Follow-Up Sequence */}
+                      <div className="bg-stone-50 border border-stone-200 p-5 rounded-none space-y-4">
+                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 border-b border-stone-200 pb-2">
+                          4. 3-Step Drip Follow-Up Sequence
+                        </h4>
+
+                        <div className="space-y-3">
+                          {strategistStrategy.sequence.steps.map((step: any, sIdx: number) => (
+                            <div key={sIdx} className="bg-white border border-stone-200 p-4 space-y-2 relative">
+                              <div className="flex justify-between items-center">
+                                <span className="bg-stone-950 text-white font-extrabold text-[9px] uppercase tracking-wider px-2 py-0.5">
+                                  Step {sIdx + 1}
+                                </span>
+                                <div className="text-[10px] font-bold text-stone-500">
+                                  Delay: {step.delayMinutes === 0 ? "Immediate" : step.delayMinutes < 60 ? `${step.delayMinutes}m` : `${Math.round(step.delayMinutes / 60)}h`}
+                                </div>
+                              </div>
+                              
+                              <textarea
+                                rows={2}
+                                value={step.message}
+                                onChange={(e) => {
+                                  const nextSteps = [...strategistStrategy.sequence.steps];
+                                  nextSteps[sIdx].message = e.target.value;
+                                  setStrategistStrategy({
+                                    ...strategistStrategy,
+                                    sequence: { ...strategistStrategy.sequence, steps: nextSteps }
+                                  });
+                                }}
+                                className="w-full bg-stone-50 border border-stone-200 rounded-none p-2 text-xs focus:outline-none focus:border-stone-950 resize-none font-semibold text-stone-700"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-stone-200 flex justify-between items-center shrink-0 bg-[#fafaf9] select-none">
+              <div>
+                {strategistStrategy && (
+                  <button
+                    type="button"
+                    onClick={() => setStrategistStrategy(null)}
+                    className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-300"
+                  >
+                    Start Over
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsStrategistOpen(false);
+                    setStrategistStrategy(null);
+                    setStrategistError("");
+                  }}
+                  className="px-4 py-2 bg-white hover:bg-stone-50 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-200"
+                >
+                  Cancel
+                </button>
+                
+                {strategistStrategy && (
+                  <button
+                    type="button"
+                    disabled={isApplyingStrategy || !organization?.whatsappConnected}
+                    onClick={async () => {
+                      setIsApplyingStrategy(true);
+                      setStrategistError("");
+                      try {
+                        const res = await fetch("/api/ai/campaign-strategist", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            action: "apply",
+                            orgId,
+                            template: strategistStrategy.template,
+                            segment: strategistStrategy.segment,
+                            schedule: strategistStrategy.schedule,
+                            sequence: strategistStrategy.sequence
+                          })
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || "Failed to apply strategy");
+                        
+                        alert("Campaign strategy applied successfully! Check campaigns & workflows.");
+                        setIsStrategistOpen(false);
+                        setStrategistStrategy(null);
+                        if (orgId) await refreshWorkspace(orgId);
+                      } catch (err: any) {
+                        alert(err.message || "Failed to apply strategy");
+                      } finally {
+                        setIsApplyingStrategy(false);
+                      }
+                    }}
+                    className="px-5 py-2 bg-stone-950 hover:bg-stone-900 border border-stone-950 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-none cursor-pointer flex items-center gap-1.5 transition-all shadow-md"
+                  >
+                    {isApplyingStrategy ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Applying Strategy...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Approve & Launch Strategy
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

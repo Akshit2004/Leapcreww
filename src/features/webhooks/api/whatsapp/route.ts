@@ -3,6 +3,7 @@ import { verifyWebhook, validateWebhookSignature, WhatsAppWebhookPayload } from 
 import { prisma } from "@/shared/lib/prisma";
 import { handleAutoResponder } from "@/shared/lib/autoresponder";
 import { handleMarketplaceMessage } from "@/shared/lib/marketplace";
+import { resolveAttribution } from "@/features/analytics/services/attribution";
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
@@ -302,6 +303,8 @@ async function processInboundMessage(
       const { createRazorpayPaymentLink } = await import("@/shared/lib/razorpay");
       const rzpLink = await createRazorpayPaymentLink(totalCents, orderIdStr, contact.phone, contact.name);
 
+      const attribution = await resolveAttribution(orgId, contact);
+
       await prisma.order.create({
         data: {
           orderId: orderIdStr,
@@ -313,8 +316,33 @@ async function processInboundMessage(
           phone: contact.phone,
           organizationId: orgId,
           address: { address: "pending" },
+          ...attribution,
           items: {
             create: orderItemsToCreate,
+          },
+        },
+      });
+
+      // Tag + persist cart metadata so the abandoned-cart sweep (60-min) and the
+      // unified E-Commerce CRM panels can track this WhatsApp marketplace cart.
+      // The cart stays "abandoned" until the pending order is paid (cart_recovered).
+      const cartItemsSummary = orderItemsToCreate
+        .map((i) => `${i.name} (x${i.quantity})`)
+        .join(", ");
+      const existingAttrs = (contact.attributes as Record<string, any>) || {};
+      const updatedCartTags = Array.from(new Set([...contact.tags, "WhatsApp-Cart"]));
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          tags: updatedCartTags,
+          attributes: {
+            ...existingAttrs,
+            cart_total: (totalCents / 100).toFixed(2),
+            cart_items: cartItemsSummary,
+            cart_checkout_url: rzpLink.short_url,
+            cart_orderId: orderIdStr,
+            cart_recovered: false,
+            cart_recovery_enrolled: false,
           },
         },
       });

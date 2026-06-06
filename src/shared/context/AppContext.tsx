@@ -26,6 +26,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const lastSyncTimeRef = React.useRef<number>(0);
+  const [orders, setOrders] = React.useState<any[]>([]);
   const {
     organization,
     setOrganization,
@@ -104,6 +105,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     integrations: Integration[];
     systemLogs: SystemLog[];
     members: Member[];
+    orders?: any[];
   }) => {
     if (syncLockedRef.current) {
       return;
@@ -117,6 +119,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIntegrations(data.integrations);
     setSystemLogs(data.systemLogs);
     setMembers(data.members);
+    setOrders(data.orders || []);
     if (data.contacts.length > 0) {
       setActiveContactId(data.contacts[0].id);
     } else {
@@ -134,6 +137,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSystemLogs,
     setMembers,
     setActiveContactId,
+    setOrders,
   ]);
 
   const refreshWorkspace = useCallback(async (orgId: string) => {
@@ -180,6 +184,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         integrations,
         systemLogs,
         members,
+        orders,
         activeContactId,
         setActiveContactId,
         addContact,

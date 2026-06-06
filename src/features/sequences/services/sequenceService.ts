@@ -5,8 +5,9 @@
  * cart abandoned, signup, form submit). processDueEnrollments() is the cron
  * worker that advances each enrollment step-by-step over time.
  */
-import type { SequenceStep } from "@prisma/client";
+import type { SequenceStep, Contact } from "@prisma/client";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
+import { recordTouch } from "@/features/analytics/services/attribution";
 import * as repo from "../repositories/sequenceRepo";
 import type { SequenceInput, SequenceTrigger } from "../types";
 
@@ -82,16 +83,156 @@ export async function enrollOnTrigger(
   }
 }
 
-async function executeStep(step: SequenceStep, phone: string, organizationId: string) {
-  if (step.actionType === "send_template" && step.templateName) {
-    await sendWhatsAppMessage(
-      { to: phone, template: { name: step.templateName, language: { code: "en_US" } } },
+function resolveMessageVariables(text: string, contact: Contact): string {
+  const attrs = (contact.attributes as Record<string, any>) || {};
+  return text
+    .replace(/\{\{contact\.name\}\}/g, contact.name || "")
+    .replace(/\{\{contact\.phone\}\}/g, contact.phone || "")
+    .replace(/\{\{cart\.total\}\}/g, attrs.cart_total ? `₹${attrs.cart_total}` : "")
+    .replace(/\{\{cart\.checkout_url\}\}/g, attrs.cart_checkout_url || attrs.shopify_checkout_url || "")
+    .replace(/\{\{cart\.items_list\}\}/g, attrs.cart_items || "");
+}
+
+async function executeStep(step: SequenceStep, contact: Contact, organizationId: string) {
+  const phone = formatPhoneNumber(contact.phone);
+  
+  // 1. Session check: active if contact interacted within last 24h
+  const lastActive = contact.lastActiveAt ? new Date(contact.lastActiveAt).getTime() : 0;
+  const isSessionActive = (Date.now() - lastActive) <= 24 * 60 * 60 * 1000;
+
+  const attrs = (contact.attributes as Record<string, any>) || {};
+
+  // Resolve text variable placeholders
+  const resolvedMessage = step.message ? resolveMessageVariables(step.message, contact) : "";
+
+  // Track what actually went out so we can log it to chat history + record an
+  // attribution touch (D-04). Sequence sends were previously invisible in the
+  // Message table, breaking both live-chat history and revenue attribution.
+  let sentOk = false;
+  let sentPreview = "";
+
+  if (step.actionType === "send_message") {
+    if (isSessionActive) {
+      // Session is active: safe to send free-form message
+      const r = await sendWhatsAppMessage({ to: phone, text: resolvedMessage }, organizationId);
+      sentOk = r.ok;
+      if (r.ok) sentPreview = resolvedMessage;
+    } else {
+      // Session is expired: promote to cart_recovery template
+      console.log(`[Sequence Fallback] Contact ${contact.name} out of 24h window. Promoting message step to 'cart_recovery' template.`);
+      
+      const { prisma } = await import("@/shared/lib/prisma");
+      const dbTemplate = await prisma.template.findFirst({
+        where: { name: "cart_recovery", organizationId, metaStatus: "approved" },
+      });
+
+      const templateName = dbTemplate?.name || "cart_recovery";
+
+      const r = await sendWhatsAppMessage(
+        {
+          to: phone,
+          template: {
+            name: templateName,
+            language: { code: "en_US" },
+            components: [
+              {
+                type: "body",
+                parameters: [
+                  { type: "text", text: contact.name },
+                  { type: "text", text: attrs.cart_checkout_url || attrs.shopify_checkout_url || "https://wappflow.com" },
+                ],
+              },
+            ],
+          },
+        },
+        organizationId
+      );
+
+      sentOk = r.ok;
+      if (r.ok) {
+        sentPreview = `[Template: ${templateName}]`;
+      } else {
+        // Log warning in DB system logs
+        const d = new Date();
+        const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        await prisma.systemLog.create({
+          data: {
+            timestamp: timeStr,
+            type: "campaign",
+            message: `⚠️ Skipped sequence step for ${contact.name}: Contact is outside the 24h window and no approved 'cart_recovery' template was successfully sent.`,
+            organizationId,
+          },
+        });
+      }
+    }
+  } else if (step.actionType === "send_template" && step.templateName) {
+    const templateName = step.templateName;
+    const bodyParameters = [];
+
+    if (templateName === "cart_recovery") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+      bodyParameters.push({ type: "text" as const, text: attrs.cart_checkout_url || attrs.shopify_checkout_url || "https://wappflow.com" });
+    } else if (templateName === "order_confirmation") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+      bodyParameters.push({ type: "text" as const, text: attrs.cart_total ? `₹${attrs.cart_total}` : "" });
+    } else if (templateName === "order_shipped") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+      bodyParameters.push({ type: "text" as const, text: attrs.last_tracking_carrier || "DHL" });
+      bodyParameters.push({ type: "text" as const, text: attrs.last_tracking_url || "" });
+    } else {
+      // Default fallback parameter mappings
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+      bodyParameters.push({ type: "text" as const, text: attrs.cart_checkout_url || attrs.shopify_checkout_url || attrs.last_tracking_url || "" });
+    }
+
+    const r = await sendWhatsAppMessage(
+      {
+        to: phone,
+        template: {
+          name: templateName,
+          language: { code: "en_US" },
+          components: [
+            {
+              type: "body",
+              parameters: bodyParameters,
+            },
+          ],
+        },
+      },
       organizationId
     );
-  } else if (step.actionType === "send_message" && step.message) {
-    await sendWhatsAppMessage({ to: phone, text: step.message }, organizationId);
+    sentOk = r.ok;
+    if (r.ok) sentPreview = `[Template: ${templateName}]`;
   }
-  // "add_tag" / "branch" handled by future iterations (see docs T-03).
+
+  // Log the sequence send to chat history + record a sequence attribution touch.
+  if (sentOk && sentPreview) {
+    const { prisma } = await import("@/shared/lib/prisma");
+    const d = new Date();
+    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const preview = sentPreview.length > 50 ? sentPreview.slice(0, 47) + "..." : sentPreview;
+
+    await prisma.message.create({
+      data: {
+        sender: "agent",
+        text: preview,
+        timestamp: timeStr,
+        contactId: contact.id,
+        organizationId,
+      },
+    });
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: { lastMessage: preview, lastMessageTime: timeStr },
+    });
+
+    await recordTouch({
+      organizationId,
+      contactId: contact.id,
+      channel: "sequence",
+      sequenceId: step.sequenceId,
+    });
+  }
 }
 
 /** Cron worker: run all enrollments whose nextRunAt has arrived, one step each. */
@@ -108,7 +249,7 @@ export async function processDueEnrollments() {
     }
 
     try {
-      await executeStep(step, formatPhoneNumber(enrollment.contact.phone), enrollment.organizationId);
+      await executeStep(step, enrollment.contact, enrollment.organizationId);
     } catch (err) {
       console.error(`[Sequence] step failed for enrollment ${enrollment.id}:`, err);
     }
@@ -127,4 +268,116 @@ export async function processDueEnrollments() {
   }
 
   return { advanced, scanned: due.length };
+}
+
+/**
+ * Cron sweep: WhatsApp marketplace abandoned-cart detection.
+ *
+ * Unlike Shopify (which fires a `checkouts/create` webhook before an order),
+ * a native WhatsApp catalog cart immediately becomes a pending/unpaid Order.
+ * We therefore treat an Order that is still `pending` / unpaid past a threshold
+ * (default 60 min) as an abandoned cart and enroll the contact into any active
+ * `cart_abandoned` recovery sequence. Paying the order flips `cart_recovered`
+ * (see markCartRecovered) which excludes it from future sweeps.
+ *
+ * Idempotent: a per-contact `cart_recovery_enrolled` attribute flag prevents
+ * re-enrolling the same cart on every cron tick (and after the drip completes).
+ */
+export async function sweepAbandonedCarts(thresholdMinutes = 60) {
+  const { prisma } = await import("@/shared/lib/prisma");
+  const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000);
+
+  const staleOrders = await prisma.order.findMany({
+    where: {
+      status: "pending",
+      paymentStatus: "pending",
+      createdAt: { lt: cutoff },
+      contact: { tags: { has: "WhatsApp-Cart" } },
+    },
+    include: { contact: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  let enrolled = 0;
+  const handledContacts = new Set<string>();
+
+  for (const order of staleOrders) {
+    if (handledContacts.has(order.contactId)) continue;
+    handledContacts.add(order.contactId);
+
+    const attrs = (order.contact.attributes as Record<string, any>) || {};
+    if (attrs.cart_recovered === true || attrs.cart_recovery_enrolled === true) continue;
+
+    const d = new Date();
+    const timestampStr = `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+    attrs.cart_abandoned_at = attrs.cart_abandoned_at || timestampStr;
+    attrs.cart_recovery_enrolled = true;
+    await prisma.contact.update({
+      where: { id: order.contactId },
+      data: { attributes: attrs },
+    });
+
+    await enrollOnTrigger(order.organizationId, "cart_abandoned", order.contactId);
+
+    await prisma.systemLog.create({
+      data: {
+        timestamp: timeStr,
+        type: "integration",
+        message: `WhatsApp Marketplace: Cart abandoned by ${order.contact.name} (₹${attrs.cart_total || "0.00"}). Scheduling drip recovery sequence.`,
+        organizationId: order.organizationId,
+      },
+    });
+
+    await prisma.message.create({
+      data: {
+        sender: "system",
+        text: `[Marketplace Automations] Cart abandoned (₹${attrs.cart_total || "0.00"}). Enrolled ${order.contact.name} into the Cart Recovery sequence.`,
+        timestamp: timestampStr,
+        contactId: order.contactId,
+        organizationId: order.organizationId,
+      },
+    });
+
+    enrolled++;
+  }
+
+  return { enrolled, scanned: staleOrders.length };
+}
+
+/**
+ * Mark a contact's cart as recovered and stop any active abandoned-cart drip.
+ * Safe to call on any successful payment (Shopify, marketplace, reorder) — it
+ * is idempotent and a no-op when there is nothing to recover.
+ */
+export async function markCartRecovered(organizationId: string, contactId: string) {
+  const { prisma } = await import("@/shared/lib/prisma");
+
+  const contact = await prisma.contact.findUnique({ where: { id: contactId } });
+  if (!contact) return;
+
+  const attrs = (contact.attributes as Record<string, any>) || {};
+  if (attrs.cart_recovered !== true) {
+    attrs.cart_recovered = true;
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { attributes: attrs },
+    });
+  }
+
+  const activeEnrollments = await prisma.sequenceEnrollment.findMany({
+    where: {
+      contactId,
+      organizationId,
+      status: "active",
+      sequence: { trigger: "cart_abandoned" },
+    },
+  });
+  for (const enrollment of activeEnrollments) {
+    await prisma.sequenceEnrollment.update({
+      where: { id: enrollment.id },
+      data: { status: "completed", nextRunAt: null },
+    });
+  }
 }

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/features/auth/api/[...nextauth]/route";
 import { prisma } from "@/shared/lib/prisma";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
+import { recordTouch } from "@/features/analytics/services/attribution";
 
 export async function POST(request: NextRequest) {
   try {
@@ -145,6 +146,8 @@ export async function POST(request: NextRequest) {
                 campaignId: campaign.id
               }
             });
+            // D-04: record a campaign touch for last-touch revenue attribution.
+            await recordTouch({ organizationId, contactId: contact.id, channel: "campaign", campaignId: campaign.id });
           }
 
           await prisma.campaign.update({

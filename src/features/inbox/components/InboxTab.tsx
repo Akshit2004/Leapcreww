@@ -18,7 +18,9 @@ import {
   ShoppingBag,
   ExternalLink,
   Laptop,
-  ArrowLeft
+  ArrowLeft,
+  Sparkles,
+  Copy
 } from "lucide-react";
 import { useApp, Message } from "@/shared/context/AppContext";
 import { useSession } from "next-auth/react";
@@ -38,7 +40,8 @@ export const InboxTab: React.FC = () => {
     members,
     lockSync,
     unlockSync,
-    refreshWorkspace
+    refreshWorkspace,
+    orders
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,6 +51,32 @@ export const InboxTab: React.FC = () => {
   const [showSimulate, setShowSimulate] = useState(false);
   const [simMessage, setSimMessage] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [replySuggestions, setReplySuggestions] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
+  const fetchReplySuggestions = React.useCallback(async () => {
+    if (!activeContactId || !orgId) return;
+    setLoadingSuggestions(true);
+    try {
+      const res = await fetch(`/api/ai/reply-suggestions?contactId=${activeContactId}&orgId=${orgId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setReplySuggestions(data.suggestions || []);
+      }
+    } catch (err) {
+      console.error("Suggestions error:", err);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [activeContactId, orgId]);
+
+  useEffect(() => {
+    if (activeContactId) {
+      fetchReplySuggestions();
+    } else {
+      setReplySuggestions([]);
+    }
+  }, [activeContactId, fetchReplySuggestions]);
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -110,6 +139,7 @@ export const InboxTab: React.FC = () => {
           orgId: orgId
         }),
       });
+      setTimeout(() => fetchReplySuggestions(), 800);
     } catch (err) {
       console.error("Failed to sync live chat message with backend:", err);
     } finally {
@@ -169,6 +199,7 @@ export const InboxTab: React.FC = () => {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         })
       });
+      setTimeout(() => fetchReplySuggestions(), 800);
     } catch (err) {
       console.error(err);
     } finally {
@@ -497,6 +528,35 @@ export const InboxTab: React.FC = () => {
               <div ref={chatEndRef} />
             </div>
 
+            {/* AI Reply Suggestions Bar */}
+            <div className="px-4 py-2 bg-stone-50 border-t border-stone-200 flex items-center gap-3 shrink-0 relative z-10 overflow-x-auto custom-scrollbar select-none">
+              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex items-center gap-1 shrink-0">
+                <Sparkles className="w-3 h-3 text-emerald-600 animate-pulse" />
+                AI Assist:
+              </span>
+              {loadingSuggestions ? (
+                <div className="flex gap-1.5 items-center">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <span className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider">Drafting Suggestions...</span>
+                </div>
+              ) : replySuggestions.length === 0 ? (
+                <span className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider">No suggestions available</span>
+              ) : (
+                replySuggestions.map((sug, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setInputText(sug)}
+                    className="text-xs font-semibold bg-white hover:bg-stone-100 border border-stone-200 px-3.5 py-1.5 whitespace-nowrap cursor-pointer rounded-lg text-stone-700 transition-all hover:border-stone-300 shadow-sm active:scale-95 shrink-0"
+                  >
+                    {sug}
+                  </button>
+                ))
+              )}
+            </div>
+
             {/* ─── Input Bar ─── */}
             <form 
               onSubmit={handleSendMessage}
@@ -639,6 +699,133 @@ export const InboxTab: React.FC = () => {
                     </div>
                   </div>
                 )}
+                
+                {/* Unified E-Commerce Integration Panel (Shopify + WhatsApp Marketplace) */}
+                {(() => {
+                  const attrs = (activeContact.attributes as Record<string, any>) || {};
+                  const isWhatsAppCart = activeContact.tags.includes("WhatsApp-Cart");
+                  const isShopifyCart = activeContact.tags.includes("Shopify-Cart");
+                  const checkoutUrl = attrs.shopify_checkout_url || attrs.cart_checkout_url || "";
+                  const isCartAbandoned = (isShopifyCart || isWhatsAppCart) && checkoutUrl && !attrs.cart_recovered;
+                  const cartSource = isWhatsAppCart ? "WhatsApp Marketplace" : "Shopify";
+                  const customerOrders = (orders || []).filter(
+                    (o) => o.contactId === activeContact.id || o.phone === activeContact.phone
+                  );
+
+                  if (!isCartAbandoned && customerOrders.length === 0) return null;
+
+                  return (
+                    <div className="space-y-4 pt-1">
+                      <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 select-none flex items-center gap-1">
+                        <ShoppingBag className="w-3.5 h-3.5 text-stone-400" />
+                        E-Commerce
+                      </h4>
+
+                      {/* 1. Abandoned Checkout Alert */}
+                      {isCartAbandoned && (
+                        <div className="bg-amber-50/50 border border-amber-200/60 p-4 rounded-2xl space-y-3 shadow-sm select-text text-xs relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-100/10 rounded-full blur-2xl pointer-events-none" />
+                          <div className="flex items-center justify-between">
+                            <span className="text-[8px] font-black tracking-widest uppercase bg-amber-100 text-amber-800 px-2 py-0.5 border border-amber-200 rounded-md">
+                              🛒 {cartSource} Cart
+                            </span>
+                            <span className="text-[10px] font-bold text-stone-900">
+                              ₹{attrs.cart_total || "0.00"}
+                            </span>
+                          </div>
+                          
+                          <div className="text-[11px] text-stone-600 font-medium">
+                            <p className="font-bold text-stone-850 truncate max-w-[220px]" title={attrs.cart_items}>
+                              {attrs.cart_items || "Line items missing"}
+                            </p>
+                            <p className="text-[9px] text-stone-400 mt-1 uppercase tracking-wide">
+                              Abandoned: {attrs.cart_abandoned_at || "Recent"}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1.5 select-none">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(checkoutUrl);
+                                alert("Checkout URL copied to clipboard!");
+                              }}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 border border-amber-200 bg-white hover:bg-amber-50/60 text-[9px] font-black uppercase tracking-wider text-amber-800 transition-all cursor-pointer rounded-xl active:scale-[0.97]"
+                            >
+                              <Copy className="w-3 h-3" />
+                              Copy Link
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const phoneNum = activeContact.phone.replace(/[^0-9]/g, "");
+                                try {
+                                  await fetch("/api/whatsapp/send", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      to: phoneNum,
+                                      text: `Hi ${activeContact.name}, we noticed you left some items in your cart (total value: ₹${attrs.cart_total}). You can complete your checkout here: ${checkoutUrl}`,
+                                      contactId: activeContact.id,
+                                      orgId: orgId,
+                                    }),
+                                  });
+                                  alert("Recovery reminder dispatched!");
+                                  refreshWorkspace(orgId);
+                                } catch (err) {
+                                  alert("Failed to send reminder.");
+                                }
+                              }}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer rounded-xl active:scale-[0.97]"
+                            >
+                              <Send className="w-3 h-3" />
+                              Remind
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. Customer Order History */}
+                      {customerOrders.length > 0 && (
+                        <div className="space-y-2.5">
+                          <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block">
+                            Recent Orders ({customerOrders.length})
+                          </span>
+                          <div className="space-y-2 max-h-44 overflow-y-auto pr-1 custom-scrollbar">
+                            {customerOrders.map((order: any) => {
+                              const orderStatus = order.status || "pending";
+                              let badgeColor = "bg-stone-50 text-stone-600 border-stone-200";
+                              if (orderStatus === "confirmed") badgeColor = "bg-indigo-50 text-indigo-700 border-indigo-200";
+                              if (orderStatus === "shipped") badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
+                              if (orderStatus === "delivered") badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
+
+                              return (
+                                <div key={order.id} className="border border-stone-200 p-3 bg-stone-50/20 rounded-xl flex items-center justify-between gap-3 text-xs">
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-stone-900 uppercase text-[10px] tracking-wide truncate max-w-[120px]">
+                                      {order.orderId}
+                                    </p>
+                                    <p className="text-[9px] text-stone-400 mt-0.5">
+                                      {new Date(order.createdAt).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                                    <span className="font-bold text-stone-900">
+                                      ₹{(order.total / 100).toFixed(2)}
+                                    </span>
+                                    <span className={`text-[7px] font-black tracking-widest uppercase px-1.5 py-0.5 border ${badgeColor}`}>
+                                      {orderStatus}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Agent Assignment */}
                 <div className="space-y-2 select-none">

@@ -75,6 +75,7 @@ model Organization {
   usageEvents          UsageEvent[]
   apiKeys              ApiKey[]
   webhookSubscriptions WebhookSubscription[]
+  attributionTouches   AttributionTouch[]
 
   // Flow Encryption automation state
   flowsPrivateKey      String?    @db.Text
@@ -122,6 +123,7 @@ model Contact {
   orders         Order[]
   enrollments    SequenceEnrollment[]
   flowResponses  FlowResponse[]
+  attributionTouches AttributionTouch[]
   sourceAdId     String?      // Tracks the Meta Ad ID that originated this contact
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -288,6 +290,12 @@ model Order {
   razorpaySignature String?
   address           Json?
   phone             String
+
+  // Conversion attribution (D-04) — stamped at order creation via last-touch resolution
+  attributedCampaignId  String?  // last campaign touch within window at order time
+  attributedSequenceId  String?  // last sequence touch within window at order time
+  attributedAgent       String?  // snapshot of contact.assignedAgent at order time
+
   organizationId    String
   organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt         DateTime     @default(now())
@@ -522,4 +530,22 @@ model Partner {
   organizations Organization[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+}
+
+// D-04 — Conversion-first analytics: last-touch attribution trail.
+// One row per outbound marketing send (campaign or sequence step) to a contact.
+// resolveAttribution() reads the latest row within a window to stamp Orders.
+model AttributionTouch {
+  id             String       @id @default(uuid())
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  channel        String       // "campaign" | "sequence"
+  campaignId     String?
+  sequenceId     String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([contactId, createdAt])
+  @@index([organizationId, createdAt])
 }
