@@ -19,7 +19,8 @@ import {
   HelpCircle,
   ThumbsUp,
   Globe,
-  GlobeOff
+  GlobeOff,
+  RefreshCw
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
@@ -68,6 +69,28 @@ export const TemplatesTab: React.FC = () => {
 
   // Client-side quick validation rules
   const [clientWarnings, setClientWarnings] = useState<string[]>([]);
+
+  // Sync templates from Meta into the local database
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncTemplates = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const res = await fetch(`/api/org/${orgId}/templates/sync`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        addSystemLog("crm", `Template sync failed: ${data.error || "Unknown error"}`);
+      } else {
+        addSystemLog("crm", `Synced ${data.count ?? 0} template(s) from Meta.`);
+        await refreshWorkspace(orgId);
+      }
+    } catch (err) {
+      addSystemLog("crm", `Template sync failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Brand-Aware AI generator (topic + URL → body copy)
   const [showGenerator, setShowGenerator] = useState(false);
@@ -323,6 +346,14 @@ export const TemplatesTab: React.FC = () => {
           <p className="text-stone-500 text-xs mt-1">Manage WhatsApp-compliant template layouts, media variables, and quick action headers.</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleSyncTemplates}
+            disabled={isSyncing}
+            className="bg-white hover:bg-stone-100 text-stone-900 font-bold text-xs px-4 py-2.5 rounded-none flex items-center gap-2 cursor-pointer border border-stone-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
+            {isSyncing ? "SYNCING..." : "SYNC FROM META"}
+          </button>
           <button
             onClick={() => setIsModalOpen(true)}
             className="bg-stone-950 hover:bg-stone-900 text-white font-bold text-xs px-4 py-2.5 rounded-none flex items-center gap-2 cursor-pointer border border-stone-950 transition-all"
