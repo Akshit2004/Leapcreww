@@ -4,6 +4,20 @@ import { sendWhatsAppMessage } from "@/shared/lib/whatsapp";
 
 import crypto from "crypto";
 
+// ─── Razorpay webhook payload (only the fields this handler reads) ────────
+interface RazorpayEntity {
+  id?: string;
+  order_id?: string;
+}
+interface RazorpayWebhookPayload {
+  event?: string;
+  payload?: {
+    payment?: { entity?: RazorpayEntity };
+    order?: { entity?: RazorpayEntity };
+    payment_link?: { entity?: RazorpayEntity };
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
@@ -19,12 +33,14 @@ export async function POST(req: NextRequest) {
       .update(bodyText)
       .digest("hex");
 
-    if (signature !== expected) {
+    const expectedBuf = Buffer.from(expected);
+    const sigBuf = Buffer.from(signature ?? "");
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
       console.warn("Razorpay webhook: invalid signature");
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
-    const payload = JSON.parse(bodyText);
+    const payload: RazorpayWebhookPayload = JSON.parse(bodyText);
     const event = payload.event;
 
     if (event === "payment.captured" || event === "order.paid" || event === "payment_link.paid") {
@@ -104,6 +120,6 @@ We'll notify you when it ships. Reply *ORDERS* to check status anytime.`;
     return NextResponse.json({ status: "ok" });
   } catch (err: unknown) {
     console.error("Razorpay webhook error:", err);
-    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

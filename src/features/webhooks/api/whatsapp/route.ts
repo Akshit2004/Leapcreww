@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhook, validateWebhookSignature, WhatsAppWebhookPayload } from "@/shared/lib/whatsapp";
 import { prisma } from "@/shared/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { handleAutoResponder } from "@/shared/lib/autoresponder";
 import { handleMarketplaceMessage } from "@/shared/lib/marketplace";
 import { resolveAttribution } from "@/features/analytics/services/attribution";
@@ -204,7 +205,7 @@ async function processInboundMessage(
   const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
   if (contact) {
-    const updateData: any = {
+    const updateData: Prisma.ContactUpdateInput = {
       lastMessage: text,
       lastMessageTime: timeStr,
       unreadCount: { increment: 1 },
@@ -325,7 +326,7 @@ async function processInboundMessage(
       const cartItemsSummary = orderItemsToCreate
         .map((i) => `${i.name} (x${i.quantity})`)
         .join(", ");
-      const existingAttrs = (contact.attributes as Record<string, any>) || {};
+      const existingAttrs = (contact.attributes as Record<string, unknown>) || {};
       const updatedCartTags = Array.from(new Set([...contact.tags, "WhatsApp-Cart"]));
 
       const { sendWhatsAppMessage, formatPhoneNumber } = await import("@/shared/lib/whatsapp");

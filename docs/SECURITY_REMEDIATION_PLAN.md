@@ -30,11 +30,11 @@ Check the box when the fix is merged and verified. Do Phase 0 before any product
 | 6 | 🟡 Medium | OTP-send has no per-phone throttle (WhatsApp OTP bombing) | 1 | ☑ |
 | 7 | 🟡 Medium | Partner provisioning lacks an admin role gate (privilege escalation) | 1 | ☑ |
 | 8 | 🟡 Medium | Vulnerable dependencies (`npm audit`: 11, 4 high) | 1 | ◑ |
-| 9 | 🟡 Medium | Internal error messages returned to clients (info disclosure) | 2 | ☐ |
-| 10 | 🟡 Medium | Shopify upsert keyed on global `id: email` → cross-tenant contact collision | 2 | ☐ |
-| 11 | 🟢 Low | Razorpay webhook uses non-constant-time signature compare | 2 | ☐ |
-| 12 | 🟢 Low | `any` casts in webhook handlers (Article IV violation) | 2 | ☐ |
-| 13 | 🟢 Low | Default verify token committed in `.env.example` | 2 | ☐ |
+| 9 | 🟡 Medium | Internal error messages returned to clients (info disclosure) | 2 | ☑ |
+| 10 | 🟡 Medium | Shopify upsert keyed on global `id: email` → cross-tenant contact collision | 2 | ☑ |
+| 11 | 🟢 Low | Razorpay webhook uses non-constant-time signature compare | 2 | ☑ |
+| 12 | 🟢 Low | `any` casts in webhook handlers (Article IV violation) | 2 | ☑ |
+| 13 | 🟢 Low | Default verify token committed in `.env.example` | 2 | ☑ |
 
 **Already remediated this session (context, no action needed):**
 - ✅ Per-customer rate limiting ([`src/proxy.ts`](../src/proxy.ts) + [`src/shared/lib/ratelimit.ts`](../src/shared/lib/ratelimit.ts))
@@ -201,8 +201,11 @@ bump majors manually where needed. Re-run the verification gates after.
 - All **4 high** advisories were a single root cause: the `uploadthing` chain pulled a nested
   `effect@3.17.7` (the rest of the tree was already on `3.20.0`). Fixed with a pinned
   `"overrides": { "effect": "^3.20.0" }` in `package.json` (a minor, compatible bump) — **0 high** now.
-- `nodemailer` 7→8 applied (real forward security fix; our `createTransport`/`sendMail` usage is
-  stable across the major, and the injection advisories don't touch our code paths).
+- `nodemailer` **stays on 7.x** — an 8.x bump was attempted but `next-auth@4` declares
+  `peerOptional nodemailer@^7.0.7`, so 8.x breaks the install on a clean resolver (Vercel `npm install`
+  → `ERESOLVE`). The nodemailer advisory (SMTP `envelope.size` / CRLF transport-name injection) is
+  not reachable from our `email.ts` (`createTransport`/`sendMail`) usage — accepted as residual risk
+  until next-auth v5 loosens the peer.
 - **7 moderate remain, accepted as residual risk.** `npm`'s only proposed remediation for each is a
   *downgrade* of a framework we run on the latest major of — `next@9.3.3` (from 16),
   `next-auth@1.12.1` (from 4), `prisma@6.x` (from 7). Applying `npm audit fix --force` would break the

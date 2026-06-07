@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/shared/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
 import { resolveAttribution } from "@/features/analytics/services/attribution";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
@@ -89,6 +90,41 @@ interface ShopifyWebhookPayload {
   abandoned_checkout_url?: string;
 }
 
+// Tenant-scoped contact upsert for Shopify events.
+// Keyed by (organizationId, email) — never the global id — so two orgs sharing a
+// customer email get distinct contacts. When the customer has no email, dedupe by
+// phone within the org (also catches WhatsApp-created contacts) and synthesize a
+// unique email so the (organizationId, email) constraint always holds.
+async function upsertShopifyContact(
+  orgId: string,
+  email: string,
+  name: string,
+  phone: string,
+  source: string,
+  tags: string[]
+) {
+  if (email) {
+    return prisma.contact.upsert({
+      where: { organizationId_email: { organizationId: orgId, email } },
+      update: { name, phone, source, tags: { set: tags }, status: "Active" },
+      create: { name, phone, email, source, tags, status: "Active", organizationId: orgId },
+    });
+  }
+
+  const existing = await prisma.contact.findFirst({ where: { phone, organizationId: orgId } });
+  if (existing) {
+    return prisma.contact.update({
+      where: { id: existing.id },
+      data: { name, source, tags: { set: Array.from(new Set([...existing.tags, ...tags])) }, status: "Active" },
+    });
+  }
+
+  const syntheticEmail = `${phone.replace(/[^0-9]/g, "") || "unknown"}@shopify.customer`;
+  return prisma.contact.create({
+    data: { name, phone, email: syntheticEmail, source, tags, status: "Active", organizationId: orgId },
+  });
+}
+
 // ─── 3. CORE WEBHOOK EVENT PARSER & HANDLER ────────────────────────────
 async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload, orgId: string) {
   const d = new Date();
@@ -101,33 +137,21 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
     return rawPhone.startsWith("+") ? rawPhone : `+${rawPhone.replace(/[^0-9]/g, "")}`;
   };
 
-  const email = payload.customer?.email || payload.email || "shopify@test.wappflow.com";
+  const email = payload.customer?.email || payload.email || "";
   const name = `${payload.customer?.first_name || "Shopify"} ${payload.customer?.last_name || "Customer"}`.trim();
   const phone = extractPhone(payload.billing_address || payload.shipping_address);
 
   // A. HANDLE ABANDONED CART TRIGGER
   if (topic === "checkouts/create" || topic === "checkouts/update") {
-    // 1. Create or Update Customer Contact in WappFlow
-    const contact = await prisma.contact.upsert({
-      where: { id: email }, // Standard email identifier
-      update: {
-        name,
-        phone,
-        source: "Shopify Checkout",
-        tags: { set: ["Shopify", "Shopify-Cart"] },
-        status: "Active",
-      },
-      create: {
-        id: email,
-        name,
-        phone,
-        email,
-        source: "Shopify Checkout",
-        tags: ["Shopify", "Shopify-Cart"],
-        status: "Active",
-        organizationId: orgId,
-      },
-    });
+    // 1. Create or Update Customer Contact in WappFlow (tenant-scoped by email)
+    const contact = await upsertShopifyContact(
+      orgId,
+      email,
+      name,
+      phone,
+      "Shopify Checkout",
+      ["Shopify", "Shopify-Cart"]
+    );
 
     // Sync line items to Cart / CartItem tables
     const lineItems = payload.line_items || [];
@@ -174,7 +198,7 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
     }
 
     // Save checkout attributes in contact profile
-    const contactAttributes = (contact.attributes as Record<string, any>) || {};
+    const contactAttributes = (contact.attributes as Record<string, unknown>) || {};
     contactAttributes.shopify_checkout_url = payload.abandoned_checkout_url || "";
     contactAttributes.cart_total = payload.total_price || "0.00";
     contactAttributes.cart_items = lineItems.map((i) => `${i.title} (x${i.quantity || 1})`).join(", ");
@@ -183,7 +207,7 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
 
     await prisma.contact.update({
       where: { id: contact.id },
-      data: { attributes: contactAttributes },
+      data: { attributes: contactAttributes as Prisma.InputJsonValue },
     });
 
     // 2. Log event in DB system log
@@ -215,34 +239,22 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
 
   // B. HANDLE ORDER CREATED / CONFIRMED
   if (topic === "orders/create") {
-    // 1. Create or Update Customer Contact in WappFlow
-    const contact = await prisma.contact.upsert({
-      where: { id: email },
-      update: {
-        name,
-        phone,
-        source: "Shopify Purchase",
-        tags: { set: ["Shopify", "Shopify-Buyer"] },
-        status: "Active",
-      },
-      create: {
-        id: email,
-        name,
-        phone,
-        email,
-        source: "Shopify Purchase",
-        tags: ["Shopify", "Shopify-Buyer"],
-        status: "Active",
-        organizationId: orgId,
-      },
-    });
+    // 1. Create or Update Customer Contact in WappFlow (tenant-scoped by email)
+    const contact = await upsertShopifyContact(
+      orgId,
+      email,
+      name,
+      phone,
+      "Shopify Purchase",
+      ["Shopify", "Shopify-Buyer"]
+    );
 
     // Update attributes to mark cart as recovered
-    const contactAttributes = (contact.attributes as Record<string, any>) || {};
+    const contactAttributes = (contact.attributes as Record<string, unknown>) || {};
     contactAttributes.cart_recovered = true;
     await prisma.contact.update({
       where: { id: contact.id },
-      data: { attributes: contactAttributes },
+      data: { attributes: contactAttributes as Prisma.InputJsonValue },
     });
 
     // Cancel active abandoned cart sequence enrollments
@@ -411,14 +423,14 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       });
 
       // Update Contact attributes with shipping info
-      const contactAttributes = (contact.attributes as Record<string, any>) || {};
+      const contactAttributes = (contact.attributes as Record<string, unknown>) || {};
       contactAttributes.last_tracking_carrier = trackingCompany;
       contactAttributes.last_tracking_number = trackingNumber;
       contactAttributes.last_tracking_url = trackingUrl;
 
       await prisma.contact.update({
         where: { id: contact.id },
-        data: { attributes: contactAttributes },
+        data: { attributes: contactAttributes as Prisma.InputJsonValue },
       });
 
       // 24-hour session window check

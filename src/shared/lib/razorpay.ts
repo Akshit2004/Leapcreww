@@ -57,5 +57,8 @@ export function verifyRazorpayPayment(
     .createHmac("sha256", config.webhookSecret)
     .update(orderId + "|" + paymentId)
     .digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  // Length guard: timingSafeEqual throws RangeError on unequal buffer lengths.
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }

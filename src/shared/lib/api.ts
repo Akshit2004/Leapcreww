@@ -41,8 +41,9 @@ export function route(
       return await handler(req, { params });
     } catch (err) {
       if (err instanceof ApiError) return fail(err.message, err.status);
+      // Never leak internal error details to the client; log them server-side.
       console.error("[api] Unhandled route error:", err);
-      return fail(err instanceof Error ? err.message : "Internal error", 500);
+      return fail("Internal error", 500);
     }
   };
 }
