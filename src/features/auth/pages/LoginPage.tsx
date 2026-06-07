@@ -4,9 +4,9 @@ import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, getSession } from "next-auth/react";
-import { 
-  Bot, ArrowRight, Mail, AlertCircle, Loader, CheckCircle, 
-  MessageSquare, Copy, Building, User
+import {
+  Bot, ArrowRight, Mail, AlertCircle, Loader, CheckCircle,
+  MessageSquare, Copy, Building, User, Lock
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -19,7 +19,8 @@ function LoginContent() {
   
   // Email Form states
   const [email, setEmail] = useState("");
-  
+  const [password, setPassword] = useState("");
+
   // WhatsApp QR Attempt states
   const [waAttemptId, setWaAttemptId] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState("");
@@ -181,35 +182,45 @@ function LoginContent() {
     };
   }, [waAttemptId, activeTab, showOnboarding, router]);
 
-  // Handle Email OTP Dispatch
-  const handleSendEmailOtp = async (e: React.FormEvent) => {
+  // Handle Email + Password Login
+  const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || otpCooldown > 0) return;
+    if (!email.trim() || !password) return;
 
     setErrorMsg("");
     setSuccessMsg("");
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/email-otp/initiate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+      const authRes = await signIn("credentials", {
+        email: email.trim(),
+        password,
+        redirect: false,
       });
-      const data = await res.json();
 
-      if (data.success) {
-        setCurrentAttemptId(data.attemptId);
-        setOtpSent(true);
-        setOtpCooldown(60);
-        setSuccessMsg("OTP successfully sent to your email address.");
-        setTimeout(() => otpInputsRef.current[0]?.focus(), 100);
+      if (authRes?.error) {
+        setErrorMsg("Incorrect email address or password.");
+        setLoading(false);
+        return;
+      }
+
+      const session = await getSession();
+      interface CustomSessionUser {
+        activeOrgId?: string | null;
+        organizations?: Array<{ id: string; name: string; slug: string }>;
+      }
+      const activeOrgId =
+        (session?.user as unknown as CustomSessionUser)?.activeOrgId ||
+        (session?.user as unknown as CustomSessionUser)?.organizations?.[0]?.id;
+
+      if (activeOrgId) {
+        router.push(`/org/${activeOrgId}`);
       } else {
-        setErrorMsg(data.error || "Failed to dispatch OTP. Please try again.");
+        setErrorMsg("No active workspace found for this profile.");
+        setLoading(false);
       }
     } catch {
-      setErrorMsg("Unable to connect to OTP dispatch servers.");
-    } finally {
+      setErrorMsg("Unable to sign in. Please try again.");
       setLoading(false);
     }
   };
@@ -341,21 +352,19 @@ function LoginContent() {
     ]);
 
     try {
-      const payload: any = {
+      const payload: Record<string, string> = {
         name: obName.trim(),
         organizationName: obOrgName.trim(),
-        attemptId: currentAttemptId,
+        attemptId: currentAttemptId ?? "",
         attemptType: onboardingType
       };
 
       if (onboardingType === "email") {
         payload.email = verifiedEmailOrPhone;
       } else {
-        // user verified via WhatsApp, we need an email to complete their profile
-        // Wait, for WhatsApp, they didn't provide email yet! Let's just use a dummy one or ask for it?
-        // Actually, we should collect email if they used whatsapp. 
-        // For passwordless, we need an email as primary key.
-        payload.email = `${verifiedEmailOrPhone.replace(/[^0-9]/g, "")}@wa.wappflow.internal`; // temporary placeholder
+        // WhatsApp new users have no email yet — seed a placeholder so the email
+        // primary key is satisfied; they continue to sign in via WhatsApp.
+        payload.email = `${verifiedEmailOrPhone.replace(/[^0-9]/g, "")}@wa.wappflow.internal`;
         payload.phone = verifiedEmailOrPhone;
       }
 
@@ -506,11 +515,11 @@ function LoginContent() {
               }}
               className={`w-1/2 text-center py-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                 activeTab === "email" 
-                  ? "bg-white text-stone-900 shadow-sm" 
+                  ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-500 hover:text-stone-800"
               }`}
             >
-              Email OTP
+              Email & Password
             </button>
             <button
               type="button"
@@ -673,95 +682,57 @@ function LoginContent() {
             </div>
           )}
 
-          {/* Email OTP Login Panel */}
+          {/* Email + Password Login Panel */}
           {activeTab === "email" && (
             <div className="space-y-4 animate-slide-up">
-              {!otpSent ? (
-                <form onSubmit={handleSendEmailOtp} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
-                      <Mail className="w-3 h-3" />
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      disabled={loading}
-                      placeholder="e.g. alex@wappflow.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
-                    />
-                  </div>
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
+                    <Mail className="w-3 h-3" />
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    disabled={loading}
+                    placeholder="e.g. alex@wappflow.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
+                  />
+                </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading || !email.trim()}
-                    className="w-full bg-stone-900 hover:bg-stone-850 disabled:opacity-40 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98"
-                  >
-                    {loading ? (
-                      <Loader className="w-3.5 h-3.5 animate-spin text-white" />
-                    ) : (
-                      <>
-                        <span>Send Login Code</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </>
-                    )}
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleOtpSubmit} className="space-y-3">
-                  <div className="grid grid-cols-6 gap-1.5">
-                    {otpValues.map((digit, idx) => (
-                      <input
-                        key={idx}
-                        type="text"
-                        maxLength={1}
-                        required
-                        disabled={otpVerifying}
-                        value={digit}
-                        onChange={(e) => handleOtpChange(idx, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                        ref={(el) => { otpInputsRef.current[idx] = el; }}
-                        className="w-full aspect-square text-center font-mono text-base font-bold bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-850 focus:border-transparent disabled:opacity-50 transition-all select-text"
-                      />
-                    ))}
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
+                    <Lock className="w-3 h-3" />
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    disabled={loading}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
+                  />
+                </div>
 
-                  <div className="flex items-center justify-between text-[10px]">
-                    {otpCooldown > 0 ? (
-                      <span className="text-stone-400 font-mono font-medium">Resend in 00:{otpCooldown < 10 ? "0" : ""}{otpCooldown}</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleSendEmailOtp}
-                        className="text-emerald-800 hover:text-emerald-700 font-bold underline cursor-pointer"
-                      >
-                        Resend OTP
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setOtpSent(false)}
-                      className="text-stone-500 hover:text-stone-700 font-semibold"
-                    >
-                      Change email
-                    </button>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={otpVerifying || otpValues.join("").length !== 6}
-                    className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-55 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all active:scale-98 shadow-sm flex items-center justify-center gap-1.5"
-                  >
-                    {otpVerifying ? (
-                      <Loader className="w-3.5 h-3.5 animate-spin text-white" />
-                    ) : (
-                      <span>Verify & Login</span>
-                    )}
-                  </button>
-                </form>
-              )}
+                <button
+                  type="submit"
+                  disabled={loading || !email.trim() || !password}
+                  className="w-full bg-stone-900 hover:bg-stone-850 disabled:opacity-40 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98"
+                >
+                  {loading ? (
+                    <Loader className="w-3.5 h-3.5 animate-spin text-white" />
+                  ) : (
+                    <>
+                      <span>Sign In</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
           )}
 

@@ -4,9 +4,9 @@ import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, getSession } from "next-auth/react";
-import { 
-  Bot, ArrowRight, Mail, AlertCircle, Loader, CheckCircle, 
-  MessageSquare, Copy, Building, User
+import {
+  Bot, ArrowRight, Mail, AlertCircle, Loader, CheckCircle,
+  MessageSquare, Copy, Building, User, Lock
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -46,6 +46,7 @@ function SignupContent() {
   const [verifiedEmailOrPhone, setVerifiedEmailOrPhone] = useState("");
   const [obName, setObName] = useState("");
   const [obOrgName, setObOrgName] = useState("");
+  const [obPassword, setObPassword] = useState("");
   const [obLoading, setObLoading] = useState(false);
   const [obLogs, setObLogs] = useState<string[]>([]);
   const [onboardingType, setOnboardingType] = useState<"email" | "whatsapp">("email");
@@ -282,8 +283,18 @@ function SignupContent() {
 
       if (data.success) {
         if (data.status === "VERIFIED") {
+          // An account already exists for this identity.
+          if (activeTab === "email") {
+            // Email accounts log in with a password — send them to the login page.
+            setOtpVerifying(false);
+            setSuccessMsg("An account with this email already exists. Redirecting you to sign in…");
+            setTimeout(() => router.push("/login?registered=true"), 1500);
+            return;
+          }
+
+          // WhatsApp is its own auth channel — complete the WhatsApp sign-in.
           const authRes = await signIn("credentials", {
-            type: activeTab,
+            type: "whatsapp",
             attemptId: currentAttemptId,
             redirect: false
           });
@@ -324,26 +335,34 @@ function SignupContent() {
   const handleOnboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!obName.trim() || !obOrgName.trim()) return;
+    // Email signups must set a password (used to log in afterwards).
+    if (onboardingType === "email") {
+      if (obPassword.length < 8) {
+        setErrorMsg("Password must be at least 8 characters.");
+        return;
+      }
+    }
 
     setErrorMsg("");
     setObLoading(true);
     setOnboardingStep(2);
 
     setObLogs([
-      "Verification token validated.",
+      "Email verification confirmed.",
       "Initiating registration sequence on central cluster...",
     ]);
 
     try {
-      const payload: any = {
+      const payload: Record<string, string> = {
         name: obName.trim(),
         organizationName: obOrgName.trim(),
-        attemptId: currentAttemptId,
+        attemptId: currentAttemptId ?? "",
         attemptType: onboardingType
       };
 
       if (onboardingType === "email") {
         payload.email = verifiedEmailOrPhone;
+        payload.password = obPassword;
       } else {
         payload.email = `${verifiedEmailOrPhone.replace(/[^0-9]/g, "")}@wa.wappflow.internal`; // temporary placeholder
         payload.phone = verifiedEmailOrPhone;
@@ -368,11 +387,19 @@ function SignupContent() {
 
       setTimeout(async () => {
         try {
-          const authRes = await signIn("credentials", {
-            type: onboardingType,
-            attemptId: currentAttemptId!,
-            redirect: false
-          });
+          // Email accounts sign in with their new password; WhatsApp accounts use
+          // the verified attempt. OTP is never used to authenticate.
+          const authRes = onboardingType === "email"
+            ? await signIn("credentials", {
+                email: verifiedEmailOrPhone,
+                password: obPassword,
+                redirect: false
+              })
+            : await signIn("credentials", {
+                type: "whatsapp",
+                attemptId: currentAttemptId!,
+                redirect: false
+              });
 
           if (authRes?.error) {
             setErrorMsg(authRes.error);
@@ -828,9 +855,28 @@ function SignupContent() {
                     />
                   </div>
 
+                  {onboardingType === "email" && (
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
+                        <Lock className="w-3 h-3" />
+                        Create Password
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        placeholder="At least 8 characters"
+                        value={obPassword}
+                        onChange={(e) => setObPassword(e.target.value)}
+                        className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 select-text"
+                      />
+                      <p className="text-[9px] text-stone-400 font-medium">You&apos;ll use this password to sign in.</p>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
-                    disabled={obLoading || !obName.trim() || !obOrgName.trim()}
+                    disabled={obLoading || !obName.trim() || !obOrgName.trim() || (onboardingType === "email" && obPassword.length < 8)}
                     className="w-full bg-stone-900 hover:bg-stone-850 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-98"
                   >
                     <span>Launch Workspace</span>

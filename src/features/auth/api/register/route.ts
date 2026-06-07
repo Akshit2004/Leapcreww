@@ -5,12 +5,15 @@ import { prisma } from "../../../../shared/lib/prisma";
 
 const RegisterSchema = z.object({
   email: z.string().trim().email("A valid email address is required").max(254),
-  password: z.string().max(200).optional(),
+  password: z.string().min(8, "Password must be at least 8 characters").max(200).optional(),
   name: z.string().trim().min(1, "Name is required").max(120),
   organizationName: z.string().trim().min(1, "Organization name is required").max(120),
   phone: z.string().max(20).optional(),
   attemptId: z.string().min(1, "Missing verification attempt ID."),
   attemptType: z.enum(["whatsapp", "email"]).default("whatsapp"),
+}).refine((d) => d.attemptType !== "email" || (d.password?.length ?? 0) >= 8, {
+  message: "A password is required for email signups.",
+  path: ["password"],
 });
 
 export async function POST(req: Request) {
@@ -26,8 +29,8 @@ export async function POST(req: Request) {
 
     const emailLower = email.toLowerCase().trim();
 
-    // Verify Attempt
-    let attempt: any = null;
+    // Verify Attempt (WhatsApp or Email OTP attempt — both carry status/expiry)
+    let attempt: { status: string; expiresAt: Date } | null = null;
     let hashedPassword = null;
 
     if (password) {
