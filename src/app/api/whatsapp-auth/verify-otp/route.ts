@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
+import crypto from "crypto";
+
+const MAX_OTP_ATTEMPTS = 5;
+
+/** Constant-time OTP comparison with an equal-length guard. */
+function otpMatches(stored: string | null, provided: string): boolean {
+  if (!stored) return false;
+  const a = Buffer.from(stored);
+  const b = Buffer.from(provided);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,7 +40,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Your authentication session has expired. Please request a new code." }, { status: 400 });
     }
 
-    if (attempt.otp !== otp.trim()) {
+    if (attempt.attempts >= MAX_OTP_ATTEMPTS) {
+      await prisma.whatsAppLoginAttempt.update({
+        where: { id: attemptId },
+        data: { status: "EXPIRED" },
+      });
+      return NextResponse.json({ success: false, error: "Too many incorrect attempts. Please request a new code." }, { status: 400 });
+    }
+
+    if (!otpMatches(attempt.otp, otp.trim())) {
+      const updated = await prisma.whatsAppLoginAttempt.update({
+        where: { id: attemptId },
+        data: { attempts: { increment: 1 } },
+      });
+      // Lock the attempt out the moment the cap is reached so no further guesses land.
+      if (updated.attempts >= MAX_OTP_ATTEMPTS) {
+        await prisma.whatsAppLoginAttempt.update({
+          where: { id: attemptId },
+          data: { status: "EXPIRED" },
+        });
+      }
       return NextResponse.json({ success: false, error: "Incorrect OTP code. Please try again." }, { status: 400 });
     }
 

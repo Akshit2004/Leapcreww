@@ -51,7 +51,7 @@ Mapped to the actual code so you know the starting line.
 | Commerce: products, cart, orders, Meta Catalog sync | ✅ Real | `Product/Cart/Order` models, `src/features/marketplace/*`, `lib/meta-catalog.ts` |
 | Payments: Razorpay checkout + webhook | ✅ Real | `lib/razorpay.ts`, `api/webhooks/razorpay`, `wallet/topup` |
 | Wallet / credits | ✅ Balance only | `Organization.walletBalance`, `WalletTopupModal` |
-| Shopify integration (OAuth + webhook) | ✅ Real | `src/app/api/shopify/*`, `integrations/api/shopify-webhook` |
+| Shopify integration (OAuth + webhook) | ✅ Real | `src/app/api/shopify/*`, `src/app/api/webhooks/shopify` (HMAC-verified), `org/[orgId]/integrations/shopify/sync` |
 | Multi-tenant orgs + memberships + roles (OWNER/ADMIN/AGENT) | ✅ Schema | `Organization`, `Membership`, `Role` |
 | Auth (NextAuth + WhatsApp OTP login) | ✅ | `src/features/auth/*`, `WhatsAppLoginAttempt` |
 | Analytics dashboard, ROI ledger, agent metrics, chatbot analytics | ✅ Partial | `src/features/analytics/*`, `api/org/[orgId]/analytics/*`, `ChatbotAnalytics` |

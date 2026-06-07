@@ -15,7 +15,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
 /** Tiers map to the protection level of an endpoint group. */
-export type RateLimitTier = "ai" | "publicApi" | "standard";
+export type RateLimitTier = "ai" | "publicApi" | "standard" | "otp";
 
 export interface RateLimitResult {
   success: boolean;
@@ -33,6 +33,8 @@ const TIERS: Record<RateLimitTier, { tokens: number; window: Parameters<typeof R
   publicApi: { tokens: 240, window: "1 m" },
   // Everything else under /api/*: normal operational headroom per user.
   standard: { tokens: 100, window: "10 s" },
+  // WhatsApp OTP sends — keyed by normalized phone to prevent OTP bombing.
+  otp: { tokens: 3, window: "15 m" },
 };
 
 let redis: Redis | null = null;

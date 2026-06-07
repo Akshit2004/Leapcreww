@@ -57,3 +57,21 @@ export function hasOrgRole(session: AppSession, orgId: string, minRole: Role = "
   if (!role) return false;
   return ROLE_RANK[role] >= ROLE_RANK[minRole];
 }
+
+/**
+ * True when the session's email is in the platform-admin allowlist.
+ *
+ * Platform-admin is a *cross-tenant* privilege (e.g. provisioning white-label
+ * partners) that no per-org Role can express. It's sourced from the
+ * PLATFORM_ADMIN_EMAILS env (comma-separated). Fail-closed: an empty/unset
+ * env means nobody qualifies.
+ */
+export function isPlatformAdmin(session: AppSession): boolean {
+  const allow = (process.env.PLATFORM_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (allow.length === 0) return false;
+  const email = session.user.email?.toLowerCase();
+  return !!email && allow.includes(email);
+}

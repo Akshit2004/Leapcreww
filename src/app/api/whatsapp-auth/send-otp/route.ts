@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
+import { checkRateLimit } from "@/shared/lib/ratelimit";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
@@ -17,7 +18,17 @@ export async function POST(req: NextRequest) {
       cleanPhone = `+${cleanPhone}`;
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Per-phone throttle to prevent WhatsApp OTP bombing (3 sends / 15 min).
+    // No-ops when Upstash isn't configured. Checked before any DB/Meta work.
+    const rl = await checkRateLimit("otp", `otp:${cleanPhone}`);
+    if (rl && !rl.success) {
+      return NextResponse.json(
+        { success: false, error: "Too many OTP requests. Please wait a few minutes before trying again." },
+        { status: 429 }
+      );
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins expiry
     
     const randomSuffix = crypto.randomBytes(6).toString("hex").toUpperCase();

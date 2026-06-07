@@ -25,11 +25,11 @@ Check the box when the fix is merged and verified. Do Phase 0 before any product
 | 1 | 🔴 Critical | WhatsApp webhook signature is skippable (`if (signature)`) → account takeover | 0 | ☑ |
 | 2 | 🔴 Critical | Unauthenticated debug endpoints leak cross-tenant data | 0 | ☑ |
 | 3 | 🟠 High | Shopify webhook has no HMAC verification + open "simulate" injection branch | 0 | ☑ |
-| 4 | 🟠 High | Shopify catalog sync (GET) is unauthenticated, acts on arbitrary `orgId` | 1 | ☐ |
-| 5 | 🟡 Medium | OTP uses `Math.random()` and has no max-try lockout | 1 | ☐ |
-| 6 | 🟡 Medium | OTP-send has no per-phone throttle (WhatsApp OTP bombing) | 1 | ☐ |
-| 7 | 🟡 Medium | Partner provisioning lacks an admin role gate (privilege escalation) | 1 | ☐ |
-| 8 | 🟡 Medium | Vulnerable dependencies (`npm audit`: 11, 4 high) | 1 | ☐ |
+| 4 | 🟠 High | Shopify catalog sync (GET) is unauthenticated, acts on arbitrary `orgId` | 1 | ☑ |
+| 5 | 🟡 Medium | OTP uses `Math.random()` and has no max-try lockout | 1 | ☑ |
+| 6 | 🟡 Medium | OTP-send has no per-phone throttle (WhatsApp OTP bombing) | 1 | ☑ |
+| 7 | 🟡 Medium | Partner provisioning lacks an admin role gate (privilege escalation) | 1 | ☑ |
+| 8 | 🟡 Medium | Vulnerable dependencies (`npm audit`: 11, 4 high) | 1 | ◑ |
 | 9 | 🟡 Medium | Internal error messages returned to clients (info disclosure) | 2 | ☐ |
 | 10 | 🟡 Medium | Shopify upsert keyed on global `id: email` → cross-tenant contact collision | 2 | ☐ |
 | 11 | 🟢 Low | Razorpay webhook uses non-constant-time signature compare | 2 | ☐ |
@@ -196,6 +196,19 @@ flag) and require it here. Until that exists, restrict to a known allowlist rath
 **Fix:** `npm audit`, then `npm audit fix`; review the 4 high-severity advisories individually and
 bump majors manually where needed. Re-run the verification gates after.
 **Verify:** `npm audit` high count is `0`; `tsc --noEmit` and `next build` still pass.
+
+**Status (◑ partial — high count cleared, 7 moderate accepted):**
+- All **4 high** advisories were a single root cause: the `uploadthing` chain pulled a nested
+  `effect@3.17.7` (the rest of the tree was already on `3.20.0`). Fixed with a pinned
+  `"overrides": { "effect": "^3.20.0" }` in `package.json` (a minor, compatible bump) — **0 high** now.
+- `nodemailer` 7→8 applied (real forward security fix; our `createTransport`/`sendMail` usage is
+  stable across the major, and the injection advisories don't touch our code paths).
+- **7 moderate remain, accepted as residual risk.** `npm`'s only proposed remediation for each is a
+  *downgrade* of a framework we run on the latest major of — `next@9.3.3` (from 16),
+  `next-auth@1.12.1` (from 4), `prisma@6.x` (from 7). Applying `npm audit fix --force` would break the
+  app. The underlying advisories (`postcss` stringify XSS — build-time; `uuid` v3/v5/v6 buf bounds —
+  not reachable via our next-auth usage; `@hono/node-server` slash bypass — transitive under prisma 7)
+  are low real-world risk on the current majors. Re-evaluate when upstream ships forward fixes.
 
 ---
 

@@ -320,7 +320,8 @@ model WhatsAppLoginAttempt {
   otp       String?  // 6-digit OTP for fallback
   phone     String?  // Target phone number if entered for OTP
   status    String   @default("PENDING") // "PENDING" | "VERIFIED" | "VERIFIED_NEW_USER" | "EXPIRED"
-  userId    String?  
+  attempts  Int      @default(0) // wrong-OTP guesses; attempt is locked at >= 5
+  userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   expiresAt DateTime

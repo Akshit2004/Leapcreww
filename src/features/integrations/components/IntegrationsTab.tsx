@@ -211,7 +211,7 @@ export function IntegrationsTab() {
   async function handleSync() {
     setSyncing(true);
     try {
-      const res = await fetch(`/api/webhooks/shopify?action=sync&orgId=${orgId}`);
+      const res = await fetch(`/api/org/${orgId}/integrations/shopify/sync`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
         // sync success

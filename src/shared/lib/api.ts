@@ -6,7 +6,7 @@
  * in feature `repositories/`. Routes should read like a table of contents.
  */
 import { NextResponse } from "next/server";
-import { getAppSession, hasOrgRole, type AppSession, type Role } from "./authz";
+import { getAppSession, hasOrgRole, isPlatformAdmin, type AppSession, type Role } from "./authz";
 
 /** Standard success envelope. */
 export function ok<T>(data: T, init?: ResponseInit): NextResponse {
@@ -59,6 +59,15 @@ export async function requireOrg(orgId: string, minRole: Role = "AGENT"): Promis
   const session = await requireSession();
   if (!hasOrgRole(session, orgId, minRole)) {
     throw new ApiError("Forbidden: insufficient access to this workspace", 403);
+  }
+  return session;
+}
+
+/** Require a platform-admin (cross-tenant) session or throw 403. */
+export async function requirePlatformAdmin(): Promise<AppSession> {
+  const session = await requireSession();
+  if (!isPlatformAdmin(session)) {
+    throw new ApiError("Forbidden: platform admin only", 403);
   }
   return session;
 }
