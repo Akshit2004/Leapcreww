@@ -77,8 +77,20 @@ export async function runBroadcast(campaign: Campaign, contacts: Contact[]): Pro
       );
       return 0;
     }
+    if (flow.status !== "published") {
+      await repo.updateCampaign(campaignId, { status: "Failed" });
+      await repo.logCampaignEvent(
+        organizationId,
+        campaignId,
+        `Failed to run flow broadcast: "${flow.name}" has unpublished changes. Publish it to Meta before broadcasting.`,
+        hhmm()
+      );
+      return 0;
+    }
     const flowJson = flow.flowJson as any;
-    screenId = flowJson?.screens?.[0]?.id || "WELCOME_SCREEN";
+    const rawScreenId = flowJson?.screens?.[0]?.id || "WELCOME_SCREEN";
+    // Sanitize to match what flowService uploads to Meta (alphabets + underscores only)
+    screenId = rawScreenId.replace(/[^a-zA-Z_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "WELCOME_SCREEN";
   }
 
   let delivered = 0;
@@ -95,7 +107,7 @@ export async function runBroadcast(campaign: Campaign, contacts: Contact[]): Pro
           to: phone,
           flow: {
             flowId: flow.metaFlowId,
-            flowToken: `campaign-token-${campaignId}-${contact.id}`,
+            flowToken: `flow_${flow.id}_campaign_${campaignId}_${contact.id}`,
             flowCta: flowVars.ctaText || "Open Form",
             screen: screenId,
             title: flowVars.title || `Flow: ${flow.name}`,

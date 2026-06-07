@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { Plus, RefreshCw, Layers, LayoutTemplate, Settings2, Code, Share2, ShieldAlert, Lock, Play, MonitorSmartphone } from "lucide-react";
+import { Plus, RefreshCw, Layers, LayoutTemplate, Settings2, Code, Share2, ShieldAlert, Lock, Play, MonitorSmartphone, Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
 import { VisualFlowBuilder } from "./VisualFlowBuilder";
 
 export const FlowsTab: React.FC = () => {
@@ -76,7 +77,7 @@ export const FlowsTab: React.FC = () => {
       try {
         parsedJson = JSON.parse(flowJsonStr);
       } catch (e) {
-        alert("Invalid JSON format");
+        toast.error("Invalid JSON format");
         return;
       }
 
@@ -87,12 +88,26 @@ export const FlowsTab: React.FC = () => {
       });
       if (!res.ok) throw new Error("Failed to save to database");
 
-      const updatedFlows = flows.map(f => f.id === selectedFlow.id ? { ...f, flowJson: parsedJson, name: selectedFlow.name } : f);
+      // The backend drops a published flow back to "draft" whenever its JSON
+      // changes (the live Meta asset would otherwise drift out of sync — see
+      // #131009 "Specified screen ... is not allowed as first screen"). Mirror
+      // that here so the Publish button re-enables instead of staying stuck
+      // showing a stale "Published" state.
+      const jsonChanged = JSON.stringify(parsedJson) !== JSON.stringify(selectedFlow.flowJson || {});
+      const nextStatus = jsonChanged && selectedFlow.status === "published" ? "draft" : selectedFlow.status;
+
+      const updatedFlows = flows.map(f => f.id === selectedFlow.id ? { ...f, flowJson: parsedJson, name: selectedFlow.name, status: nextStatus } : f);
       setFlows(updatedFlows);
-      alert("Flow JSON updated successfully!");
+      setSelectedFlow((prev: any) => prev ? { ...prev, flowJson: parsedJson, name: prev.name, status: nextStatus } : prev);
+
+      if (nextStatus === "draft" && selectedFlow.status === "published") {
+        toast.success("Flow JSON updated. Re-publish to push these changes to Meta before broadcasting.");
+      } else {
+        toast.success("Flow JSON updated successfully!");
+      }
     } catch (err) {
       console.error(err);
-      alert("Failed to save flow JSON");
+      toast.error("Failed to save flow JSON");
     } finally {
       setIsSaving(false);
     }
@@ -107,13 +122,13 @@ export const FlowsTab: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to publish");
-      alert(`Successfully published to Meta. Flow ID: ${data.metaFlowId}`);
+      toast.success(`Successfully published to Meta. Flow ID: ${data.metaFlowId}`);
       
       const updatedFlows = flows.map(f => f.id === selectedFlow.id ? { ...f, status: "published", metaFlowId: data.metaFlowId } : f);
       setFlows(updatedFlows);
       setSelectedFlow({ ...selectedFlow, status: "published", metaFlowId: data.metaFlowId });
     } catch (err: any) {
-      alert(err.message || "Failed to publish");
+      toast.error(err.message || "Failed to publish");
     } finally {
       setIsSaving(false);
     }
@@ -148,10 +163,10 @@ export const FlowsTab: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to launch broadcast");
-      alert(`Broadcast Campaign successfully launched! Active leads will be messaged in the background.`);
+      toast.success(`Broadcast Campaign successfully launched! Active leads will be messaged in the background.`);
       setShowBroadcastModal(false);
     } catch (err: any) {
-      alert(err.message || "Failed to launch broadcast");
+      toast.error(err.message || "Failed to launch broadcast");
     } finally {
       setIsBroadcasting(false);
     }
@@ -190,7 +205,30 @@ export const FlowsTab: React.FC = () => {
       handleSelectFlow(data.flow);
     } catch (err) {
       console.error(err);
-      alert("Failed to create flow");
+      toast.error("Failed to create flow");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteFlow = async (flowId: string) => {
+    if (!confirm("Are you sure you want to delete this flow? This cannot be undone.")) return;
+    
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/org/${orgId}/flows/${flowId}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) throw new Error("Failed to delete flow");
+      
+      setFlows(flows.filter(f => f.id !== flowId));
+      if (selectedFlow?.id === flowId) {
+        setSelectedFlow(null);
+        setFlowJsonStr("");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete flow");
     } finally {
       setIsSaving(false);
     }
@@ -205,10 +243,10 @@ export const FlowsTab: React.FC = () => {
         throw new Error(data.error || "Failed to setup keys");
       }
       setIsEncryptionSetup(true);
-      alert("Keys successfully generated and uploaded to Meta!");
+      toast.success("Keys successfully generated and uploaded to Meta!");
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Failed to setup encryption keys");
+      toast.error(err.message || "Failed to setup encryption keys");
     } finally {
       setIsSettingUp(false);
     }
@@ -281,6 +319,15 @@ export const FlowsTab: React.FC = () => {
                   <span>Broadcast Flow</span>
                 </button>
               )}
+              <button
+                onClick={() => handleDeleteFlow(selectedFlow.id)}
+                disabled={isSaving}
+                className="flex items-center gap-1.5 border border-red-200 hover:border-red-400 text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-none text-xs font-semibold cursor-pointer transition-all shadow-none"
+                title="Delete Flow"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete</span>
+              </button>
             </>
           )}
           <button

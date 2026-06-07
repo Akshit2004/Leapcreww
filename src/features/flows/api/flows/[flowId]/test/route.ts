@@ -21,13 +21,15 @@ export const POST = route(async (req, { params }) => {
 
   // Find the target welcome or lead capture screen
   const flowJson = flow.flowJson as any;
-  const screenId = flowJson?.screens?.[0]?.id || "WELCOME_SCREEN";
+  const rawScreenId = flowJson?.screens?.[0]?.id || "WELCOME_SCREEN";
+  // Sanitize to match what flowService uploads to Meta (alphabets + underscores only)
+  const screenId = rawScreenId.replace(/[^a-zA-Z_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "WELCOME_SCREEN";
 
   const result = await sendWhatsAppMessage({
     to: formatPhoneNumber(payload.to),
     flow: {
       flowId: flow.metaFlowId,
-      flowToken: `test-token-${Date.now()}`,
+      flowToken: `flow_${flow.id}_test_${Date.now()}`,
       flowCta: "Open Form",
       screen: screenId,
       title: `Test Flow: ${flow.name}`,

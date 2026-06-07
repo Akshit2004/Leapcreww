@@ -4,6 +4,7 @@ import "./globals.css";
 import "@uploadthing/react/styles.css";
 import { AppProvider } from "@/shared/context/AppContext";
 import { AuthProvider } from "@/features/auth/context/AuthProvider";
+import { Toaster } from "react-hot-toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,7 +46,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-amber-50 text-stone-900">
         <AuthProvider>
-          <AppProvider>{children}</AppProvider>
+          <AppProvider>
+            {children}
+            <Toaster position="bottom-center" />
+          </AppProvider>
         </AuthProvider>
       </body>
     </html>

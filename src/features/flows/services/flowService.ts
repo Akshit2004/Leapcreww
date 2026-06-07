@@ -69,8 +69,30 @@ export async function publishToMeta(flowId: string, orgId: string) {
   delete sanitizedJson.data_api_version;
   delete sanitizedJson.routing_model;
 
+  // Deep-sanitize all 'id' and 'name' properties — Meta requires alphabets and underscores only
+  function sanitizeIds(obj: any): any {
+    if (Array.isArray(obj)) return obj.map(sanitizeIds);
+    if (obj && typeof obj === "object") {
+      const result: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if ((key === "id" || key === "name") && typeof value === "string") {
+          // Strip anything that isn't a letter or underscore
+          let sanitized = value.replace(/[^a-zA-Z_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+          if (!sanitized) sanitized = "field_default";
+          result[key] = sanitized;
+        } else {
+          result[key] = sanitizeIds(value);
+        }
+      }
+      return result;
+    }
+    return obj;
+  }
+
+  const finalJson = sanitizeIds(sanitizedJson);
+
   const formData = new FormData();
-  formData.append("file", new Blob([JSON.stringify(sanitizedJson)], { type: "application/json" }), "flow.json");
+  formData.append("file", new Blob([JSON.stringify(finalJson)], { type: "application/json" }), "flow.json");
   formData.append("name", "flow.json");
   formData.append("asset_type", "FLOW_JSON");
 

@@ -4,6 +4,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { handleAutoResponder } from "@/shared/lib/autoresponder";
 import { handleMarketplaceMessage } from "@/shared/lib/marketplace";
 import { resolveAttribution } from "@/features/analytics/services/attribution";
+import { handleNfmReply } from "../../services/webhookService";
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
@@ -262,10 +263,8 @@ async function processInboundMessage(
 
   // Handle Native Flow Reply
   if (interactiveData?.type === "nfm_reply" && interactiveData.nfm_reply) {
-    const { handleNfmReply } = await import("../../services/webhookService");
     await handleNfmReply(contact.id, orgId, {
       responseJson: interactiveData.nfm_reply.response_json,
-      flowName: interactiveData.nfm_reply.name,
     });
   }
 

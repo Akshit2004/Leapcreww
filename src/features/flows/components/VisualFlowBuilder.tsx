@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Settings2, GripVertical, Type, List, CheckSquare, CircleDot, Calendar, LayoutTemplate } from "lucide-react";
+import { Plus, Trash2, Settings2, GripVertical, Type, List, CheckSquare, CircleDot, Calendar, LayoutTemplate, Sparkles, RefreshCw } from "lucide-react";
+import toast from "react-hot-toast";
 import { MobileFlowPreview } from "./MobileFlowPreview";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
@@ -32,12 +33,14 @@ const FIELD_TYPES = [
   { id: "DatePicker", label: "Date Picker", icon: Calendar },
 ];
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
+const generateId = () => Array.from({length: 8}, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
 
 export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({ flowJsonStr, onChange }) => {
   const [screens, setScreens] = useState<Screen[]>([]);
   const [activeScreenIndex, setActiveScreenIndex] = useState(0);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   // Initialize state from existing JSON
   useEffect(() => {
@@ -70,18 +73,18 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({ flowJsonSt
           }
           
           return {
-            id: s.id || generateId(),
+            id: (s.id || "").replace(/[^a-zA-Z_]/g, '') + "_" + generateId(),
             title: s.title || "Untitled Screen",
             fields
           };
         });
-        setScreens(parsedScreens.length > 0 ? parsedScreens : [{ id: generateId(), title: "Welcome", fields: [] }]);
+        setScreens(parsedScreens.length > 0 ? parsedScreens : [{ id: "welcome_" + generateId(), title: "Welcome", fields: [] }]);
       } else {
-        setScreens([{ id: "WELCOME_SCREEN", title: "Welcome", fields: [] }]);
+        setScreens([{ id: "welcome_" + generateId(), title: "Welcome", fields: [] }]);
       }
     } catch (e) {
       console.error("Failed to parse flow JSON", e);
-      setScreens([{ id: "WELCOME_SCREEN", title: "Welcome", fields: [] }]);
+      setScreens([{ id: "welcome_" + generateId(), title: "Welcome", fields: [] }]);
     } finally {
       setIsInitializing(false);
     }
@@ -98,11 +101,15 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({ flowJsonSt
           const base: any = {
             type: f.type,
             label: f.label,
-            name: f.name || f.label.toLowerCase().replace(/\s+/g, '_'),
+            name: (f.name || f.label).toLowerCase().replace(/[^a-z_]/g, '_').replace(/_+/g, '_'),
             required: f.required
           };
           if (f.type === "Dropdown" || f.type === "RadioButtons" || f.type === "CheckboxGroup") {
-            base.dataSource = (f.options || []).map(opt => ({ id: opt.toLowerCase().replace(/\s+/g, '_'), title: opt }));
+            const letters = 'abcdefghijklmnopqrstuvwxyz';
+            base.dataSource = (f.options || []).map((opt, oIdx) => ({ 
+              id: `opt_${letters[oIdx % 26]}${letters[Math.floor(oIdx / 26) % 26]}`, 
+              title: opt 
+            }));
           }
           return base;
         });
@@ -118,7 +125,7 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({ flowJsonSt
         } as any);
 
         return {
-          id: screen.id,
+          id: screen.id.replace(/[^a-zA-Z_]/g, ''),
           title: screen.title,
           terminal: idx === screens.length - 1,
           data: {},
@@ -127,7 +134,7 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({ flowJsonSt
             children: [
               {
                 type: "Form",
-                name: `form_${screen.id}`,
+                name: `form_${screen.id.replace(/[^a-zA-Z_]/g, '')}`,
                 children: formChildren
               }
             ]
@@ -176,8 +183,41 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({ flowJsonSt
   };
 
   const addScreen = () => {
-    setScreens([...screens, { id: `SCREEN_${generateId()}`, title: `Screen ${screens.length + 1}`, fields: [] }]);
+    setScreens([...screens, { id: `screen_${generateId()}`, title: `Screen ${screens.length + 1}`, fields: [] }]);
     setActiveScreenIndex(screens.length);
+  };
+
+  const handleGenerateAi = async () => {
+    if (!aiPrompt.trim()) return;
+    setIsGeneratingAi(true);
+    try {
+      const res = await fetch("/api/ai/generate-wa-flow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userPrompt: aiPrompt })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate flow");
+      
+      if (data.screens && Array.isArray(data.screens)) {
+        const newScreens = data.screens.map((s: any) => ({
+          ...s,
+          id: (s.id || "").replace(/[^a-zA-Z_]/g, '') + "_" + generateId(),
+          fields: (s.fields || []).map((f: any) => ({
+            ...f,
+            id: (f.id || "").replace(/[^a-zA-Z_]/g, '') + "_" + generateId()
+          }))
+        }));
+        setScreens(newScreens);
+        setActiveScreenIndex(0);
+        setAiPrompt("");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to generate AI flow");
+    } finally {
+      setIsGeneratingAi(false);
+    }
   };
 
   if (isInitializing) return null;
@@ -187,6 +227,34 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({ flowJsonSt
       {/* Left Panel: Builder Controls */}
       <div className="w-[450px] border-r border-stone-200 bg-white flex flex-col overflow-y-auto custom-scrollbar shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 shrink-0">
         
+        {/* AI Copilot */}
+        <div className="p-4 border-b border-stone-200 bg-stone-50/80">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-bold text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-wa-green" />
+              AI Form Architect
+            </h3>
+          </div>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder="e.g. Lead gen form for real estate..."
+              className="flex-1 bg-white border border-stone-200 px-3 py-1.5 text-xs focus:outline-none focus:border-stone-900 transition-colors placeholder:text-stone-400"
+              onKeyDown={(e) => e.key === 'Enter' && handleGenerateAi()}
+              disabled={isGeneratingAi}
+            />
+            <button 
+              onClick={handleGenerateAi}
+              disabled={isGeneratingAi || !aiPrompt.trim()}
+              className="bg-wa-green hover:bg-wa-green-dark disabled:opacity-50 disabled:hover:bg-wa-green text-white px-4 py-1.5 text-xs font-bold flex items-center gap-1.5 transition-colors active:scale-95"
+            >
+              {isGeneratingAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Generate"}
+            </button>
+          </div>
+        </div>
+
         {/* Screen Selector */}
         <div className="p-4 border-b border-stone-100 bg-stone-50/50">
           <div className="flex items-center justify-between mb-3">
