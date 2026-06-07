@@ -22,9 +22,9 @@ Check the box when the fix is merged and verified. Do Phase 0 before any product
 
 | # | Severity | Finding | Phase | Status |
 |---|----------|---------|-------|--------|
-| 1 | 🔴 Critical | WhatsApp webhook signature is skippable (`if (signature)`) → account takeover | 0 | ☐ |
-| 2 | 🔴 Critical | Unauthenticated debug endpoints leak cross-tenant data | 0 | ☐ |
-| 3 | 🟠 High | Shopify webhook has no HMAC verification + open "simulate" injection branch | 0 | ☐ |
+| 1 | 🔴 Critical | WhatsApp webhook signature is skippable (`if (signature)`) → account takeover | 0 | ☑ |
+| 2 | 🔴 Critical | Unauthenticated debug endpoints leak cross-tenant data | 0 | ☑ |
+| 3 | 🟠 High | Shopify webhook has no HMAC verification + open "simulate" injection branch | 0 | ☑ |
 | 4 | 🟠 High | Shopify catalog sync (GET) is unauthenticated, acts on arbitrary `orgId` | 1 | ☐ |
 | 5 | 🟡 Medium | OTP uses `Math.random()` and has no max-try lockout | 1 | ☐ |
 | 6 | 🟡 Medium | OTP-send has no per-phone throttle (WhatsApp OTP bombing) | 1 | ☐ |
@@ -46,11 +46,8 @@ Check the box when the fix is merged and verified. Do Phase 0 before any product
 
 ## New environment variables introduced by this plan
 
-Add to [`.env.example`](../.env.example) and provisioned environments:
-
 ```bash
-# Shopify webhook HMAC verification (Settings → Notifications → Webhooks → "Signing secret")
-SHOPIFY_WEBHOOK_SECRET=""
+# Shopify HMAC verification uses SHOPIFY_CLIENT_SECRET natively. No new variable needed.
 ```
 
 `WHATSAPP_APP_SECRET` and `RAZORPAY_WEBHOOK_SECRET` already exist and become **mandatory** in production

@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { prisma } from "@/shared/lib/prisma";
 import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
 import { resolveAttribution } from "@/features/analytics/services/attribution";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
+
+// ─── Shopify webhook HMAC verification ────────────────────────────────
+// Verifies x-shopify-hmac-sha256 (base64 HMAC-SHA256 of the raw body with
+// SHOPIFY_WEBHOOK_SECRET) using a constant-time compare. Returns false when
+// the secret is unset, so the route rejects all traffic until configured.
+function verifyShopifyHmac(rawBody: string, header: string | null): boolean {
+  const secret = process.env.SHOPIFY_CLIENT_SECRET;
+  if (!secret || !header) return false;
+  const digest = crypto.createHmac("sha256", secret).update(rawBody, "utf8").digest("base64");
+  const a = Buffer.from(digest);
+  const b = Buffer.from(header);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 // ─── 1. HANDLE CATALOG SYNCHRONIZATION (GET) ──────────────────────────
 export async function GET(request: NextRequest) {
@@ -145,17 +159,20 @@ export async function GET(request: NextRequest) {
 // ─── 2. RECEIVE WEBHOOK NOTIFICATIONS (POST) ──────────────────────────
 export async function POST(request: NextRequest) {
   try {
+    // Read the raw body once and verify the Shopify HMAC before trusting any
+    // header or parsing the payload. Reject forged/unsigned requests with 401.
+    const rawBody = await request.text();
+    if (!verifyShopifyHmac(rawBody, request.headers.get("x-shopify-hmac-sha256"))) {
+      console.warn("⚠️ Shopify webhook: missing or invalid HMAC signature");
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
     const topic = request.headers.get("x-shopify-topic") || "";
     const shop = request.headers.get("x-shopify-shop-domain") || "";
 
-    const payload = await request.json();
+    const payload: ShopifyWebhookPayload = JSON.parse(rawBody);
 
     if (!topic || !shop) {
-      // Support manual webhook trigger simulation testing
-      const { simulatedTopic, simulatedPayload, orgId } = payload;
-      if (simulatedTopic && simulatedPayload && orgId) {
-        return await handleWebhookEvent(simulatedTopic, simulatedPayload, orgId);
-      }
       return NextResponse.json({ error: "Invalid webhook request headers." }, { status: 400 });
     }
 
