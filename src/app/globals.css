@@ -1,5 +1,76 @@
 @import "tailwindcss";
 
+/* ─── Landing page typography ─── */
+::selection { background: #2E4A3F; color: #FAF7F2; }
+
+/* Grain/noise overlay */
+.grain-overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Marquee */
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.animate-marquee { animation: marquee 40s linear infinite; }
+.marquee-pause:hover .animate-marquee { animation-play-state: paused; }
+
+/* Slow drift */
+@keyframes drift {
+  0%, 100% { transform: translate3d(0,0,0) scale(1); }
+  50% { transform: translate3d(20px,-12px,0) scale(1.02); }
+}
+.animate-drift { animation: drift 14s ease-in-out infinite; }
+
+/* Typing dots */
+@keyframes typingBlink {
+  0%, 60%, 100% { opacity: 0.2; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+.typing-dot {
+  display: inline-block;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  margin: 0 1.5px;
+  animation: typingBlink 1.2s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+/* Pulse ring on live indicator */
+@keyframes pulseRing {
+  0% { box-shadow: 0 0 0 0 rgba(208,94,60,0.55); }
+  70% { box-shadow: 0 0 0 10px rgba(208,94,60,0); }
+  100% { box-shadow: 0 0 0 0 rgba(208,94,60,0); }
+}
+.pulse-ring { animation: pulseRing 2s ease-out infinite; }
+
+/* Shimmer underline for hero accent text */
+.shimmer-underline {
+  background-image: linear-gradient(120deg, transparent 0%, transparent 38%, rgba(208,94,60,0.18) 38%, rgba(208,94,60,0.18) 100%);
+  background-size: 100% 38%;
+  background-position: 0 88%;
+  background-repeat: no-repeat;
+}
+
+/* Magnetic CTA transition */
+.magnetic-cta { transition: transform 0.4s cubic-bezier(0.22,1,0.36,1), background-color 0.3s, color 0.3s; }
+
+/* Hide scrollbar (testimonials mobile) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee, .animate-drift, .pulse-ring { animation: none !important; }
+}
+
 :root {
   --background: #f4f6f5;
   --foreground: #0f172a;
