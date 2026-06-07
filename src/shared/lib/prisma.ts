@@ -26,3 +26,6 @@ export const prisma = createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 export default prisma;
+
+// Force reload timestamp: 1
+

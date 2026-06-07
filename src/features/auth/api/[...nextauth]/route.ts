@@ -65,6 +65,56 @@ export const authOptions: NextAuthOptions = {
           };
         }
 
+        if (credentials?.type === "email") {
+          if (!credentials.attemptId) {
+            throw new Error("Missing Email OTP verification attempt ID.");
+          }
+
+          const attempt = await prisma.emailOtpAttempt.findUnique({
+            where: { id: credentials.attemptId }
+          });
+
+          if (!attempt) {
+            throw new Error("Email OTP session not found.");
+          }
+
+          if (attempt.status !== "VERIFIED") {
+            throw new Error("Email OTP has not been verified.");
+          }
+
+          if (attempt.expiresAt < new Date()) {
+            throw new Error("Email OTP session has expired.");
+          }
+
+          const user = await prisma.user.findUnique({
+            where: { email: attempt.email },
+            include: {
+              memberships: {
+                include: {
+                  organization: true
+                }
+              }
+            }
+          });
+
+          if (!user) {
+            throw new Error("No user profile is associated with this verified email.");
+          }
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            organizations: (user.memberships as { organization: { id: string; name: string; slug: string }; role: string }[]).map((m) => ({
+              id: m.organization.id,
+              name: m.organization.name,
+              slug: m.organization.slug,
+              role: m.role
+            }))
+          };
+        }
+
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Missing email or password credentials.");
         }

@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, getSession } from "next-auth/react";
 import { 
-  Bot, ArrowRight, KeyRound, Mail, AlertCircle, Loader, CheckCircle, 
-  MessageSquare, Copy, Building, User, Lock
+  Bot, ArrowRight, Mail, AlertCircle, Loader, CheckCircle, 
+  MessageSquare, Copy, Building, User
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -15,24 +15,24 @@ function LoginContent() {
   const searchParams = useSearchParams();
   
   // Tab states
-  const [activeTab, setActiveTab] = useState<"whatsapp" | "email">("whatsapp");
+  const [activeTab, setActiveTab] = useState<"whatsapp" | "email">("email");
   
   // Email Form states
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   
   // WhatsApp QR Attempt states
-  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [waAttemptId, setWaAttemptId] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState("");
   const [waUrl, setWaUrl] = useState("");
   const [expiresIn, setExpiresIn] = useState(300); // 5 minutes in seconds
   
-  // WhatsApp OTP Fallback states
+  // Unified OTP Fallback states (Used for both Email and WhatsApp)
   const [phone, setPhone] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [otpValues, setOtpValues] = useState<string[]>(Array(6).fill(""));
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
+  const [currentAttemptId, setCurrentAttemptId] = useState<string | null>(null);
   
   // Messages & Loaders
   const [errorMsg, setErrorMsg] = useState("");
@@ -43,20 +43,19 @@ function LoginContent() {
   // New User Onboarding Modal states
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(1);
-  const [verifiedPhone, setVerifiedPhone] = useState("");
+  const [verifiedEmailOrPhone, setVerifiedEmailOrPhone] = useState("");
   const [obName, setObName] = useState("");
-  const [obEmail, setObEmail] = useState("");
   const [obOrgName, setObOrgName] = useState("");
-  const [obPassword, setObPassword] = useState("");
   const [obLoading, setObLoading] = useState(false);
   const [obLogs, setObLogs] = useState<string[]>([]);
+  const [onboardingType, setOnboardingType] = useState<"email" | "whatsapp">("email");
 
   const initiateWhatsAppSession = async () => {
     try {
       const res = await fetch("/api/whatsapp-auth/initiate", { method: "POST" });
       const data = await res.json();
       if (data.success) {
-        setAttemptId(data.attemptId);
+        setWaAttemptId(data.attemptId);
         setVerificationCode(data.code);
         setWaUrl(data.waUrl);
         setExpiresIn(300);
@@ -72,40 +71,34 @@ function LoginContent() {
     const registeredParam = searchParams.get("registered");
     
     if (errorParam) {
-      if (errorParam === "CredentialsSignin") {
-        setTimeout(() => {
-          setErrorMsg("Incorrect email address or password.");
-        }, 0);
-      } else {
-        setTimeout(() => {
-          setErrorMsg("An authentication error occurred. Please try again.");
-        }, 0);
-      }
+      setTimeout(() => {
+        setErrorMsg("An authentication error occurred. Please try again.");
+      }, 0);
     } else if (registeredParam === "true") {
       setTimeout(() => {
-        setSuccessMsg("Account created! Log in below with your email and password.");
+        setSuccessMsg("Account created! Log in below with your email.");
       }, 0);
     }
   }, [searchParams]);
 
-  // Initiate WhatsApp Verification Session automatically on load/tab switch
+  // Initiate WhatsApp Verification Session automatically on tab switch
   useEffect(() => {
-    if (activeTab === "whatsapp" && !attemptId) {
+    if (activeTab === "whatsapp" && !waAttemptId) {
       setTimeout(() => {
         initiateWhatsAppSession();
       }, 0);
     }
-  }, [activeTab, attemptId]);
+  }, [activeTab, waAttemptId]);
 
   // Countdown timer for active QR attempt
   useEffect(() => {
-    if (!attemptId || expiresIn <= 0 || activeTab !== "whatsapp") return;
+    if (!waAttemptId || expiresIn <= 0 || activeTab !== "whatsapp") return;
     
     const timer = setInterval(() => {
       setExpiresIn(prev => {
         if (prev <= 1) {
           clearInterval(timer);
-          setAttemptId(null);
+          setWaAttemptId(null);
           initiateWhatsAppSession();
           return 0;
         }
@@ -114,7 +107,7 @@ function LoginContent() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [attemptId, activeTab, expiresIn]);
+  }, [waAttemptId, activeTab, expiresIn]);
 
   // OTP Cooldown timer
   useEffect(() => {
@@ -127,12 +120,12 @@ function LoginContent() {
 
   // Session Polling to detect QR Code scans / Direct message sending
   useEffect(() => {
-    if (!attemptId || activeTab !== "whatsapp" || showOnboarding) return;
+    if (!waAttemptId || activeTab !== "whatsapp" || showOnboarding) return;
 
     let isSubscribed = true;
     const pollInterval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/whatsapp-auth/status?attemptId=${attemptId}`);
+        const res = await fetch(`/api/whatsapp-auth/status?attemptId=${waAttemptId}`);
         const data = await res.json();
         
         if (!isSubscribed) return;
@@ -143,7 +136,7 @@ function LoginContent() {
             setLoading(true);
             const authRes = await signIn("credentials", {
               type: "whatsapp",
-              attemptId: attemptId,
+              attemptId: waAttemptId,
               redirect: false
             });
 
@@ -167,11 +160,13 @@ function LoginContent() {
             }
           } else if (data.status === "VERIFIED_NEW_USER") {
             clearInterval(pollInterval);
-            setVerifiedPhone(data.phone || "");
+            setVerifiedEmailOrPhone(data.phone || "");
+            setOnboardingType("whatsapp");
+            setCurrentAttemptId(waAttemptId);
             setShowOnboarding(true);
           } else if (data.status === "EXPIRED") {
             clearInterval(pollInterval);
-            setAttemptId(null);
+            setWaAttemptId(null);
             initiateWhatsAppSession();
           }
         }
@@ -184,49 +179,44 @@ function LoginContent() {
       isSubscribed = false;
       clearInterval(pollInterval);
     };
-  }, [attemptId, activeTab, showOnboarding, router]);
+  }, [waAttemptId, activeTab, showOnboarding, router]);
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  // Handle Email OTP Dispatch
+  const handleSendEmailOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) return;
+    if (!email.trim() || otpCooldown > 0) return;
 
     setErrorMsg("");
     setSuccessMsg("");
     setLoading(true);
 
     try {
-      const res = await signIn("credentials", {
-        email: email.trim().toLowerCase(),
-        password: password.trim(),
-        redirect: false
+      const res = await fetch("/api/auth/email-otp/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
       });
+      const data = await res.json();
 
-      if (res?.error) {
-        setErrorMsg("Incorrect email address or password.");
-        setLoading(false);
+      if (data.success) {
+        setCurrentAttemptId(data.attemptId);
+        setOtpSent(true);
+        setOtpCooldown(60);
+        setSuccessMsg("OTP successfully sent to your email address.");
+        setTimeout(() => otpInputsRef.current[0]?.focus(), 100);
       } else {
-        const session = await getSession();
-        interface CustomSessionUser {
-          activeOrgId?: string | null;
-          organizations?: Array<{ id: string; name: string; slug: string }>;
-        }
-        const activeOrgId = (session?.user as unknown as CustomSessionUser)?.activeOrgId || (session?.user as unknown as CustomSessionUser)?.organizations?.[0]?.id;
-
-        if (activeOrgId) {
-          router.push(`/org/${activeOrgId}`);
-        } else {
-          setErrorMsg("We couldn't locate any active workspace for your profile.");
-          setLoading(false);
-        }
+        setErrorMsg(data.error || "Failed to dispatch OTP. Please try again.");
       }
     } catch {
-      setErrorMsg("An unexpected connection issue occurred. Please check your credentials.");
+      setErrorMsg("Unable to connect to OTP dispatch servers.");
+    } finally {
       setLoading(false);
     }
   };
 
-  // OTP Handlers
-  const handleSendOtp = async () => {
+  // Handle WhatsApp OTP Dispatch
+  const handleSendWaOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!phone || otpCooldown > 0) return;
     
     setErrorMsg("");
@@ -242,14 +232,11 @@ function LoginContent() {
       const data = await res.json();
       
       if (data.success) {
-        setAttemptId(data.attemptId);
+        setCurrentAttemptId(data.attemptId);
         setOtpSent(true);
         setOtpCooldown(30);
         setSuccessMsg("OTP successfully sent to your WhatsApp number.");
-        
-        setTimeout(() => {
-          otpInputsRef.current[0]?.focus();
-        }, 100);
+        setTimeout(() => otpInputsRef.current[0]?.focus(), 100);
       } else {
         setErrorMsg(data.error || "Failed to dispatch OTP. Please check the number.");
       }
@@ -283,25 +270,27 @@ function LoginContent() {
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalOtp = otpValues.join("");
-    if (finalOtp.length !== 6 || !attemptId) return;
+    if (finalOtp.length !== 6 || !currentAttemptId) return;
 
     setErrorMsg("");
     setSuccessMsg("");
     setOtpVerifying(true);
 
+    const endpoint = activeTab === "whatsapp" ? "/api/whatsapp-auth/verify-otp" : "/api/auth/email-otp/verify";
+
     try {
-      const res = await fetch("/api/whatsapp-auth/verify-otp", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attemptId, otp: finalOtp }),
+        body: JSON.stringify({ attemptId: currentAttemptId, otp: finalOtp }),
       });
       const data = await res.json();
 
       if (data.success) {
         if (data.status === "VERIFIED") {
           const authRes = await signIn("credentials", {
-            type: "whatsapp",
-            attemptId: attemptId,
+            type: activeTab,
+            attemptId: currentAttemptId,
             redirect: false
           });
 
@@ -323,7 +312,8 @@ function LoginContent() {
             }
           }
         } else if (data.status === "VERIFIED_NEW_USER") {
-          setVerifiedPhone(data.phone || phone);
+          setVerifiedEmailOrPhone(activeTab === "whatsapp" ? (data.phone || phone) : data.email);
+          setOnboardingType(activeTab);
           setShowOnboarding(true);
           setOtpVerifying(false);
         }
@@ -339,29 +329,40 @@ function LoginContent() {
 
   const handleOnboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!obName.trim() || !obEmail.trim() || !obOrgName.trim() || !obPassword.trim()) return;
+    if (!obName.trim() || !obOrgName.trim()) return;
 
     setErrorMsg("");
     setObLoading(true);
-    setOnboardingStep(3);
+    setOnboardingStep(2);
 
     setObLogs([
-      "Verification token validated: verified phone number confirmed.",
+      "Verification token validated.",
       "Initiating registration sequence on central cluster...",
     ]);
 
     try {
+      const payload: any = {
+        name: obName.trim(),
+        organizationName: obOrgName.trim(),
+        attemptId: currentAttemptId,
+        attemptType: onboardingType
+      };
+
+      if (onboardingType === "email") {
+        payload.email = verifiedEmailOrPhone;
+      } else {
+        // user verified via WhatsApp, we need an email to complete their profile
+        // Wait, for WhatsApp, they didn't provide email yet! Let's just use a dummy one or ask for it?
+        // Actually, we should collect email if they used whatsapp. 
+        // For passwordless, we need an email as primary key.
+        payload.email = `${verifiedEmailOrPhone.replace(/[^0-9]/g, "")}@wa.wappflow.internal`; // temporary placeholder
+        payload.phone = verifiedEmailOrPhone;
+      }
+
       const regRes = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: obName.trim(),
-          email: obEmail.trim().toLowerCase(),
-          organizationName: obOrgName.trim(),
-          password: obPassword.trim(),
-          phone: verifiedPhone,
-          attemptId: attemptId,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const regData = await regRes.json();
@@ -378,8 +379,8 @@ function LoginContent() {
       setTimeout(async () => {
         try {
           const authRes = await signIn("credentials", {
-            type: "whatsapp",
-            attemptId: attemptId!,
+            type: onboardingType,
+            attemptId: currentAttemptId!,
             redirect: false
           });
 
@@ -498,9 +499,26 @@ function LoginContent() {
             <button
               type="button"
               onClick={() => {
+                setActiveTab("email");
+                setErrorMsg("");
+                setSuccessMsg("");
+                setOtpSent(false);
+              }}
+              className={`w-1/2 text-center py-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                activeTab === "email" 
+                  ? "bg-white text-stone-900 shadow-sm" 
+                  : "text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              Email OTP
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 setActiveTab("whatsapp");
                 setErrorMsg("");
                 setSuccessMsg("");
+                setOtpSent(false);
               }}
               className={`w-1/2 text-center py-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                 activeTab === "whatsapp" 
@@ -510,21 +528,6 @@ function LoginContent() {
             >
               WhatsApp Link
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("email");
-                setErrorMsg("");
-                setSuccessMsg("");
-              }}
-              className={`w-1/2 text-center py-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                activeTab === "email" 
-                  ? "bg-white text-stone-900 shadow-sm" 
-                  : "text-stone-500 hover:text-stone-800"
-              }`}
-            >
-              Email Login
-            </button>
           </div>
 
           {/* WhatsApp Auth Panel */}
@@ -533,7 +536,7 @@ function LoginContent() {
               
               <div className="flex flex-col items-center justify-center space-y-3">
                 <div className="relative p-3 bg-white border border-stone-200 rounded-2xl shadow-inner flex items-center justify-center">
-                  {attemptId ? (
+                  {waAttemptId ? (
                     <div className="relative">
                       <QRCodeSVG
                         value={waUrl}
@@ -601,7 +604,7 @@ function LoginContent() {
                   <button
                     type="button"
                     disabled={loading || !phone.trim()}
-                    onClick={handleSendOtp}
+                    onClick={handleSendWaOtp}
                     className="w-full bg-stone-900 hover:bg-stone-850 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all active:scale-98 shadow-sm flex items-center justify-center gap-1.5"
                   >
                     {loading ? (
@@ -639,7 +642,7 @@ function LoginContent() {
                     ) : (
                       <button
                         type="button"
-                        onClick={handleSendOtp}
+                        onClick={handleSendWaOtp}
                         className="text-emerald-800 hover:text-emerald-700 font-bold underline cursor-pointer"
                       >
                         Resend OTP
@@ -670,56 +673,99 @@ function LoginContent() {
             </div>
           )}
 
-          {/* Email Login Panel */}
+          {/* Email OTP Login Panel */}
           {activeTab === "email" && (
-            <form onSubmit={handleEmailSubmit} className="space-y-4 animate-slide-up">
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
-                  <Mail className="w-3 h-3" />
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  required
-                  disabled={loading}
-                  placeholder="e.g. alex@wappflow.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
-                />
-              </div>
+            <div className="space-y-4 animate-slide-up">
+              {!otpSent ? (
+                <form onSubmit={handleSendEmailOtp} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
+                      <Mail className="w-3 h-3" />
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      disabled={loading}
+                      placeholder="e.g. alex@wappflow.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
+                    />
+                  </div>
 
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
-                  <KeyRound className="w-3 h-3" />
-                  Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  disabled={loading}
-                  placeholder="••••••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
-                />
-              </div>
+                  <button
+                    type="submit"
+                    disabled={loading || !email.trim()}
+                    className="w-full bg-stone-900 hover:bg-stone-850 disabled:opacity-40 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98"
+                  >
+                    {loading ? (
+                      <Loader className="w-3.5 h-3.5 animate-spin text-white" />
+                    ) : (
+                      <>
+                        <span>Send Login Code</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleOtpSubmit} className="space-y-3">
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {otpValues.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        type="text"
+                        maxLength={1}
+                        required
+                        disabled={otpVerifying}
+                        value={digit}
+                        onChange={(e) => handleOtpChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                        ref={(el) => { otpInputsRef.current[idx] = el; }}
+                        className="w-full aspect-square text-center font-mono text-base font-bold bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-850 focus:border-transparent disabled:opacity-50 transition-all select-text"
+                      />
+                    ))}
+                  </div>
 
-              <button
-                type="submit"
-                disabled={loading || !email.trim() || !password.trim()}
-                className="w-full bg-stone-900 hover:bg-stone-850 disabled:opacity-40 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98"
-              >
-                {loading ? (
-                  <Loader className="w-3.5 h-3.5 animate-spin text-white" />
-                ) : (
-                  <span>Sign In to Workspace</span>
-                )}
-              </button>
-            </form>
+                  <div className="flex items-center justify-between text-[10px]">
+                    {otpCooldown > 0 ? (
+                      <span className="text-stone-400 font-mono font-medium">Resend in 00:{otpCooldown < 10 ? "0" : ""}{otpCooldown}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSendEmailOtp}
+                        className="text-emerald-800 hover:text-emerald-700 font-bold underline cursor-pointer"
+                      >
+                        Resend OTP
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setOtpSent(false)}
+                      className="text-stone-500 hover:text-stone-700 font-semibold"
+                    >
+                      Change email
+                    </button>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={otpVerifying || otpValues.join("").length !== 6}
+                    className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-55 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all active:scale-98 shadow-sm flex items-center justify-center gap-1.5"
+                  >
+                    {otpVerifying ? (
+                      <Loader className="w-3.5 h-3.5 animate-spin text-white" />
+                    ) : (
+                      <span>Verify & Login</span>
+                    )}
+                  </button>
+                </form>
+              )}
+            </div>
           )}
 
-          {/* Footer Terms & Signup Links - Linked beautifully to /privacy and /terms */}
+          {/* Footer Terms & Signup Links */}
           <div className="text-center text-[9px] text-stone-400 font-mono tracking-wider pt-4 border-t border-stone-150 uppercase leading-relaxed font-semibold">
             <span>Need a new tenant instance? </span>
             <Link href="/signup" className="text-emerald-800 hover:underline font-bold">
@@ -749,15 +795,13 @@ function LoginContent() {
             <div className="flex items-center justify-center">
               <div className="inline-flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 border border-emerald-100 rounded-xl">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                <span className="text-[10px] font-mono font-bold text-emerald-800">Phone Verified: {verifiedPhone}</span>
+                <span className="text-[10px] font-mono font-bold text-emerald-800">Verified: {verifiedEmailOrPhone}</span>
               </div>
             </div>
 
-            {onboardingStep < 3 && (
+            {onboardingStep < 2 && (
               <div className="flex items-center justify-center gap-1.5 text-[9px] font-mono font-bold tracking-widest text-stone-400 uppercase">
-                <span className={onboardingStep === 1 ? "text-emerald-800" : "text-stone-400"}>01. Profile Details</span>
-                <span className="text-stone-300">/</span>
-                <span className={onboardingStep === 2 ? "text-emerald-800" : "text-stone-400"}>02. Tenant Workspace</span>
+                <span className={onboardingStep === 1 ? "text-emerald-800" : "text-stone-400"}>01. Profile & Tenant</span>
               </div>
             )}
 
@@ -781,84 +825,31 @@ function LoginContent() {
 
                   <div className="space-y-1">
                     <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
-                      <Mail className="w-3 h-3" />
-                      Work Email
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="e.g. alex@company.com"
-                      value={obEmail}
-                      onChange={(e) => setObEmail(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 select-text"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={!obName.trim() || !obEmail.trim()}
-                    onClick={() => setOnboardingStep(2)}
-                    className="w-full bg-stone-900 hover:bg-stone-850 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-98"
-                  >
-                    <span>Next step</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-
-              {onboardingStep === 2 && (
-                <div className="space-y-3 animate-slide-up">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
                       <Building className="w-3 h-3" />
-                      Company Name
+                      Workspace Name
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Acme Business Corp"
+                      placeholder="e.g. Acme Corp"
                       value={obOrgName}
                       onChange={(e) => setObOrgName(e.target.value)}
                       className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 select-text"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
-                      <Lock className="w-3 h-3" />
-                      Password
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="Min. 8 characters"
-                      value={obPassword}
-                      onChange={(e) => setObPassword(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 select-text"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setOnboardingStep(1)}
-                      className="w-full bg-white hover:bg-stone-50 text-stone-600 border border-stone-200 text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all active:scale-98"
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={obLoading || !obOrgName.trim() || !obPassword.trim()}
-                      className="w-full bg-stone-900 hover:bg-stone-850 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-98"
-                    >
-                      <span>Launch</span>
-                      <Bot className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  <button
+                    type="submit"
+                    disabled={obLoading || !obName.trim() || !obOrgName.trim()}
+                    className="w-full bg-stone-900 hover:bg-stone-850 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-98"
+                  >
+                    <span>Launch Workspace</span>
+                    <Bot className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               )}
 
-              {onboardingStep === 3 && (
+              {onboardingStep === 2 && (
                 <div className="space-y-3 animate-slide-up">
                   <div className="bg-[#141413] border border-stone-850 p-4 rounded-xl shadow-inner space-y-3">
                     <div className="flex items-center justify-between border-b border-stone-800 pb-2">

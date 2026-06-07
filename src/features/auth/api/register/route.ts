@@ -5,11 +5,12 @@ import { prisma } from "../../../../shared/lib/prisma";
 
 const RegisterSchema = z.object({
   email: z.string().trim().email("A valid email address is required").max(254),
-  password: z.string().min(8, "Password must be at least 8 characters").max(200),
+  password: z.string().max(200).optional(),
   name: z.string().trim().min(1, "Name is required").max(120),
   organizationName: z.string().trim().min(1, "Organization name is required").max(120),
   phone: z.string().max(20).optional(),
-  attemptId: z.string().min(1, "Missing WhatsApp verification attempt ID."),
+  attemptId: z.string().min(1, "Missing verification attempt ID."),
+  attemptType: z.enum(["whatsapp", "email"]).default("whatsapp"),
 });
 
 export async function POST(req: Request) {
@@ -21,40 +22,50 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const { email, password, name, organizationName, phone, attemptId } = parsed.data;
+    const { email, password, name, organizationName, phone, attemptId, attemptType } = parsed.data;
 
     const emailLower = email.toLowerCase().trim();
 
-    // Validate WhatsApp attempt and hash password in parallel (don't depend on each other)
-    const [attempt, hashedPassword] = await Promise.all([
-      prisma.whatsAppLoginAttempt.findUnique({
+    // Verify Attempt
+    let attempt: any = null;
+    let hashedPassword = null;
+
+    if (password) {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
+
+    if (attemptType === "whatsapp") {
+      attempt = await prisma.whatsAppLoginAttempt.findUnique({
         where: { id: attemptId }
-      }),
-      bcrypt.hash(password, 10)
-    ]);
+      });
+    } else {
+      attempt = await prisma.emailOtpAttempt.findUnique({
+        where: { id: attemptId }
+      });
+    }
 
     if (!attempt) {
       return NextResponse.json(
-        { error: "WhatsApp verification session not found." },
+        { error: "Verification session not found." },
         { status: 400 }
       );
     }
 
     if (attempt.status !== "VERIFIED_NEW_USER") {
       return NextResponse.json(
-        { error: "WhatsApp verification has not been completed for this session." },
+        { error: "Verification has not been completed for this session." },
         { status: 400 }
       );
     }
 
     if (attempt.expiresAt < new Date()) {
       return NextResponse.json(
-        { error: "WhatsApp verification session has expired. Please scan the QR code again." },
+        { error: "Verification session has expired. Please try again." },
         { status: 400 }
       );
     }
 
-    // Check if user already exists and if phone already registered in parallel
+    // Check if user already exists
     let checkPhoneUser: Awaited<ReturnType<typeof prisma.user.findUnique>> | undefined;
     const existingUser = await prisma.user.findUnique({
       where: { email: emailLower }
@@ -82,7 +93,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Generate Slug for Organization
+    // Generate Slug for Organization
     const slug = organizationName
       .toLowerCase()
       .trim()
@@ -91,15 +102,16 @@ export async function POST(req: Request) {
       
     const uniqueSlug = `${slug}-${Date.now().toString().slice(-4)}`;
 
-    // 4. Execute Transaction to create User, Org, Membership, and Default assets!
+    // Execute Transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create User and Organization in parallel (don't depend on each other)
+      // Create User and Organization
       const [user, org] = await Promise.all([
         tx.user.create({
           data: {
             email: emailLower,
             name,
             hashedPassword,
+            emailVerified: attemptType === "email" ? new Date() : null,
             phone: phone ? (phone.startsWith("+") ? phone : `+${phone.replace(/[^0-9]/g, "")}`) : null,
           }
         }),
@@ -120,15 +132,26 @@ export async function POST(req: Request) {
         }
       });
 
-      // Mark WhatsApp attempt, create default chatbot node, and create templates in parallel (don't depend on each other)
-      await Promise.all([
-        tx.whatsAppLoginAttempt.update({
+      // Update attempt status
+      if (attemptType === "whatsapp") {
+        await tx.whatsAppLoginAttempt.update({
           where: { id: attemptId },
           data: {
             status: "VERIFIED",
             userId: user.id
           }
-        }),
+        });
+      } else {
+        await tx.emailOtpAttempt.update({
+          where: { id: attemptId },
+          data: {
+            status: "VERIFIED"
+          }
+        });
+      }
+
+      // Default visual nodes and templates
+      await Promise.all([
         tx.chatbotNode.create({
           data: {
             id: "n1",

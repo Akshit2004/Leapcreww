@@ -11,7 +11,8 @@ model User {
   id             String       @id @default(uuid())
   name           String?
   email          String       @unique
-  hashedPassword String
+  hashedPassword String?
+  emailVerified  DateTime?
   image          String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -548,4 +549,13 @@ model AttributionTouch {
 
   @@index([contactId, createdAt])
   @@index([organizationId, createdAt])
+}
+
+model EmailOtpAttempt {
+  id        String   @id @default(uuid())
+  email     String
+  otp       String
+  status    String   @default("PENDING") // "PENDING" | "VERIFIED" | "EXPIRED"
+  createdAt DateTime @default(now())
+  expiresAt DateTime
 }
