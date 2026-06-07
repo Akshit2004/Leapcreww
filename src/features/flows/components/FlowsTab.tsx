@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { Plus, RefreshCw, Layers, LayoutTemplate, Settings2, Code, Share2, ShieldAlert, Lock, Play } from "lucide-react";
+import { Plus, RefreshCw, Layers, LayoutTemplate, Settings2, Code, Share2, ShieldAlert, Lock, Play, MonitorSmartphone } from "lucide-react";
+import { VisualFlowBuilder } from "./VisualFlowBuilder";
 
 export const FlowsTab: React.FC = () => {
   const params = useParams();
@@ -23,6 +24,7 @@ export const FlowsTab: React.FC = () => {
   const [messageFooter, setMessageFooter] = useState("WappFlow Broadcast");
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [activeTab, setActiveTab] = useState<"editor" | "submissions">("editor");
+  const [editorMode, setEditorMode] = useState<"visual" | "developer">("visual");
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
@@ -377,36 +379,67 @@ export const FlowsTab: React.FC = () => {
           )}
         </div>
 
-        {/* Right Side: JSON Editor */}
+        {/* Right Side: Builder / Editor */}
         <div className="flex-1 bg-white flex flex-col">
           {selectedFlow ? (
             activeTab === "editor" ? (
-              <>
-                <div className="h-12 border-b border-stone-200 bg-stone-50 flex items-center px-4 justify-between">
-                  <div className="flex items-center gap-2">
-                    <Code className="w-4 h-4 text-stone-500" />
-                    <span className="text-xs font-bold text-stone-700 uppercase tracking-wider hidden sm:inline">Flow JSON Definition</span>
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="h-12 border-b border-stone-200 bg-stone-50 flex items-center px-4 justify-between shrink-0">
+                  <div className="flex items-center gap-4">
+                    <div className="flex bg-stone-200/50 p-0.5 rounded-none border border-stone-200">
+                      <button
+                        onClick={() => setEditorMode("visual")}
+                        className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                          editorMode === "visual" ? "bg-white shadow-sm text-stone-900 border border-stone-200" : "text-stone-500 hover:text-stone-700 border border-transparent"
+                        }`}
+                      >
+                        <MonitorSmartphone className="w-3 h-3" />
+                        Visual Builder
+                      </button>
+                      <button
+                        onClick={() => setEditorMode("developer")}
+                        className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                          editorMode === "developer" ? "bg-white shadow-sm text-stone-900 border border-stone-200" : "text-stone-500 hover:text-stone-700 border border-transparent"
+                        }`}
+                      >
+                        <Code className="w-3 h-3" />
+                        Developer
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-stone-500 font-semibold uppercase tracking-wider">Name</span>
+                    <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">Flow Name</span>
                     <input
                       type="text"
                       value={selectedFlow.name}
                       onChange={(e) => setSelectedFlow({ ...selectedFlow, name: e.target.value })}
-                      className="bg-white border border-stone-200 text-xs text-stone-900 px-2 py-1 focus:outline-none focus:border-stone-400 focus:ring-0 w-48 rounded-none"
+                      className="bg-white border border-stone-200 text-xs text-stone-900 px-2 py-1 font-semibold focus:outline-none focus:border-stone-400 focus:ring-0 w-48 rounded-none transition-colors"
                       disabled={selectedFlow.status === "published"}
                     />
                   </div>
                 </div>
-                <div className="flex-1 p-4">
-                  <textarea
-                    value={flowJsonStr}
-                    onChange={(e) => setFlowJsonStr(e.target.value)}
-                    className="w-full h-full bg-[#fafaf9] text-stone-900 font-mono text-xs p-4 focus:outline-none border border-stone-200 resize-none"
-                    spellCheck={false}
-                  />
+                
+                <div className="flex-1 flex overflow-hidden">
+                  {editorMode === "visual" ? (
+                    <VisualFlowBuilder 
+                      flowJsonStr={flowJsonStr} 
+                      onChange={setFlowJsonStr} 
+                    />
+                  ) : (
+                    <div className="flex-1 p-4 bg-stone-100/50">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Raw JSON Definition</span>
+                      </div>
+                      <textarea
+                        value={flowJsonStr}
+                        onChange={(e) => setFlowJsonStr(e.target.value)}
+                        className="w-full h-full bg-[#fafaf9] text-stone-900 font-mono text-xs p-4 focus:outline-none border border-stone-200 resize-none shadow-inner"
+                        spellCheck={false}
+                      />
+                    </div>
+                  )}
                 </div>
-              </>
+              </div>
             ) : (
               <div className="flex-1 flex flex-col overflow-hidden bg-white">
                 {/* Header */}
