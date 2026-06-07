@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/api/[...nextauth]/route";
 import { getGroqChatCompletion } from "@/shared/lib/groq";
+
+const CopilotSchema = z.object({
+  prompt: z.string().trim().min(1, "Missing prompt").max(4000),
+  context: z.unknown().optional(),
+});
 
 interface CopilotResponse {
   reply: string;
@@ -34,11 +40,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { prompt, context } = await request.json();
-
-    if (!prompt) {
-      return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
+    const input = CopilotSchema.safeParse(await request.json().catch(() => null));
+    if (!input.success) {
+      return NextResponse.json(
+        { error: input.error.issues.map((i) => i.message).join("; ") },
+        { status: 400 }
+      );
     }
+    const { prompt, context } = input.data;
 
     const systemPrompt = `You are WappFlow AI Copilot, an intelligent assistant for a WhatsApp Marketing & CRM platform.
 Your tone is warm, proactive, and concise — like a senior teammate who's always one step ahead.

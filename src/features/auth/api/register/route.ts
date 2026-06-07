@@ -1,24 +1,27 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../../../shared/lib/prisma";
 
+const RegisterSchema = z.object({
+  email: z.string().trim().email("A valid email address is required").max(254),
+  password: z.string().min(8, "Password must be at least 8 characters").max(200),
+  name: z.string().trim().min(1, "Name is required").max(120),
+  organizationName: z.string().trim().min(1, "Organization name is required").max(120),
+  phone: z.string().max(20).optional(),
+  attemptId: z.string().min(1, "Missing WhatsApp verification attempt ID."),
+});
+
 export async function POST(req: Request) {
   try {
-    const { email, password, name, organizationName, phone, attemptId } = await req.json();
-
-    if (!email || !password || !name || !organizationName) {
+    const parsed = RegisterSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Missing required fields (email, password, name, organizationName)." },
+        { error: parsed.error.issues.map((i) => i.message).join("; ") },
         { status: 400 }
       );
     }
-
-    if (!attemptId) {
-      return NextResponse.json(
-        { error: "Missing WhatsApp verification attempt ID." },
-        { status: 400 }
-      );
-    }
+    const { email, password, name, organizationName, phone, attemptId } = parsed.data;
 
     const emailLower = email.toLowerCase().trim();
 

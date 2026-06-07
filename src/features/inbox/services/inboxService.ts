@@ -1,7 +1,21 @@
 /** inboxService.ts — Team Inbox business logic (send, edit, import contacts). */
+import { ApiError } from "@/shared/lib/api";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
 import * as repo from "../repositories/contactRepo";
 import { CONTACT_EDITABLE_FIELDS, type ImportContactRow, type SendMessageInput } from "../types";
+
+/**
+ * Load a contact and assert it belongs to one of the caller's organizations.
+ * Prevents cross-tenant IDOR on routes keyed only by `contactId` (Article III).
+ */
+async function requireOwnedContact(contactId: string, callerOrgIds: string[]) {
+  const contact = await repo.findContact(contactId);
+  if (!contact) throw new ApiError("Contact not found", 404);
+  if (!callerOrgIds.includes(contact.organizationId)) {
+    throw new ApiError("Forbidden: this contact belongs to another workspace", 403);
+  }
+  return contact;
+}
 
 const hhmm = (d = new Date()) =>
   `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -66,12 +80,18 @@ export async function sendAgentMessage(input: SendMessageInput, agentName: strin
   return { status: "sent", message: dbMsg, waMessageId: result.data?.messages?.[0]?.id || null };
 }
 
-export function deleteContact(contactId: string) {
+export async function deleteContact(contactId: string, callerOrgIds: string[]) {
+  await requireOwnedContact(contactId, callerOrgIds);
   return repo.deleteContactCascade(contactId);
 }
 
-/** Apply a whitelisted partial update to a contact. */
-export function updateContactFields(contactId: string, body: Record<string, unknown>) {
+/** Apply a whitelisted partial update to a contact owned by the caller. */
+export async function updateContactFields(
+  contactId: string,
+  callerOrgIds: string[],
+  body: Record<string, unknown>
+) {
+  await requireOwnedContact(contactId, callerOrgIds);
   const updates: Record<string, unknown> = {};
   for (const key of CONTACT_EDITABLE_FIELDS) {
     if (body[key] !== undefined) updates[key] = body[key];
