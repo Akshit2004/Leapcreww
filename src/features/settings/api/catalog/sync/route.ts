@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
             access_token: systemToken,
-            catalog_id: catalogId
+            catalog_id: catalogId as string
           })
         }
       );
