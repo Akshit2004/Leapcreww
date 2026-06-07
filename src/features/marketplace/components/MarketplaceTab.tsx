@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect} from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import type { Organization } from "@/shared/context/types";
 import {
@@ -14,6 +14,8 @@ import {
   RefreshCw,
   CheckCircle2,
   ExternalLink,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
 
 interface Product {
@@ -46,6 +48,32 @@ interface Order {
   createdAt: string;
 }
 
+interface SequenceSummary {
+  id: string;
+  trigger: string;
+}
+
+interface ToastState {
+  id: number;
+  type: "success" | "error";
+  title: string;
+  message: string;
+}
+
+const TOAST_DURATION_MS = 5000;
+
+/** Translate raw API error strings into plain language a non-technical user can act on. */
+function simplifyCartRecoveryError(raw?: string): string {
+  const lower = (raw || "").toLowerCase();
+  if (lower.includes("forbidden") || lower.includes("admin")) {
+    return "You'll need admin access in this workspace to turn this on — ask a workspace admin to enable it.";
+  }
+  if (lower.includes("unauthorized") || lower.includes("session")) {
+    return "Your session seems to have expired. Refresh the page and try again.";
+  }
+  return "Something went wrong while turning this on. Please wait a moment and try again.";
+}
+
 export const MarketplaceTab: React.FC = () => {
   const params = useParams();
   const orgId = params.orgId as string;
@@ -69,20 +97,87 @@ export const MarketplaceTab: React.FC = () => {
     stock: "0",
   });
 
+  // Abandoned Cart Recovery — one-click sequence setup
+  const [sequences, setSequences] = useState<SequenceSummary[]>([]);
+  const [creatingCartRecovery, setCreatingCartRecovery] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastIdRef = useRef(0);
+
+  const showToast = (type: "success" | "error", title: string, message: string) => {
+    toastIdRef.current += 1;
+    setToast({ id: toastIdRef.current, type, title, message });
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), TOAST_DURATION_MS);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const hasCartRecoverySequence = sequences.some((s) => s.trigger === "cart_abandoned");
+
+  const handleSetUpCartRecovery = async () => {
+    if (creatingCartRecovery || hasCartRecoverySequence) return;
+    setCreatingCartRecovery(true);
+    try {
+      const res = await fetch(`/api/org/${orgId}/sequences`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Cart Recovery",
+          trigger: "cart_abandoned",
+          steps: [
+            {
+              order: 0,
+              delayMinutes: 0,
+              actionType: "send_message",
+              message:
+                "Hey {{contact.name}}! 🛒 You left {{cart.items_list}} in your cart (Total: {{cart.total}}). Complete your order here: {{cart.checkout_url}}",
+            },
+            {
+              order: 1,
+              delayMinutes: 120,
+              actionType: "send_template",
+              templateName: "cart_recovery",
+            },
+          ],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        showToast("error", "Couldn't turn this on", simplifyCartRecoveryError(data.error));
+      } else if (data.sequence) {
+        setSequences((prev) => [...prev, { id: data.sequence.id, trigger: data.sequence.trigger }]);
+        showToast(
+          "success",
+          "Cart recovery is now live",
+          "Customers who leave items unpaid for an hour will automatically get a friendly reminder, with a follow-up two hours later."
+        );
+      }
+    } catch {
+      showToast("error", "Couldn't turn this on", simplifyCartRecoveryError());
+    } finally {
+      setCreatingCartRecovery(false);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     const loadAll = async () => {
       try {
-        const [resP, resO] = await Promise.all([
+        const [resP, resO, resS] = await Promise.all([
           fetch(`/api/marketplace/catalog?orgId=${orgId}`),
-          fetch(`/api/org/${orgId}/data`)
+          fetch(`/api/org/${orgId}/data`),
+          fetch(`/api/org/${orgId}/sequences`)
         ]);
         const dataP = await resP.json();
         const dataO = await resO.json();
+        const dataS = await resS.json().catch(() => ({}));
         if (mounted) {
           setProducts(dataP.products || []);
           if (dataO.orders) setOrders(dataO.orders);
           if (dataO.organization) setOrganization(dataO.organization);
+          setSequences(dataS.sequences || []);
         }
       } catch (err) {
         console.error("Failed to fetch marketplace data", err);
@@ -282,6 +377,35 @@ export const MarketplaceTab: React.FC = () => {
                   }`}
                 />
               </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-none p-5 sm:p-8 border border-stone-200 hover:border-stone-400 transition-colors duration-300 animate-fade-in flex max-md:flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className={`inline-block w-2 h-2 rounded-full transition-all duration-300 ${hasCartRecoverySequence ? "bg-stone-900 animate-pulse" : "bg-stone-300"}`} />
+                <h3 className="text-xs font-bold text-stone-900 uppercase tracking-widest">Abandoned Cart Recovery</h3>
+              </div>
+              <p className="text-[11px] text-stone-500 max-w-2xl leading-relaxed">
+                When a customer adds items to their cart on WhatsApp but never pays, this automatically sends a friendly reminder with their cart total and payment link an hour later — then a follow-up two hours after that if they still haven&apos;t checked out.
+              </p>
+            </div>
+            <div className="self-start md:self-auto">
+              {hasCartRecoverySequence ? (
+                <span className="inline-flex items-center gap-2 px-4 py-2.5 border border-stone-200 text-[10px] font-extrabold text-stone-500 uppercase tracking-widest">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-stone-900" />
+                  Active
+                </span>
+              ) : (
+                <button
+                  onClick={handleSetUpCartRecovery}
+                  disabled={creatingCartRecovery}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-stone-950 text-white rounded-none border border-stone-950 text-xs font-bold hover:bg-stone-900 transition-all cursor-pointer uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creatingCartRecovery ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+                  {creatingCartRecovery ? "Setting Up..." : "Set Up Cart Recovery"}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -541,6 +665,35 @@ export const MarketplaceTab: React.FC = () => {
                 No orders yet
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Slide-in toast with auto-dismiss timer bar */}
+      {toast && (
+        <div key={toast.id} className="fixed top-6 right-4 sm:right-8 z-[200] w-[calc(100%-2rem)] sm:w-96 animate-toast-in">
+          <div className={`bg-white border shadow-lg rounded-none overflow-hidden ${toast.type === "success" ? "border-stone-900" : "border-red-300"}`}>
+            <div className="p-4 flex items-start gap-3">
+              {toast.type === "success" ? (
+                <CheckCircle2 className="w-5 h-5 text-stone-900 shrink-0 mt-0.5" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-stone-900 uppercase tracking-wide">{toast.title}</p>
+                <p className="text-[11px] text-stone-500 leading-relaxed mt-1">{toast.message}</p>
+              </div>
+              <button
+                onClick={() => setToast(null)}
+                className="text-stone-400 hover:text-stone-900 cursor-pointer shrink-0"
+                aria-label="Dismiss notification"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="h-[3px] bg-stone-100 w-full overflow-hidden">
+              <div className={`h-full animate-toast-bar ${toast.type === "success" ? "bg-stone-900" : "bg-red-400"}`} />
+            </div>
           </div>
         </div>
       )}

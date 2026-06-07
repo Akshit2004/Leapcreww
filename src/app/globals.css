@@ -109,6 +109,26 @@ input::placeholder, textarea::placeholder {
   }
 }
 
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toastBarShrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
 @keyframes pulseSoft {
   0%, 100% {
     opacity: 1;
@@ -135,6 +155,14 @@ input::placeholder, textarea::placeholder {
 
 .animate-slide-in-left {
   animation: slideInLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-in {
+  animation: toastIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-bar {
+  animation: toastBarShrink 5s linear forwards;
 }
 
 .animate-pulse-soft {
