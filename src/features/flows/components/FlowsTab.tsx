@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { Plus, RefreshCw, Layers, LayoutTemplate, Settings2, Code, Share2, ShieldAlert, Lock, Play, MonitorSmartphone, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Layers, LayoutTemplate, Settings2, Code, Share2, ShieldAlert, Lock, Play, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { VisualFlowBuilder } from "./VisualFlowBuilder";
 
@@ -25,7 +25,7 @@ export const FlowsTab: React.FC = () => {
   const [messageFooter, setMessageFooter] = useState("WappFlow Broadcast");
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [activeTab, setActiveTab] = useState<"editor" | "submissions">("editor");
-  const [editorMode, setEditorMode] = useState<"visual" | "developer">("visual");
+  const [showJsonMode, setShowJsonMode] = useState(false);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
@@ -136,11 +136,11 @@ export const FlowsTab: React.FC = () => {
 
   const handleOpenBroadcastModal = () => {
     if (!selectedFlow) return;
-    setCampaignName(`${selectedFlow.name} Campaign - ${new Date().toLocaleDateString()}`);
+    setCampaignName(`${selectedFlow.name} – ${new Date().toLocaleDateString()}`);
     setTargetTag("all");
-    setMessageTitle("Hey there! Please take a moment to fill out our form.");
+    setMessageTitle("Hey! Please take a moment to fill out our form.");
     setCtaText("Open Form");
-    setMessageFooter("WappFlow Broadcast");
+    setMessageFooter("WappFlow");
     setShowBroadcastModal(true);
   };
 
@@ -432,30 +432,8 @@ export const FlowsTab: React.FC = () => {
             activeTab === "editor" ? (
               <div className="flex-1 flex flex-col overflow-hidden">
                 <div className="h-12 border-b border-stone-200 bg-stone-50 flex items-center px-4 justify-between shrink-0">
-                  <div className="flex items-center gap-4">
-                    <div className="flex bg-stone-200/50 p-0.5 rounded-none border border-stone-200">
-                      <button
-                        onClick={() => setEditorMode("visual")}
-                        className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                          editorMode === "visual" ? "bg-white shadow-sm text-stone-900 border border-stone-200" : "text-stone-500 hover:text-stone-700 border border-transparent"
-                        }`}
-                      >
-                        <MonitorSmartphone className="w-3 h-3" />
-                        Visual Builder
-                      </button>
-                      <button
-                        onClick={() => setEditorMode("developer")}
-                        className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                          editorMode === "developer" ? "bg-white shadow-sm text-stone-900 border border-stone-200" : "text-stone-500 hover:text-stone-700 border border-transparent"
-                        }`}
-                      >
-                        <Code className="w-3 h-3" />
-                        Developer
-                      </button>
-                    </div>
-                  </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">Flow Name</span>
+                    <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">Name</span>
                     <input
                       type="text"
                       value={selectedFlow.name}
@@ -464,19 +442,19 @@ export const FlowsTab: React.FC = () => {
                       disabled={selectedFlow.status === "published"}
                     />
                   </div>
+                  <button
+                    onClick={() => setShowJsonMode(v => !v)}
+                    className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 border transition-colors cursor-pointer ${showJsonMode ? "border-stone-900 text-stone-900 bg-stone-100" : "border-stone-200 text-stone-400 hover:text-stone-700"}`}
+                    title="Toggle raw JSON editor"
+                  >
+                    <Code className="w-3 h-3" />
+                    JSON
+                  </button>
                 </div>
-                
+
                 <div className="flex-1 flex overflow-hidden">
-                  {editorMode === "visual" ? (
-                    <VisualFlowBuilder 
-                      flowJsonStr={flowJsonStr} 
-                      onChange={setFlowJsonStr} 
-                    />
-                  ) : (
+                  {showJsonMode ? (
                     <div className="flex-1 p-4 bg-stone-100/50">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Raw JSON Definition</span>
-                      </div>
                       <textarea
                         value={flowJsonStr}
                         onChange={(e) => setFlowJsonStr(e.target.value)}
@@ -484,6 +462,11 @@ export const FlowsTab: React.FC = () => {
                         spellCheck={false}
                       />
                     </div>
+                  ) : (
+                    <VisualFlowBuilder
+                      flowJsonStr={flowJsonStr}
+                      onChange={setFlowJsonStr}
+                    />
                   )}
                 </div>
               </div>
@@ -588,58 +571,33 @@ export const FlowsTab: React.FC = () => {
                   required
                   value={campaignName}
                   onChange={(e) => setCampaignName(e.target.value)}
-                  placeholder="e.g. Lead Capture Form Campaign"
+                  placeholder="e.g. Lead Capture – June"
                   className="w-full bg-stone-50 border border-stone-200 rounded-none px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-stone-900 focus:bg-white transition-all placeholder:text-stone-400"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-stone-700 uppercase tracking-wide">Target CRM Tag</label>
+                <label className="text-[10px] font-bold text-stone-700 uppercase tracking-wide">Target Audience</label>
                 <input
                   type="text"
                   required
                   value={targetTag}
                   onChange={(e) => setTargetTag(e.target.value)}
-                  placeholder="e.g. VIP, Inbound, or 'all'"
+                  placeholder="Tag name, or 'all' for everyone"
                   className="w-full bg-stone-50 border border-stone-200 rounded-none px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-stone-900 focus:bg-white transition-all placeholder:text-stone-400"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-stone-700 uppercase tracking-wide">Message Body Text</label>
+                <label className="text-[10px] font-bold text-stone-700 uppercase tracking-wide">Message</label>
                 <textarea
                   required
                   rows={3}
                   value={messageTitle}
                   onChange={(e) => setMessageTitle(e.target.value)}
-                  placeholder="This text appears above the trigger button inside the WhatsApp chat."
+                  placeholder="Text shown above the form button in WhatsApp."
                   className="w-full bg-stone-50 border border-stone-200 rounded-none px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-stone-900 focus:bg-white transition-all placeholder:text-stone-400 resize-none h-20"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-stone-700 uppercase tracking-wide">CTA Button Label</label>
-                  <input
-                    type="text"
-                    required
-                    value={ctaText}
-                    onChange={(e) => setCtaText(e.target.value)}
-                    placeholder="e.g. Open Form"
-                    className="w-full bg-stone-50 border border-stone-200 rounded-none px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-stone-900 focus:bg-white transition-all placeholder:text-stone-400"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-stone-700 uppercase tracking-wide">Footer Text</label>
-                  <input
-                    type="text"
-                    value={messageFooter}
-                    onChange={(e) => setMessageFooter(e.target.value)}
-                    placeholder="e.g. Powered by WappFlow"
-                    className="w-full bg-stone-50 border border-stone-200 rounded-none px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-stone-900 focus:bg-white transition-all placeholder:text-stone-400"
-                  />
-                </div>
               </div>
             </div>
 

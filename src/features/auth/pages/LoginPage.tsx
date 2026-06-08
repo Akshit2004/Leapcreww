@@ -4,9 +4,9 @@ import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, getSession } from "next-auth/react";
-import { 
-  Bot, ArrowRight, Mail, AlertCircle, Loader, CheckCircle, 
-  MessageSquare, Copy, Building, User
+import {
+  Bot, ArrowRight, Mail, AlertCircle, Loader, CheckCircle,
+  MessageSquare, Copy, Building, User, Lock
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -15,8 +15,11 @@ function LoginContent() {
   const searchParams = useSearchParams();
   
   // Tab states
-  const [activeTab, setActiveTab] = useState<"whatsapp" | "email">("email");
-  
+  const [activeTab, setActiveTab] = useState<"password" | "whatsapp" | "email">("password");
+
+  // Password login state
+  const [password, setPassword] = useState("");
+
   // Email Form states
   const [email, setEmail] = useState("");
   
@@ -181,6 +184,43 @@ function LoginContent() {
     };
   }, [waAttemptId, activeTab, showOnboarding, router]);
 
+  // Handle Password Login
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (res?.error) {
+        setErrorMsg("Incorrect email or password.");
+        return;
+      }
+      // Poll for session — NextAuth JWT needs one round-trip to propagate
+      let attempts = 0;
+      const poll = async (): Promise<void> => {
+        const session = await getSession();
+        const orgs = (session?.user as { organizations?: { id: string }[] })?.organizations;
+        if (orgs && orgs.length > 0) {
+          router.push(`/org/${orgs[0].id}`);
+        } else if (attempts++ < 5) {
+          await new Promise(r => setTimeout(r, 400));
+          return poll();
+        } else {
+          router.push("/");
+        }
+      };
+      await poll();
+    } catch {
+      setErrorMsg("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handle Email OTP Dispatch
   const handleSendEmailOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,7 +353,7 @@ function LoginContent() {
           }
         } else if (data.status === "VERIFIED_NEW_USER") {
           setVerifiedEmailOrPhone(activeTab === "whatsapp" ? (data.phone || phone) : data.email);
-          setOnboardingType(activeTab);
+          setOnboardingType(activeTab === "whatsapp" ? "whatsapp" : "email");
           setShowOnboarding(true);
           setOtpVerifying(false);
         }
@@ -496,39 +536,60 @@ function LoginContent() {
 
           {/* Segment Tab Controls */}
           <div className="bg-stone-100 p-1 rounded-xl flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("email");
-                setErrorMsg("");
-                setSuccessMsg("");
-                setOtpSent(false);
-              }}
-              className={`w-1/2 text-center py-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                activeTab === "email" 
-                  ? "bg-white text-stone-900 shadow-sm" 
-                  : "text-stone-500 hover:text-stone-800"
-              }`}
-            >
-              Email OTP
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("whatsapp");
-                setErrorMsg("");
-                setSuccessMsg("");
-                setOtpSent(false);
-              }}
-              className={`w-1/2 text-center py-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                activeTab === "whatsapp" 
-                  ? "bg-white text-stone-900 shadow-sm" 
-                  : "text-stone-500 hover:text-stone-800"
-              }`}
-            >
-              WhatsApp Link
-            </button>
+            {(["password", "email", "whatsapp"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => { setActiveTab(tab); setErrorMsg(""); setSuccessMsg(""); setOtpSent(false); }}
+                className={`flex-1 text-center py-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                  activeTab === tab ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                {tab === "password" ? "Password" : tab === "email" ? "Email OTP" : "WhatsApp"}
+              </button>
+            ))}
           </div>
+
+          {/* Password Login Panel */}
+          {activeTab === "password" && (
+            <form onSubmit={handlePasswordLogin} className="space-y-4 animate-slide-up">
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
+                  <Mail className="w-3 h-3" /> Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  disabled={loading}
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
+                  <Lock className="w-3 h-3" /> Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  disabled={loading}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading || !email.trim() || !password}
+                className="w-full bg-stone-900 hover:bg-stone-800 disabled:opacity-40 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98"
+              >
+                {loading ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <><span>Sign In</span><ArrowRight className="w-3.5 h-3.5" /></>}
+              </button>
+            </form>
+          )}
 
           {/* WhatsApp Auth Panel */}
           {activeTab === "whatsapp" && (

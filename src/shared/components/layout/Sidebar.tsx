@@ -62,25 +62,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // ─── Data & Config ──────────────────────────────────────────────
   const totalUnread = contacts.reduce((acc, contact) => acc + (contact.unreadCount || 0), 0);
-  const sessionName = (session?.user as { name?: string })?.name || "";
-  const agentName = sessionName || "Agent";
+  const sessionUser = session?.user as { name?: string; organizations?: { role: string }[] } | undefined;
+  const agentName = sessionUser?.name || "User";
+  const userRole = sessionUser?.organizations?.[0]?.role || "Member";
   const appName = "WappFlow";
   const appVersion = "v2.4.0";
 
-  const menuItems = [
+  const primaryItems = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
-    { id: "analytics", label: "Analytics", icon: BarChart3 },
-    { id: "inbox", label: "Team Inbox", icon: MessageSquare, badge: totalUnread > 0 ? totalUnread : undefined },
-    { id: "customers", label: "Customers", icon: Users },
-    { id: "ads", label: "Ads Manager", icon: Target },
+    { id: "inbox", label: "Inbox", icon: MessageSquare, badge: totalUnread > 0 ? totalUnread : undefined },
+    { id: "customers", label: "Contacts", icon: Users },
     { id: "campaigns", label: "Campaigns", icon: Megaphone },
     { id: "templates", label: "Templates", icon: FileText },
+  ];
+
+  const secondaryItems = [
+    { id: "chatbot", label: "Chatbot", icon: Cpu, hideOnMobile: true },
     { id: "flows", label: "Flows", icon: Layers },
-    { id: "chatbot", label: "Bot Builder", icon: Cpu, hideOnMobile: true },
-    { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
+    { id: "analytics", label: "Analytics", icon: BarChart3 },
+    { id: "ads", label: "Ads", icon: Target },
     { id: "integrations", label: "Integrations", icon: Plug },
+    { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
     { id: "settings", label: "Settings", icon: Settings },
   ];
+
+  const menuItems = [...primaryItems, ...secondaryItems];
 
   // ─── API Effects (Sandbox Mode Permanently Active) ──────────────
 
@@ -118,58 +124,65 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto custom-scrollbar relative z-10">
-          <div
-            data-stagger-pos="0.12"
-            className={`text-[9px] font-black text-stone-600 tracking-wider uppercase px-2 mb-3 transition-all duration-300 ${
-              isExpanded ? "opacity-100" : "lg:opacity-0 lg:pointer-events-none lg:mb-0"
-            }`}
-          >
-            Management
-          </div>
-          {menuItems.map((item, idx) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            const pos = 0.15 + (idx / Math.max(menuItems.length - 1, 1)) * 0.60;
-            return (
-              <button
-                key={item.id}
-                data-stagger-pos={pos.toFixed(3)}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-3 transition-all duration-250 group relative cursor-pointer rounded-none border border-transparent ${
-                  isActive
-                    ? "bg-wa-green text-white font-bold"
-                    : "hover:bg-stone-100 text-stone-600 hover:text-stone-950"
-                } ${isExpanded ? "" : "lg:px-2.5"}`}
-                title={!isExpanded ? item.label : undefined}
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <Icon className={`w-5 h-5 transition-all duration-300 shrink-0 ${
-                    isActive ? "text-white scale-105" : "text-stone-500 group-hover:text-stone-900"
-                  }`} />
-                  <span className={`text-xs font-semibold transition-all duration-300 min-w-[120px] text-left ${
-                    isExpanded ? "opacity-100 translate-x-0" : "lg:opacity-0 lg:-translate-x-4 lg:pointer-events-none"
-                  }`}>{item.label}</span>
-                </div>
-                
-                {item.badge !== undefined && (
-                  isExpanded ? (
-                    <span className={`text-[9px] font-bold px-2 py-0.5 shrink-0 rounded-none border ${
-                      isActive ? "bg-wa-green-dark border-wa-green text-white" : "bg-stone-100 border-stone-200 text-stone-900"
-                    }`}>
+        <nav className="flex-1 px-3 py-4 overflow-y-auto custom-scrollbar relative z-10 space-y-4">
+          {/* Primary */}
+          <div>
+            <div className={`text-[9px] font-black text-stone-400 tracking-wider uppercase px-2 mb-2 transition-all duration-300 ${isExpanded ? "opacity-100" : "lg:opacity-0 lg:h-0 lg:mb-0 lg:overflow-hidden"}`}>
+              Main
+            </div>
+            {primaryItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 mb-0.5 transition-all group relative cursor-pointer rounded-none border border-transparent ${
+                    isActive ? "bg-wa-green text-white font-bold" : "hover:bg-stone-100 text-stone-600 hover:text-stone-950"
+                  } ${isExpanded ? "" : "lg:px-2.5 lg:justify-center"}`}
+                  title={!isExpanded ? item.label : undefined}
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <Icon className={`w-5 h-5 shrink-0 ${isActive ? "text-white" : "text-stone-500 group-hover:text-stone-900"}`} />
+                    <span className={`text-xs font-semibold min-w-[100px] text-left transition-all duration-200 ${isExpanded ? "opacity-100" : "lg:opacity-0 lg:w-0 lg:min-w-0 lg:overflow-hidden"}`}>{item.label}</span>
+                  </div>
+                  {item.badge !== undefined && isExpanded && (
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 shrink-0 border ${isActive ? "bg-wa-green-dark border-wa-green-light text-white" : "bg-stone-100 border-stone-200 text-stone-900"}`}>
                       {item.badge}
                     </span>
-                  ) : (
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-wa-green border border-white rounded-full lg:block hidden" />
-                  )
-                )}
+                  )}
+                  {item.badge !== undefined && !isExpanded && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-wa-green border border-white rounded-full hidden lg:block" />
+                  )}
+                  {isActive && <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-white" />}
+                </button>
+              );
+            })}
+          </div>
 
-                {isActive && (
-                  <div className="absolute left-0 top-3 bottom-3 w-1 bg-white" />
-                )}
-              </button>
-            );
-          })}
+          {/* Secondary */}
+          <div>
+            <div className={`text-[9px] font-black text-stone-400 tracking-wider uppercase px-2 mb-2 transition-all duration-300 ${isExpanded ? "opacity-100" : "lg:opacity-0 lg:h-0 lg:mb-0 lg:overflow-hidden"}`}>
+              Tools
+            </div>
+            {secondaryItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 mb-0.5 transition-all group relative cursor-pointer rounded-none border border-transparent ${
+                    isActive ? "bg-stone-100 text-stone-900 font-bold border-stone-200" : "hover:bg-stone-50 text-stone-500 hover:text-stone-800"
+                  } ${isExpanded ? "" : "lg:px-2.5 lg:justify-center"}`}
+                  title={!isExpanded ? item.label : undefined}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-stone-900" : "text-stone-400 group-hover:text-stone-700"}`} />
+                  <span className={`text-xs font-semibold transition-all duration-200 ${isExpanded ? "opacity-100" : "lg:opacity-0 lg:w-0 lg:overflow-hidden"}`}>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </nav>
 
         {/* Bottom Profile / Signout */}
@@ -189,7 +202,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               <div className="text-xs font-bold text-stone-950 truncate leading-none mb-1">{agentName}</div>
-              <div className="text-[9px] text-stone-400 font-bold tracking-wider uppercase leading-none">Agent Portal</div>
+              <div className="text-[9px] text-stone-400 font-bold tracking-wider uppercase leading-none">{userRole}</div>
             </div>
 
             <div
@@ -212,7 +225,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* --- MOBILE BOTTOM NAVIGATION --- */}
       <nav className="max-lg:flex lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200 items-center overflow-x-auto pb-safe scrollbar-none snap-x snap-mandatory">
-        {menuItems.filter(item => !item.hideOnMobile).map((item) => {
+        {primaryItems.filter(item => !("hideOnMobile" in item && item.hideOnMobile)).map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
