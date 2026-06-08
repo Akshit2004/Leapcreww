@@ -5,7 +5,7 @@ import { Send, FileCode2, UploadCloud } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { CSVImporterModal } from "@/features/inbox/components/CSVImporterModal";
 import { ChecklistWizard } from "./ChecklistWizard";
-import { WalletTopupModal } from "@/features/wallet/components/WalletTopupModal";
+import { MetaBillingModal } from "@/features/wallet/components/MetaBillingModal";
 import { EditorialHeader } from "./EditorialHeader";
 import { FlowJournalStream } from "./FlowJournalStream";
 
@@ -46,7 +46,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
       {/* 1. Elegant Editorial Header & Wallet Dock */}
       <EditorialHeader 
         organization={organization}
-        onTopupClick={() => setIsTopupOpen(true)}
+        onManageBillingClick={() => setIsTopupOpen(true)}
       />
 
       {/* 2. Getting Started Onboarding checklist */}
@@ -174,13 +174,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
         />
       )}
 
-      {/* 5. Secure Credits Top-Up Modal */}
+      {/* 5. Secure Meta Billing Modal */}
       {organization && (
-        <WalletTopupModal
+        <MetaBillingModal
           isOpen={isTopupOpen}
           onClose={() => setIsTopupOpen(false)}
           organizationId={organization.id}
-          refreshWorkspace={refreshWorkspace}
         />
       )}
     </div>

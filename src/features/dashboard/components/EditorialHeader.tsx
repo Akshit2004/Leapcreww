@@ -1,27 +1,19 @@
 "use client";
 
 import React from "react";
-import { Wallet, CheckCircle2, AlertCircle } from "lucide-react";
+import { Wallet, CheckCircle2, AlertCircle, CreditCard } from "lucide-react";
 import { Organization } from "@/shared/context/types";
 
 interface EditorialHeaderProps {
   organization: Organization | null;
-  onTopupClick: () => void;
+  onManageBillingClick: () => void;
 }
 
 export const EditorialHeader: React.FC<EditorialHeaderProps> = ({
   organization,
-  onTopupClick,
+  onManageBillingClick,
 }) => {
   const fbConnected = !!(organization?.whatsappConnected || organization?.whatsappBusinessAccountId);
-  
-  // Clean formatting for wallet balance
-  const rawBalance = (organization?.walletBalance as number) ?? 0.0;
-  const formattedBalance = rawBalance.toLocaleString("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  });
 
   // Today's date in a clean editorial/journal format (e.g., "MAY 29, 2026 // ISSUE NO. 14")
   const formattedDate = new Date().toLocaleDateString("en-US", {
@@ -80,23 +72,36 @@ export const EditorialHeader: React.FC<EditorialHeaderProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Flat Minimalist Wallet Dock */}
+        {/* Right Column: Flat Minimalist Meta Billing Dock */}
         <div className="bg-white border border-stone-200 p-5 flex flex-col justify-between space-y-4 hover:border-stone-900 transition-colors duration-300">
           <div className="space-y-1.5">
             <span className="text-[10px] font-bold tracking-widest text-stone-400 uppercase block">
-              AVAILABLE OPERATIONAL CREDITS
+              META CLOUD BILLING
             </span>
-            <div className="text-2xl font-semibold tracking-tight text-stone-950">
-              {formattedBalance}
+            <div className="flex items-center gap-2 text-stone-950 font-semibold tracking-tight">
+              {fbConnected ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <span className="text-xl">Active & Verified</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-5 h-5 text-stone-400" />
+                  <span className="text-xl text-stone-500">Unlinked</span>
+                </>
+              )}
             </div>
+            <p className="text-[10px] text-stone-500 uppercase mt-1">
+              Direct billing via Meta Business Suite
+            </p>
           </div>
 
           <button
-            onClick={onTopupClick}
+            onClick={onManageBillingClick}
             className="w-full bg-stone-950 text-white text-[10px] tracking-widest uppercase py-2 px-3 border border-stone-950 hover:bg-white hover:text-stone-950 transition-all duration-300 font-bold flex items-center justify-center gap-2 rounded-none"
           >
-            <Wallet className="w-3.5 h-3.5" />
-            TOP UP BALANCE
+            <CreditCard className="w-3.5 h-3.5" />
+            MANAGE BILLING
           </button>
         </div>
       </div>
