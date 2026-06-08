@@ -29,6 +29,11 @@ export default function TenantDashboard() {
   const orgId = params.orgId as string;
 
   const [activeTab, setActiveTab] = useState<string>("overview");
+  const mainRef = React.useRef<HTMLElement>(null);
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    mainRef.current?.scrollTo({ top: 0 });
+  };
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -78,7 +83,7 @@ export default function TenantDashboard() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case "overview":
-        return <OverviewTab onNavigate={setActiveTab} />;
+        return <OverviewTab onNavigate={handleTabChange} />;
       case "analytics":
         return <AnalyticsTab />;
       case "inbox":
@@ -131,24 +136,29 @@ export default function TenantDashboard() {
   // Render Access Error Screen
   if (errorMsg) {
     return (
-      <div className="min-h-screen bg-[#f4f6f5] flex flex-col justify-center items-center px-6 relative overflow-hidden">
-        {/* Background decorative glow */}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-80 h-80 bg-red-100/50 rounded-full blur-3xl opacity-60 animate-pulse-soft" />
-        
-        <div className="max-w-md w-full bg-white/80 backdrop-blur-md border border-slate-200/60 p-8 rounded-3xl shadow-xl space-y-6 text-center animate-slide-up relative z-10">
-          <div className="w-14 h-14 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mx-auto border border-red-200">
-            <AlertCircle className="w-6 h-6 animate-pulse" />
+      <div className="min-h-screen bg-[#f4f6f5] flex flex-col justify-center items-center px-6">
+        <div className="max-w-sm w-full bg-white border border-stone-200 p-8 space-y-5 text-center">
+          <div className="w-12 h-12 bg-red-50 border border-red-100 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-5 h-5 text-red-500" />
           </div>
-          <div className="space-y-2">
-            <h3 className="font-extrabold text-slate-900 text-lg tracking-tight">Workspace Access Refused</h3>
-            <p className="text-stone-500 text-xs leading-relaxed select-text font-medium">{errorMsg}</p>
+          <div className="space-y-1.5">
+            <h3 className="font-bold text-stone-900 text-base">Could not load workspace</h3>
+            <p className="text-stone-500 text-xs leading-relaxed">{errorMsg}</p>
           </div>
-          <button
-            onClick={() => router.push("/login")}
-            className="w-full bg-wa-green hover:bg-wa-green-dark text-white font-bold text-xs py-3.5 rounded-xl transition-all duration-300 hover:shadow-md hover:shadow-wa-green/15 cursor-pointer"
-          >
-            Return to Login Portal
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setErrorMsg(""); setLoading(true); }}
+              className="flex-1 bg-stone-950 hover:bg-stone-800 text-white font-bold text-xs py-2.5 transition-colors cursor-pointer"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => router.push("/login")}
+              className="flex-1 border border-stone-200 hover:border-stone-400 text-stone-700 font-bold text-xs py-2.5 transition-colors cursor-pointer"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -157,16 +167,16 @@ export default function TenantDashboard() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#f4f6f5] font-sans">
       {/* 1. Left Sidebar Navigation */}
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        isOpen={isSidebarOpen} 
-        onClose={() => setIsSidebarOpen(false)} 
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={handleTabChange}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
         onOpenCopilot={() => setIsCopilotOpen(true)}
       />
 
       {/* 2. Main Tab View Panels */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#f4f6f5] relative max-lg:pb-20 lg:pb-0">
+      <main ref={mainRef} className="flex-1 flex flex-col h-full overflow-hidden bg-[#f4f6f5] relative max-lg:pb-20 lg:pb-0">
         {/* Mobile Top Navigation Header */}
         <header className="h-14 px-4 bg-white/80 backdrop-blur-md border-b border-slate-200/50 items-center justify-between shrink-0 max-lg:flex lg:hidden select-none z-30">
           <div className="flex items-center gap-3">
