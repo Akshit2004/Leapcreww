@@ -93,8 +93,14 @@ export interface WhatsAppWebhookPayload {
           conversation?: { id: string };
           errors?: { code: number; title: string; message?: string; error_data?: any }[];
         }[];
+        // message_template_status_update events carry these instead of messages/statuses.
+        event?: string; // "APPROVED" | "REJECTED" | "FLAGGED" | "PAUSED" | "DISABLED"
+        message_template_id?: number | string;
+        message_template_name?: string;
+        message_template_language?: string;
+        reason?: string | null;
       };
-      field: "messages";
+      field: "messages" | "message_template_status_update";
     }[];
   }[];
 }

@@ -447,6 +447,20 @@ export const CampaignsTab: React.FC = () => {
             Scheduled
           </span>
         );
+      case "PendingTemplate":
+        return (
+          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-none flex items-center gap-1.5 self-start uppercase">
+            <Clock className="w-3.5 h-3.5 text-amber-600" />
+            Awaiting Approval
+          </span>
+        );
+      case "Failed":
+        return (
+          <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-none flex items-center gap-1.5 self-start uppercase">
+            <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+            Failed
+          </span>
+        );
       default:
         return (
           <span className="text-[10px] font-bold text-stone-600 bg-stone-50 px-2.5 py-1 rounded-none border border-stone-200 flex items-center gap-1.5 self-start uppercase">
@@ -1162,6 +1176,35 @@ export const CampaignsTab: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Template Approval Status Notice */}
+                  {strategistStrategy.templateExists ? (
+                    <div className="bg-emerald-50 border border-emerald-200 p-4 flex items-start gap-3 rounded-none shadow-sm">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-emerald-800 uppercase block">
+                          Approved Template Matched
+                        </span>
+                        <p className="text-[11px] text-emerald-700 leading-relaxed font-semibold">
+                          An approved template named <strong className="text-emerald-950 font-bold">"{strategistStrategy.template.name}"</strong> fits your objective.
+                          WappFlow will reuse this template, so no new Meta registration is needed and you can launch immediately!
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-amber-50 border border-amber-250 p-4 flex items-start gap-3 rounded-none shadow-sm">
+                      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-amber-800 uppercase block">
+                          No Matching Approved Template Found
+                        </span>
+                        <p className="text-[11px] text-amber-700 leading-relaxed font-semibold">
+                          No suitable approved template was found in your library for this objective.
+                          To launch this strategy, WappFlow will submit the proposed template <strong className="text-amber-950 font-bold">"{strategistStrategy.template.name}"</strong> to Meta for approval.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
                     {/* LEFT COLUMN: Template and Segment */}
@@ -1416,7 +1459,17 @@ export const CampaignsTab: React.FC = () => {
                         const data = await res.json();
                         if (!res.ok) throw new Error(data.error || "Failed to apply strategy");
 
-                        notify.success("Strategy applied", "Your campaign strategy is live — check Campaigns and workflows.");
+                        if (data.templateApproved) {
+                          notify.success(
+                            "Strategy applied",
+                            `Your campaign is live${typeof data.enrolledCount === "number" ? ` — ${data.enrolledCount} contact(s) enrolled` : ""}. Check Campaigns and workflows.`
+                          );
+                        } else {
+                          notify.success(
+                            "Template submitted to Meta",
+                            "Your campaign is queued — it will broadcast automatically the moment Meta approves the new template."
+                          );
+                        }
                         setIsStrategistOpen(false);
                         setStrategistStrategy(null);
                         if (orgId) await refreshWorkspace(orgId);
@@ -1431,12 +1484,12 @@ export const CampaignsTab: React.FC = () => {
                     {isApplyingStrategy ? (
                       <>
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Applying Strategy...
+                        {strategistStrategy.templateExists ? "Applying Strategy..." : "Registering Template..."}
                       </>
                     ) : (
                       <>
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        Approve & Launch Strategy
+                        {strategistStrategy.templateExists ? "Approve & Launch Strategy" : "Approve & Register New Template"}
                       </>
                     )}
                   </button>

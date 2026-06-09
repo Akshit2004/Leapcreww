@@ -83,6 +83,18 @@ export async function GET(request: NextRequest) {
           organizationId: template.organizationId
         }
       });
+
+      // Drive any AI-strategist campaign parked on this template forward. The
+      // webhook normally handles this, but the poll covers environments without
+      // live template webhooks (incl. the local mock auto-approval simulator).
+      const { resumeCampaignsAwaitingTemplate, failCampaignsAwaitingTemplate } = await import(
+        "@/features/campaigns/services/strategistActivation"
+      );
+      if (dbStatus === "approved") {
+        await resumeCampaignsAwaitingTemplate(template.organizationId, template.name);
+      } else if (dbStatus === "rejected") {
+        await failCampaignsAwaitingTemplate(template.organizationId, template.name);
+      }
     }
 
     return NextResponse.json({ metaStatus: dbStatus, metaData });

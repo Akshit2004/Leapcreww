@@ -6,6 +6,10 @@ import { handleAutoResponder } from "@/shared/lib/autoresponder";
 import { handleMarketplaceMessage } from "@/shared/lib/marketplace";
 import { resolveAttribution } from "@/features/analytics/services/attribution";
 import { handleNfmReply } from "../../services/webhookService";
+import {
+  resumeCampaignsAwaitingTemplate,
+  failCampaignsAwaitingTemplate,
+} from "@/features/campaigns/services/strategistActivation";
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
@@ -43,6 +47,14 @@ export async function POST(req: NextRequest) {
 
       for (const change of entry.changes) {
         const { value } = change;
+
+        // ─── Message Template Status Updates ────────────────────────
+        // Meta posts these when a template's review verdict changes. We flip the
+        // local metaStatus and resume/cancel any AI-strategist campaign parked on it.
+        if (change.field === "message_template_status_update" && value.event) {
+          await handleTemplateStatusUpdate(entryWabaId, value);
+          continue;
+        }
 
         // ─── Status Updates ─────────────────────────────────────────
         if (value.statuses) {
@@ -178,6 +190,61 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     console.error("WhatsApp webhook error:", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
+}
+
+/**
+ * Handle a message_template_status_update webhook: sync the template's local
+ * metaStatus and drive any AI-strategist campaign parked on it forward
+ * (launch on approval, cancel on rejection).
+ */
+async function handleTemplateStatusUpdate(
+  wabaId: string,
+  value: { event?: string; message_template_name?: string; reason?: string | null }
+) {
+  const event = (value.event || "").toUpperCase();
+  const templateName = value.message_template_name;
+  if (!templateName) return;
+
+  // Map Meta's verdict to a verdict we act on. FLAGGED / PAUSED / PENDING_DELETION
+  // don't change launchability, so we ignore them here.
+  const newStatus =
+    event === "APPROVED"
+      ? "approved"
+      : event === "REJECTED" || event === "DISABLED"
+      ? "rejected"
+      : null;
+  if (!newStatus) return;
+
+  const org = await prisma.organization.findFirst({
+    where: { whatsappBusinessAccountId: wabaId },
+    select: { id: true },
+  });
+  if (!org) {
+    console.warn(`[Template Status Webhook] No org found for WABA ${wabaId}`);
+    return;
+  }
+
+  await prisma.template.updateMany({
+    where: { name: templateName, organizationId: org.id },
+    data: { metaStatus: newStatus },
+  });
+
+  const d = new Date();
+  const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  await prisma.systemLog.create({
+    data: {
+      timestamp: timeStr,
+      type: "crm",
+      message: `Template "${templateName}" is now ${newStatus.toUpperCase()}${value.reason ? ` — ${value.reason}` : ""}.`,
+      organizationId: org.id,
+    },
+  });
+
+  if (newStatus === "approved") {
+    await resumeCampaignsAwaitingTemplate(org.id, templateName);
+  } else {
+    await failCampaignsAwaitingTemplate(org.id, templateName, value.reason);
   }
 }
 
