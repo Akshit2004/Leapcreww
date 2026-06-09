@@ -761,45 +761,87 @@ export const ChatbotTab: React.FC = () => {
       )}
 
       {/* Top Header Tab Panel Actions */}
-      <header className="h-16 border-b border-stone-200 bg-[#fafaf9] px-6 flex items-center justify-between shrink-0 select-none">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-stone-950 rounded-none flex items-center justify-center border border-stone-950">
-            <Cpu className="w-5 h-5 text-white" />
+      <header className="h-16 border-b border-stone-200 bg-[#fafaf9] pl-5 pr-6 flex items-center justify-between shrink-0 select-none">
+        <div className="flex items-center gap-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-stone-950 rounded-none flex items-center justify-center border border-stone-950">
+              <Cpu className="w-5 h-5 text-white" />
+            </div>
+            <div className="leading-tight">
+              <h1 className="font-bold text-sm tracking-tight text-stone-900 uppercase">Visual Bot Builder</h1>
+              <p className="text-[10px] text-stone-500">Conversational routing, wired visually</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-sm tracking-tight text-stone-900 uppercase">Visual Bot Builder</h1>
-            <p className="text-[10px] text-stone-500">Architect conversational routing with visual nodes and Groq LLMs</p>
+
+          {/* Live canvas readout */}
+          <div className="hidden xl:flex items-center gap-4 pl-5 border-l border-stone-200 text-stone-500">
+            <div className="flex flex-col">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Nodes</span>
+              <span className="text-sm font-bold text-stone-900 tabular-nums">{nodeCount}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Links</span>
+              <span className="text-sm font-bold text-stone-900 tabular-nums">{connectionCount}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Zoom</span>
+              <span className="text-sm font-bold text-stone-900 tabular-nums">{Math.round(zoom * 100)}%</span>
+            </div>
           </div>
         </div>
 
-        {/* Sync & Layout Actions */}
+        {/* Engine toggle + Sync & Layout Actions */}
         <div className="flex items-center gap-3">
+          {/* Visual Builder Engine toggle */}
+          <div className="flex items-center gap-2.5 pr-3 border-r border-stone-200">
+            <div className="flex flex-col items-end leading-tight">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Builder Engine</span>
+              <span className={`text-[10px] font-bold ${organization?.chatbotBuilderEnabled ? "text-wa-green" : "text-stone-400"}`}>
+                {organization?.chatbotBuilderEnabled ? "Active" : "Pure AI Mode"}
+              </span>
+            </div>
+            <button
+              disabled={botToggling}
+              onClick={toggleBuilderStatus}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-none border transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-stone-900 ${
+                organization?.chatbotBuilderEnabled ? "bg-wa-green border-wa-green" : "bg-stone-100 border-stone-300"
+              } ${botToggling ? "opacity-50 cursor-not-allowed" : ""}`}
+              title="Toggle the visual builder engine"
+            >
+              <span className="sr-only">Toggle Builder</span>
+              <span
+                aria-hidden="true"
+                className={`inline-block h-4 w-4 transform bg-white ring-0 transition duration-200 ease-in-out ${organization?.chatbotBuilderEnabled ? "translate-x-4" : "translate-x-0.5"} mt-0.5`}
+              />
+            </button>
+          </div>
+
           <button
             onClick={() => setShowStats((prev) => !prev)}
-            className={`flex items-center gap-1.5 border px-3 py-1.5 rounded-none text-xs font-semibold cursor-pointer transition-all shadow-none ${
+            className={`flex items-center gap-1.5 border px-3 py-2 rounded-none text-xs font-semibold cursor-pointer transition-all ${
               showStats ? "bg-stone-900 border-stone-900 text-white" : "bg-white border-stone-200 hover:border-stone-400 text-stone-700"
             }`}
-            title="Toggle conversational stats overlays"
+            title="Overlay node impression & drop-off stats"
           >
             <BarChart3 className="w-3.5 h-3.5" />
-            <span>{showStats ? "Hide Stats" : "Show Node Stats"}</span>
+            <span>Stats</span>
           </button>
 
           <button
             onClick={() => handleAutoLayout()}
-            className="flex items-center gap-1.5 border border-stone-200 hover:border-stone-400 text-stone-700 bg-white px-3 py-1.5 rounded-none text-xs font-semibold cursor-pointer transition-all shadow-none"
-            title="Clean canvas alignment"
+            className="flex items-center gap-1.5 border border-stone-200 hover:border-stone-400 text-stone-700 bg-white px-3 py-2 rounded-none text-xs font-semibold cursor-pointer transition-all"
+            title="Re-flow the canvas into a clean tree layout"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Clean Alignment</span>
+            <span>Auto-Arrange</span>
           </button>
 
           <button
             onClick={handleSaveAllFlow}
             disabled={isSaving}
-            className={`flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-none transition-all cursor-pointer border select-none ${
+            className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-none transition-all cursor-pointer border select-none ${
               saveSuccess
-                ? "bg-stone-900 border-stone-900 text-white"
+                ? "bg-wa-green border-wa-green text-white"
                 : "bg-stone-950 hover:bg-stone-900 border-stone-950 text-white active:scale-95"
             }`}
           >
@@ -810,7 +852,7 @@ export const ChatbotTab: React.FC = () => {
             ) : (
               <Save className="w-3.5 h-3.5" />
             )}
-            <span>{isSaving ? "Saving..." : saveSuccess ? "Saved Flow!" : "SAVE & PUBLISH"}</span>
+            <span>{isSaving ? "Saving" : saveSuccess ? "Saved" : "Save & Publish"}</span>
           </button>
         </div>
       </header>
@@ -829,21 +871,54 @@ export const ChatbotTab: React.FC = () => {
           onTouchEnd={handleCanvasTouchEnd}
           style={{ cursor: getCanvasCursor(), touchAction: "none" }}
         >
-          {/* Zoom Overlay Control buttons - Touch-friendly sizing */}
-          <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 lg:gap-2 gap-1.5">
-            <button
-              onClick={() => setZoom((prev) => Math.min(1.5, prev + 0.1))}
-              className="w-11 h-11 lg:w-9 lg:h-9 border border-stone-200 hover:border-stone-400 bg-white rounded-none shadow-none text-stone-700 hover:bg-stone-50 flex items-center justify-center cursor-pointer transition-all active:scale-95"
-              title="Zoom in"
-            >
-              <ZoomIn className="w-5 lg:w-4 h-5 lg:h-4" />
-            </button>
+          {/* Add Step Palette — top-left */}
+          <div className="absolute top-4 left-4 z-20 w-44 bg-white border border-stone-200 rounded-none select-none">
+            <div className="px-3 py-2 border-b border-stone-200 flex items-center gap-1.5">
+              <Plus className="w-3 h-3 text-stone-400" />
+              <span className="text-[9px] font-bold uppercase tracking-widest text-stone-500">Add Step</span>
+            </div>
+            <div className="p-1.5 flex flex-col gap-1">
+              {([
+                { type: "message", label: "Message", desc: "Send text", Icon: MessageSquare },
+                { type: "question", label: "Question", desc: "Branch on reply", Icon: HelpCircle },
+                { type: "delay", label: "Delay", desc: "Pause the flow", Icon: Clock },
+              ] as const).map(({ type, label, desc, Icon }) => (
+                <button
+                  key={type}
+                  onClick={() => handleAddNode(type)}
+                  className="group flex items-center gap-2.5 px-2 py-2 rounded-none hover:bg-stone-100 cursor-pointer transition-colors text-left"
+                  title={`Add ${label.toLowerCase()} node`}
+                >
+                  <span className={`w-7 h-7 shrink-0 flex items-center justify-center border rounded-none ${nodeAccent(type).icon}`}>
+                    <Icon className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="flex flex-col leading-tight">
+                    <span className="text-[11px] font-bold text-stone-900">{label}</span>
+                    <span className="text-[9px] text-stone-400">{desc}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Zoom dock — bottom-left */}
+          <div className="absolute bottom-4 left-4 z-20 flex items-stretch bg-white border border-stone-200 rounded-none select-none">
             <button
               onClick={() => setZoom((prev) => Math.max(0.6, prev - 0.1))}
-              className="w-11 h-11 lg:w-9 lg:h-9 border border-stone-200 hover:border-stone-400 bg-white rounded-none shadow-none text-stone-700 hover:bg-stone-50 flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              className="w-9 h-9 text-stone-600 hover:bg-stone-100 flex items-center justify-center cursor-pointer transition-colors active:scale-95"
               title="Zoom out"
             >
-              <ZoomOut className="w-5 lg:w-4 h-5 lg:h-4" />
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <span className="w-12 flex items-center justify-center text-[11px] font-bold text-stone-700 tabular-nums border-x border-stone-200 select-none">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              onClick={() => setZoom((prev) => Math.min(1.5, prev + 0.1))}
+              className="w-9 h-9 text-stone-600 hover:bg-stone-100 flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+              title="Zoom in"
+            >
+              <ZoomIn className="w-4 h-4" />
             </button>
             <button
               onClick={() => {
@@ -851,46 +926,40 @@ export const ChatbotTab: React.FC = () => {
                 setPan({ x: 0, y: 0 });
                 handleAutoLayout();
               }}
-              className="w-11 h-11 lg:w-9 lg:h-9 border border-stone-200 hover:border-stone-400 bg-white rounded-none shadow-none text-stone-700 hover:bg-stone-50 flex items-center justify-center cursor-pointer transition-all active:scale-95"
-              title="Reset zoom and pan to fit"
+              className="w-9 h-9 text-stone-600 hover:bg-stone-100 flex items-center justify-center cursor-pointer transition-colors active:scale-95 border-l border-stone-200"
+              title="Reset zoom & fit to layout"
             >
-              <Maximize2 className="w-5 lg:w-4 h-5 lg:h-4" />
+              <Maximize2 className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Friendly Traversal Tips Helper - Desktop only */}
-          <div className="max-lg:hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-white border border-stone-200 rounded-none text-[9px] font-bold text-stone-500 shadow-none pointer-events-none select-none">
-            <span className="bg-stone-100 border border-stone-300 px-1 py-0.5 rounded-none text-[8px] text-stone-700">SPACE + DRAG</span>
-            <span>to pan • Two fingers to pan on mobile</span>
+          {/* Pan hint — bottom-center */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-stone-200 rounded-none text-[9px] font-semibold text-stone-500 pointer-events-none select-none">
+            <span className="bg-stone-100 border border-stone-300 px-1.5 py-0.5 rounded-none text-[8px] font-bold tracking-wider text-stone-700">SPACE</span>
+            <span>+ drag to pan the canvas</span>
           </div>
 
-          {/* Quick Node Add Toolbar - Responsive layout */}
-          <div className="absolute top-4 right-4 z-10 flex flex-col lg:flex-row gap-2 lg:gap-1.5">
-            <button
-              onClick={() => handleAddNode("message")}
-              className="flex items-center justify-center lg:justify-start gap-2 lg:gap-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-900 px-3 py-2.5 lg:px-3 lg:py-1.5 rounded-none text-xs font-semibold shadow-none cursor-pointer transition-all active:scale-95 min-w-[44px] lg:min-w-auto h-11 lg:h-auto"
-              title="Add message node"
-            >
-              <Plus className="w-5 lg:w-3.5 h-5 lg:h-3.5 text-stone-900" />
-              <span className="hidden lg:inline">Add Message</span>
-            </button>
-            <button
-              onClick={() => handleAddNode("question")}
-              className="flex items-center justify-center lg:justify-start gap-2 lg:gap-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-900 px-3 py-2.5 lg:px-3 lg:py-1.5 rounded-none text-xs font-semibold shadow-none cursor-pointer transition-all active:scale-95 min-w-[44px] lg:min-w-auto h-11 lg:h-auto"
-              title="Add question node with options"
-            >
-              <HelpCircle className="w-5 lg:w-3.5 h-5 lg:h-3.5 text-stone-900" />
-              <span className="hidden lg:inline">Add Question</span>
-            </button>
-            <button
-              onClick={() => handleAddNode("delay")}
-              className="flex items-center justify-center lg:justify-start gap-2 lg:gap-1 bg-white hover:bg-stone-50 border border-stone-200 text-stone-900 px-3 py-2.5 lg:px-3 lg:py-1.5 rounded-none text-xs font-semibold shadow-none cursor-pointer transition-all active:scale-95 min-w-[44px] lg:min-w-auto h-11 lg:h-auto"
-              title="Add delay/wait node"
-            >
-              <Clock className="w-5 lg:w-3.5 h-5 lg:h-3.5 text-stone-900" />
-              <span className="hidden lg:inline">Add Delay</span>
-            </button>
-          </div>
+          {/* Empty canvas state */}
+          {localNodes.length === 0 && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+              <div className="max-w-sm text-center space-y-4 px-6">
+                <div className="w-14 h-14 mx-auto bg-white border border-stone-300 rounded-none flex items-center justify-center">
+                  <Cpu className="w-7 h-7 text-stone-400" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-base font-bold text-stone-900 tracking-tight">Start your conversation tree</h3>
+                  <p className="text-xs text-stone-500 leading-relaxed">
+                    Add a step from the palette top-left, or describe the flow in plain English and let the AI architect wire it for you.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+                  <span className="h-px w-6 bg-stone-300" />
+                  Add Step · Or use AI
+                  <span className="h-px w-6 bg-stone-300" />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Canvas Blueprint Grid */}
           <div
@@ -933,10 +1002,7 @@ export const ChatbotTab: React.FC = () => {
                     const x2 = endPos.x + cardWidth / 2;
                     const y2 = endPos.y;
 
-                    let strokeColor = "#94a3b8";
-                    if (node.type === "trigger") strokeColor = "#128c7e";
-                    if (node.type === "message") strokeColor = "#3b82f6";
-                    if (node.type === "delay") strokeColor = "#14b8a6";
+                    const strokeColor = nodeAccent(node.type).stroke;
 
                     return (
                       <g key={`${node.id}-to-${node.nextId}`}>
@@ -1012,20 +1078,12 @@ export const ChatbotTab: React.FC = () => {
               const cardWidth = isMobile ? 200 : 260;
               const cardHeight = isMobile ? 140 : 160;
 
-              // Choose color & icon styles
-              let badgeColor = "bg-stone-50 text-stone-700 border-stone-200";
-              let NodeIcon = MessageSquare;
-
-              if (node.type === "trigger") {
-                badgeColor = "bg-stone-900 text-white border-stone-950";
-                NodeIcon = Play;
-              } else if (node.type === "question") {
-                badgeColor = "bg-stone-100 text-stone-900 border-stone-300";
-                NodeIcon = HelpCircle;
-              } else if (node.type === "delay") {
-                badgeColor = "bg-stone-50 text-stone-600 border-stone-200";
-                NodeIcon = Clock;
-              }
+              // Per-type accent + icon
+              const accent = nodeAccent(node.type);
+              const NodeIcon =
+                node.type === "trigger" ? Play :
+                node.type === "question" ? HelpCircle :
+                node.type === "delay" ? Clock : MessageSquare;
 
               return (
                 <div
@@ -1039,28 +1097,31 @@ export const ChatbotTab: React.FC = () => {
                     height: cardHeight,
                     zIndex: isSelected ? 30 : 10
                   }}
-                  className={`backdrop-blur-sm rounded-none p-3 lg:p-4 cursor-grab active:cursor-grabbing border flex flex-col justify-between transition-all select-none shadow-none ${
+                  className={`group relative overflow-hidden rounded-none pl-5 pr-4 py-4 cursor-grab active:cursor-grabbing border flex flex-col justify-between transition-all duration-150 select-none ${
                     isSelected
-                      ? "border-stone-950 bg-white ring-2 ring-stone-950/20 scale-[1.02]"
-                      : "border-stone-200 bg-white hover:border-stone-400"
+                      ? "border-wa-green bg-white ring-2 ring-wa-green/25 shadow-[0_8px_28px_rgba(0,0,0,0.07)]"
+                      : "border-stone-200 bg-white hover:border-stone-400 hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)]"
                   }`}
                 >
+                  {/* Left type accent stripe */}
+                  <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${accent.stripe}`} />
+
                   {/* Top Input Connection Port */}
-                  <div className="absolute -top-1.5 left-[125px] w-3 h-3 bg-stone-100 rounded-none border border-stone-300 flex items-center justify-center">
+                  <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-none border border-stone-300 flex items-center justify-center">
                     <span className="w-1 h-1 bg-stone-400" />
                   </div>
 
-                  {/* Header Badge */}
+                  {/* Header */}
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <div className={`p-1 rounded-none border ${badgeColor}`}>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-6 h-6 flex items-center justify-center rounded-none border ${accent.icon}`}>
                         <NodeIcon className="w-3.5 h-3.5" />
                       </div>
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-stone-500">
+                      <span className="text-[10px] font-bold tracking-wider text-stone-400 font-mono">
                         {node.id}
                       </span>
                     </div>
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-none uppercase border ${badgeColor}`}>
+                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-none uppercase tracking-widest text-stone-400 border border-stone-200 bg-stone-50">
                       {node.type}
                     </span>
                   </div>
@@ -1069,7 +1130,7 @@ export const ChatbotTab: React.FC = () => {
                     <div className="flex items-center justify-between gap-1 mt-1.5 border-b border-stone-100 pb-1.5 text-[9px] font-bold uppercase tracking-wider text-stone-500">
                       <span className="text-stone-900">{nodeStats[node.id].impressions} Views</span>
                       {node.type === "question" ? (
-                        <span className="text-stone-900">{nodeStats[node.id].rate}% Conv</span>
+                        <span className="text-wa-green">{nodeStats[node.id].rate}% Conv</span>
                       ) : (
                         <span className="text-stone-500">{nodeStats[node.id].dropoffs} Drops</span>
                       )}
@@ -1082,7 +1143,7 @@ export const ChatbotTab: React.FC = () => {
                       {node.title}
                     </h4>
                     <p className="text-[10px] text-stone-500 line-clamp-2 leading-relaxed">
-                      {node.type === "delay" ? `Delay: ${node.delayTime}s` : node.content}
+                      {node.type === "delay" ? `Waits ${node.delayTime}s before continuing` : node.content}
                     </p>
                   </div>
 
@@ -1112,14 +1173,14 @@ export const ChatbotTab: React.FC = () => {
                         {node.options.map((_, oIdx) => (
                           <div
                             key={oIdx}
-                            className="w-3 h-3 bg-stone-100 rounded-none border border-stone-300 flex items-center justify-center"
+                            className="w-3 h-3 bg-white rounded-none border border-stone-400 flex items-center justify-center"
                           >
                             <span className="w-1.5 h-1.5 bg-stone-500" />
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="w-3 h-3 bg-stone-100 rounded-none border border-stone-300 flex items-center justify-center">
+                      <div className="w-3 h-3 bg-white rounded-none border border-stone-400 flex items-center justify-center">
                         <span className="w-1.5 h-1.5 bg-stone-400" />
                       </div>
                     )}
@@ -1140,28 +1201,16 @@ export const ChatbotTab: React.FC = () => {
         <aside className={`fixed bottom-0 right-0 lg:relative z-50 w-full lg:w-[380px] max-h-[85vh] lg:max-h-none bg-white border-t lg:border-t-0 lg:border-l border-stone-200 flex flex-col justify-between select-text overflow-hidden transform transition-transform duration-300 ease-in-out lg:translate-y-0 ${
           isMobileInspectorOpen ? "translate-y-0 shadow-2xl" : "lg:translate-y-0 translate-y-full"
         }`}>
-          {/* BOT BUILDER TOGGLE */}
-          <div className="p-4 border-b border-stone-200 bg-[#fafaf9] flex items-center justify-between z-10 shrink-0 min-h-[60px]">
-            <div className="flex flex-col gap-0.5 flex-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${organization?.chatbotBuilderEnabled ? "bg-stone-900 animate-pulse" : "bg-stone-300"}`} />
-                Visual Builder Engine
-              </span>
-              <span className="text-xs font-bold text-stone-900">{organization?.chatbotBuilderEnabled ? "ACTIVE" : "DISABLED (PURE AI MODE)"}</span>
+          {/* Inspector header */}
+          <div className="px-5 h-14 border-b border-stone-200 bg-[#fafaf9] flex items-center justify-between z-10 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-stone-900">Inspector</span>
+              {selectedNodeId && (
+                <span className="text-[9px] font-mono font-bold text-stone-400 bg-white border border-stone-200 px-1.5 py-0.5 rounded-none">
+                  {selectedNodeId}
+                </span>
+              )}
             </div>
-            <button
-              disabled={botToggling}
-              onClick={toggleBuilderStatus}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-none border border-stone-300 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-stone-900 mx-3 ${
-                organization?.chatbotBuilderEnabled ? "bg-stone-950" : "bg-stone-100"
-              } ${botToggling ? "opacity-50 cursor-not-allowed" : ""}`}
-            >
-              <span className="sr-only">Toggle Builder</span>
-              <span
-                aria-hidden="true"
-                className={`inline-block h-4 w-4 transform rounded-full bg-white ring-0 transition duration-200 ease-in-out ${organization?.chatbotBuilderEnabled ? "translate-x-4" : "translate-x-0"}`}
-              />
-            </button>
             <button
               className="p-2 hover:bg-stone-200 rounded-none text-stone-500 transition-colors active:scale-95 shrink-0 w-11 h-11 items-center justify-center max-lg:flex lg:hidden"
               onClick={() => setIsMobileInspectorOpen(false)}
@@ -1171,16 +1220,20 @@ export const ChatbotTab: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+          <div className="flex-1 overflow-y-auto custom-scrollbar relative p-5">
             {selectedNodeId ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-stone-200 gap-2">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-xs font-bold text-stone-900 bg-stone-100 border border-stone-300 px-2 py-0.5 rounded-none shrink-0">
-                      {selectedNodeId}
+                    <span className={`w-6 h-6 flex items-center justify-center rounded-none border shrink-0 ${nodeAccent(localNodes.find((n) => n.id === selectedNodeId)?.type || "message").icon}`}>
+                      {(() => {
+                        const t = localNodes.find((n) => n.id === selectedNodeId)?.type;
+                        const Ico = t === "trigger" ? Play : t === "question" ? HelpCircle : t === "delay" ? Clock : MessageSquare;
+                        return <Ico className="w-3.5 h-3.5" />;
+                      })()}
                     </span>
                     <h3 className="font-bold text-xs text-stone-900 uppercase tracking-wide truncate">
-                      Edit Step Attributes
+                      {selectedNodeId === "n1" ? "Entry Trigger" : `Edit ${localNodes.find((n) => n.id === selectedNodeId)?.type || "step"}`}
                     </h3>
                   </div>
                   <button
@@ -1328,20 +1381,20 @@ export const ChatbotTab: React.FC = () => {
                 )}
 
                 {/* Friendly hint explaining the visual auto-apply flow */}
-                <div className="flex items-start gap-2 bg-stone-50 border border-stone-200 rounded-none p-3.5 text-[10px] text-stone-800 leading-relaxed font-semibold">
-                  <Info className="w-4 h-4 text-stone-900 shrink-0 mt-0.5" />
-                  <span>💡 Edits apply to the visual canvas instantly. Click &quot;Save & Publish&quot; at the top header toolbar when you&apos;re ready to persist your full conversational tree to WappFlow&apos;s PostgreSQL sandbox.</span>
+                <div className="flex items-start gap-2 bg-stone-50 border border-stone-200 rounded-none p-3.5 text-[10px] text-stone-700 leading-relaxed font-semibold">
+                  <Info className="w-4 h-4 text-stone-500 shrink-0 mt-0.5" />
+                  <span>Edits preview on the canvas instantly. Hit <strong className="text-stone-900">Save &amp; Publish</strong> in the top bar to make them live.</span>
                 </div>
               </div>
             ) : (
-              <div className="h-full flex flex-col justify-center items-center text-center p-6 border border-stone-200 rounded-none space-y-4 bg-stone-50">
-                <div className="w-12 h-12 rounded-none bg-white text-stone-900 flex items-center justify-center border border-stone-300">
-                  <Info className="w-6 h-6 animate-pulse-soft text-stone-900" />
+              <div className="h-full min-h-[280px] flex flex-col justify-center items-center text-center space-y-4">
+                <div className="w-12 h-12 rounded-none bg-stone-50 text-stone-400 flex items-center justify-center border border-stone-200">
+                  <CornerDownRight className="w-6 h-6" />
                 </div>
-                <div className="space-y-1">
-                  <h4 className="font-bold text-xs text-stone-800 uppercase">No Step Selected</h4>
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-xs text-stone-900 uppercase tracking-wide">No step selected</h4>
                   <p className="text-[10px] text-stone-500 leading-relaxed max-w-[220px]">
-                    Click on any visual card in the blueprint canvas to inspect and configure its conversational routing properties.
+                    Pick a card on the canvas to edit its copy, options, and routing — changes preview live before you publish.
                   </p>
                 </div>
               </div>
@@ -1351,12 +1404,12 @@ export const ChatbotTab: React.FC = () => {
           {/* Bottom Conversational AI Architect prompt box */}
           <div className="p-5 bg-stone-50 border-t border-stone-200 space-y-4 select-text">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-none bg-white border border-stone-300 text-stone-900">
+              <div className="p-1.5 rounded-none bg-wa-green/10 border border-wa-green/30 text-wa-green">
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
                 <h3 className="font-bold text-xs tracking-tight text-stone-900 uppercase">AI Flow Architect</h3>
-                <p className="text-[9px] text-stone-500">Powered by Groq & Llama 3.1</p>
+                <p className="text-[9px] text-stone-500">Describe it in plain English — Groq wires the tree</p>
               </div>
             </div>
 
