@@ -65,6 +65,8 @@ export async function POST(request: NextRequest) {
       const systemPrompt = `You are WappFlow AI Campaign Strategist. Your job is to draft a comprehensive WhatsApp campaign strategy based on the user's objective (e.g. "It's Diwali, I sell sarees").
 Your response MUST be a single, valid JSON object containing a template, a target segment, a campaign schedule, and a 3-step sequence.
 
+Current Date/Time (UTC): ${new Date().toISOString()}
+
 Organization profile:
 - Brand Name: ${brandName}
 - Industry: ${industry}

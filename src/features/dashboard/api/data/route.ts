@@ -82,6 +82,7 @@ export async function GET(
     const campaigns = await prisma.campaign.findMany({
       where: { organizationId: orgId },
       orderBy: { createdAt: "desc" },
+      include: { segment: true },
     });
 
     const templates = await prisma.template.findMany({

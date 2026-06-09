@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { Users, Send, FileText, Zap, Wifi, WifiOff, Wallet, UploadCloud, Plus, Bot, CheckCircle2, AlertCircle, CreditCard } from "lucide-react";
+import { Users, Send, FileText, Zap, Wifi, WifiOff, UploadCloud, Plus, Bot, CheckCircle2, CreditCard, ArrowUpRight } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { CSVImporterModal } from "@/features/inbox/components/CSVImporterModal";
 import { ChecklistWizard } from "./ChecklistWizard";
+import { DoneForYouCopilot } from "./DoneForYouCopilot";
+import { PromoVideo } from "./PromoVideo";
 import { MetaBillingModal } from "@/features/wallet/components/MetaBillingModal";
 
 interface OverviewTabProps {
@@ -57,10 +59,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#fafaf9] space-y-5 custom-scrollbar pb-12">
 
       {/* Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-stone-900">{organization?.name || "Your Workspace"}</h1>
-          <div className="flex items-center gap-1.5 mt-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-5">
+        <div className="space-y-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Workspace Overview</span>
+          <h1 className="text-2xl font-bold tracking-tight text-stone-900">{organization?.name || "Your Workspace"}</h1>
+          <div className="flex items-center gap-1.5">
             {fbConnected ? (
               <>
                 <Wifi className="w-3.5 h-3.5 text-emerald-600" />
@@ -90,12 +93,22 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
           ) : (
             <button
               onClick={() => setIsBillingModalOpen(true)}
-              className="bg-stone-950 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 hover:bg-stone-800 transition-colors cursor-pointer flex items-center gap-2"
+              className="bg-stone-950 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 hover:bg-stone-800 transition-colors cursor-pointer flex items-center gap-2 border border-stone-950"
             >
               <CreditCard className="w-4 h-4" />
               Link Payment
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Hero — Done-For-You AI Copilot + Promo video */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
+        <div className="lg:col-span-3">
+          <DoneForYouCopilot />
+        </div>
+        <div className="lg:col-span-2">
+          <PromoVideo />
         </div>
       </div>
 
@@ -115,26 +128,30 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {stats.map(({ label, value, icon: Icon, sub, tab }) => (
-          <button
-            key={label}
-            onClick={() => onNavigate?.(tab)}
-            className="bg-white border border-stone-200 p-4 text-left hover:border-stone-400 transition-colors group cursor-pointer"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-stone-500">{label}</span>
-              <Icon className="w-4 h-4 text-stone-300 group-hover:text-stone-600 transition-colors" />
-            </div>
-            <div className="text-2xl font-bold text-stone-900">{value}</div>
-            {sub && (
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-[11px] text-emerald-600 font-semibold">{sub}</span>
+      <div>
+        <h3 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-3">At a glance</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {stats.map(({ label, value, icon: Icon, sub, tab }) => (
+            <button
+              key={label}
+              onClick={() => onNavigate?.(tab)}
+              className="bg-white border border-stone-200 p-4 text-left hover:border-stone-400 transition-colors group cursor-pointer relative"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5 text-stone-300 absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="flex items-center gap-2 mb-3">
+                <Icon className="w-4 h-4 text-stone-400 group-hover:text-stone-700 transition-colors" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500">{label}</span>
               </div>
-            )}
-          </button>
-        ))}
+              <div className="text-3xl font-bold text-stone-900 tracking-tight">{value}</div>
+              {sub && (
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                  <span className="text-[11px] text-emerald-600 font-semibold">{sub}</span>
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Quick Actions + Recent Activity */}
@@ -142,16 +159,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
 
         {/* Quick Actions */}
         <div className="lg:col-span-2 bg-white border border-stone-200 p-5">
-          <h3 className="text-sm font-bold text-stone-900 mb-4">Quick Actions</h3>
+          <h3 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-4">Quick Actions</h3>
           <div className="space-y-2">
             {quickActions.map(({ label, icon: Icon, action }) => (
               <button
                 key={label}
                 onClick={action}
-                className="w-full flex items-center gap-3 p-3 border border-stone-100 hover:border-stone-300 hover:bg-stone-50 transition-colors text-left cursor-pointer"
+                className="w-full flex items-center gap-3 p-3 border border-stone-100 hover:border-stone-300 hover:bg-stone-50 transition-colors text-left cursor-pointer group"
               >
                 <Icon className="w-4 h-4 text-stone-500" />
-                <span className="text-sm font-semibold text-stone-700">{label}</span>
+                <span className="text-sm font-semibold text-stone-700 flex-1">{label}</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-stone-300 opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
             ))}
           </div>
@@ -159,7 +177,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
 
         {/* Recent Activity */}
         <div className="lg:col-span-3 bg-white border border-stone-200 p-5">
-          <h3 className="text-sm font-bold text-stone-900 mb-4">Recent Activity</h3>
+          <h3 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-4">Recent Activity</h3>
           {recentLogs.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-center">
               <p className="text-sm text-stone-400">No activity yet.</p>

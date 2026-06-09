@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { 
-  Send, 
-  Megaphone, 
-  Users, 
-  CheckCircle, 
-  TrendingUp, 
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import {
+  Send,
+  Megaphone,
+  Users,
+  CheckCircle,
+  TrendingUp,
   X,
   PlayCircle,
   Eye,
@@ -22,93 +22,28 @@ import {
   Sparkles,
   Loader2,
   CheckCircle2,
-  ChevronRight
+  FilePlus2,
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, usePathname, useSearchParams } from "next/navigation";
 import { notify } from "@/shared/lib/toast";
 import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
 import { CampaignReportDrawer } from "./CampaignReportDrawer";
+import { CreateTemplateModal } from "@/features/templates/components/CreateTemplateModal";
 import { UploadButton } from "@/shared/lib/uploadthing";
-
-// Client-side rule matching helpers for dynamic segment campaign previews (T-04)
-interface SegmentRule {
-  field: "tags" | "status" | "source" | "attribute" | "lastActive";
-  op: "eq" | "neq" | "contains" | "in" | "active_within_days";
-  value: any;
-  key?: string;
-}
-
-interface SegmentRules {
-  all?: SegmentRule[];
-  any?: SegmentRule[];
-}
-
-function evaluateRule(contact: any, rule: SegmentRule): boolean {
-  switch (rule.field) {
-    case "tags": {
-      const tags = Array.isArray(rule.value)
-        ? rule.value
-        : String(rule.value || "").split(",").map((t) => t.trim()).filter(Boolean);
-      if (tags.length === 0) return true;
-      const hasSome = tags.some((t) => contact.tags?.includes(t));
-      if (rule.op === "in") return hasSome;
-      if (rule.op === "neq") return !hasSome;
-      const hasEvery = tags.every((t) => contact.tags?.includes(t));
-      return hasEvery;
-    }
-    case "status": {
-      const matchesStatus = contact.status === rule.value;
-      return rule.op === "neq" ? !matchesStatus : matchesStatus;
-    }
-    case "source": {
-      const contactSource = contact.source || "";
-      if (rule.op === "contains") {
-        return contactSource.toLowerCase().includes(String(rule.value).toLowerCase());
-      }
-      return contactSource.toLowerCase() === String(rule.value).toLowerCase();
-    }
-    case "attribute": {
-      if (!rule.key) return false;
-      const val = contact.attributes?.[rule.key];
-      if (val === undefined || val === null) return false;
-      return String(val).toLowerCase() === String(rule.value).toLowerCase();
-    }
-    case "lastActive": {
-      if (rule.op === "active_within_days" && contact.lastActiveAt) {
-        const since = Date.now() - Number(rule.value) * 24 * 60 * 60 * 1000;
-        const lastActiveTime = new Date(contact.lastActiveAt).getTime();
-        return lastActiveTime >= since;
-      }
-      return false;
-    }
-    default:
-      return false;
-  }
-}
-
-function evaluateSegmentRules(contact: any, rules: SegmentRules): boolean {
-  if (!rules) return true;
-  
-  if (rules.all && rules.all.length > 0) {
-    const allMatch = rules.all.every((rule) => evaluateRule(contact, rule));
-    if (!allMatch) return false;
-  }
-  
-  if (rules.any && rules.any.length > 0) {
-    const anyMatch = rules.any.some((rule) => evaluateRule(contact, rule));
-    if (!anyMatch) return false;
-  }
-  
-  return true;
-}
+import { SegmentRules, evaluateSegmentRules } from "@/shared/lib/segmentMatch";
 
 export const CampaignsTab: React.FC = () => {
   const { organization, campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign, addSystemLog, refreshWorkspace } = useApp();
   const confirm = useConfirm();
   const params = useParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const orgId = params.orgId as string;
+
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
   const [isStrategistOpen, setIsStrategistOpen] = useState(false);
   const [strategistPrompt, setStrategistPrompt] = useState("");
   const [isGeneratingStrategy, setIsGeneratingStrategy] = useState(false);
@@ -231,7 +166,7 @@ export const CampaignsTab: React.FC = () => {
   const [mediaUrl, setMediaUrl] = useState("");
   const [broadcastMode, setBroadcastMode] = useState<"template" | "session">("template");
   const [sessionText, setSessionText] = useState("");
-  
+
   // Dynamic segments targeting states
   const [segments, setSegments] = useState<any[]>([]);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>("");
@@ -243,8 +178,7 @@ export const CampaignsTab: React.FC = () => {
   const [scheduledTime, setScheduledTime] = useState("");
   const [sendDelay, setSendDelay] = useState(1); // Spacing delay in seconds
 
-  // Dynamic Variable Mappings
-  // Store variable name (e.g. "{{1}}") mapped to its type and chosen value
+  // Dynamic Variable Mappings — variable name (e.g. "{{1}}") → type and chosen value
   const [variablesMapping, setVariablesMapping] = useState<Record<string, { type: "contact_field" | "static"; value: string }>>({});
 
   // Load Saved Segments
@@ -273,7 +207,7 @@ export const CampaignsTab: React.FC = () => {
       if (segments.length > 0) {
         let maxMatches = -1;
         let largestSegmentId = "all_contacts";
-        
+
         segments.forEach(seg => {
           const matches = contacts.filter((c) => evaluateSegmentRules(c, seg.rules as SegmentRules)).length;
           if (matches > maxMatches) {
@@ -281,7 +215,7 @@ export const CampaignsTab: React.FC = () => {
             largestSegmentId = seg.id;
           }
         });
-        
+
         setSelectedSegmentId(largestSegmentId);
       } else {
         setSelectedSegmentId("all_contacts");
@@ -289,7 +223,7 @@ export const CampaignsTab: React.FC = () => {
     }
   }, [segments, selectedSegmentId, contacts]);
 
-  // Auto-initialize template choice and variables
+  // Auto-initialize template choice
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     if (!templateName && templates.length > 0) {
@@ -333,7 +267,7 @@ export const CampaignsTab: React.FC = () => {
         return !matchesExclusion;
       }).length;
     }
-    
+
     const activeSeg = segments.find((s) => s.id === selectedSegmentId);
     if (!activeSeg) return 0;
 
@@ -343,6 +277,59 @@ export const CampaignsTab: React.FC = () => {
       return matchesSeg && !matchesExclusion;
     }).length;
   }, [contacts, selectedSegmentId, segments, excludeTag]);
+
+  // Drive the AI Campaign Strategist generation. Extracted so both the modal's
+  // "Generate" button and the dashboard "Done-For-You" copilot handoff can reuse it.
+  const handleGenerateStrategy = useCallback(async (prompt: string) => {
+    if (!prompt.trim() || !orgId) return;
+    setIsGeneratingStrategy(true);
+    setStrategistError("");
+
+    const steps = [
+      "Analyzing customer purchase telemetry...",
+      "Drafting high-converting template copy...",
+      "Defining target segment matching rules...",
+      "Designing 3-step follow-up drip sequence...",
+      "Structuring campaign schedule reasoning...",
+    ];
+    let stepIdx = 0;
+    setLoadingStepText(steps[0]);
+    const stepInterval = setInterval(() => {
+      stepIdx = (stepIdx + 1) % steps.length;
+      setLoadingStepText(steps[stepIdx]);
+    }, 1800);
+
+    try {
+      const res = await fetch("/api/ai/campaign-strategist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generate", orgId, prompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate strategy");
+      setStrategistStrategy(data.strategy);
+    } catch (err: any) {
+      setStrategistError(err.message || "An unexpected error occurred.");
+    } finally {
+      clearInterval(stepInterval);
+      setIsGeneratingStrategy(false);
+    }
+  }, [orgId]);
+
+  // Dashboard "Done-For-You" copilot hands off here via ?tab=campaigns&goal=...
+  // Open the strategist, prefill the goal, and auto-generate. The ref guard + URL
+  // cleanup ensure this fires exactly once per handoff.
+  const goalHandledRef = useRef(false);
+  useEffect(() => {
+    const goal = (searchParams.get("goal") || "").trim();
+    if (!goal || !orgId || goalHandledRef.current) return;
+    goalHandledRef.current = true;
+    setIsStrategistOpen(true);
+    setStrategistStrategy(null);
+    setStrategistPrompt(goal);
+    void handleGenerateStrategy(goal);
+    router.replace(`${pathname}?tab=campaigns`, { scroll: false });
+  }, [searchParams, orgId, pathname, router, handleGenerateStrategy]);
 
   const handleLaunchCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -420,7 +407,7 @@ export const CampaignsTab: React.FC = () => {
   const compileLivePreview = () => {
     if (!activeTemplate) return "";
     let body = activeTemplate.body;
-    
+
     Object.entries(variablesMapping).forEach(([variable, mapping]) => {
       let replacement = `[${variable}]`;
       if (mapping.type === "contact_field") {
@@ -486,7 +473,7 @@ export const CampaignsTab: React.FC = () => {
     <div className={`flex-1 p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9] ${
       isModalOpen ? "overflow-hidden" : "overflow-y-auto"
     }`}>
-      
+
       {/* Tab Header */}
       <div className="flex max-sm:flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-6">
         <div>
@@ -511,8 +498,8 @@ export const CampaignsTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter and Overview Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-205 pb-3">
+      {/* Filter Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 pb-3">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-stone-500 text-[10px] font-bold uppercase tracking-wider mr-2 flex items-center gap-1">
             <Filter className="w-3.5 h-3.5 text-stone-400" />
@@ -537,7 +524,7 @@ export const CampaignsTab: React.FC = () => {
       {/* Campaigns Listing Grid */}
       <div className="space-y-6">
         <h3 className="font-bold text-xs uppercase tracking-wider text-stone-900">Recent Broadcast Activity</h3>
-        
+
         {filteredCampaigns.length === 0 ? (
           <div className="p-12 text-center rounded-none space-y-3 bg-white border border-stone-200">
             <Send className="w-10 h-10 text-stone-400 mx-auto" />
@@ -547,15 +534,13 @@ export const CampaignsTab: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredCampaigns.map((camp) => {
-              // Rates calculations
               const delRate = camp.sent > 0 ? Math.round((camp.delivered / camp.sent) * 100) : 0;
               const readRate = camp.delivered > 0 ? Math.round((camp.read / camp.delivered) * 100) : 0;
               const clickRate = camp.read > 0 ? Math.round((camp.clicked / camp.read) * 100) : 0;
 
               return (
                 <div key={camp.id} className="p-6 rounded-none flex flex-col justify-between space-y-6 bg-white border border-stone-200 relative overflow-hidden">
-                  
-                  {/* Status Indicator Bar at Top */}
+
                   {(camp.status === "Sending" || camp.status === "Active") && (
                     <div className="absolute top-0 left-0 right-0 h-1 bg-stone-950" />
                   )}
@@ -604,7 +589,7 @@ export const CampaignsTab: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Delivery Metrics Funnel Details */}
+                  {/* Delivery Metrics Funnel */}
                   <div className="space-y-3">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-stone-500">Delivery Status ({delRate}%)</span>
@@ -614,7 +599,6 @@ export const CampaignsTab: React.FC = () => {
                       <div className="h-full bg-stone-900 transition-all duration-500" style={{ width: `${delRate}%` }} />
                     </div>
 
-                    {/* Lower Funnel row cards */}
                     <div className="grid grid-cols-2 gap-3 pt-1">
                       <div className="bg-stone-50 p-2.5 rounded-none border border-stone-200">
                         <div className="text-[10px] text-stone-500 font-semibold uppercase">Read rate</div>
@@ -627,7 +611,7 @@ export const CampaignsTab: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Detailed Analytics Button Footer */}
+                  {/* Footer */}
                   <div className="border-t border-stone-200 pt-4 flex justify-between items-center">
                     <span className="text-[10px] text-stone-400 flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
@@ -657,14 +641,14 @@ export const CampaignsTab: React.FC = () => {
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-xl rounded-none flex flex-col overflow-hidden animate-slide-up bg-white border border-stone-300">
-            
+
             {/* Header */}
             <div className="p-6 border-b border-stone-200 flex items-center justify-between shrink-0 bg-stone-50">
               <h3 className="font-bold text-xs uppercase tracking-wider text-stone-900 flex items-center gap-2">
                 <Megaphone className="w-5 h-5 text-stone-900" />
                 Launch New WhatsApp Broadcast
               </h3>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="p-1 rounded-none hover:bg-stone-200 text-stone-500 transition-colors border border-transparent"
               >
@@ -674,7 +658,7 @@ export const CampaignsTab: React.FC = () => {
 
             {/* Form */}
             <form onSubmit={handleLaunchCampaign} className="p-6 space-y-5 flex-1 overflow-y-auto custom-scrollbar max-h-[80vh]">
-              
+
               {/* Campaign Name */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Campaign Name</label>
@@ -763,16 +747,37 @@ export const CampaignsTab: React.FC = () => {
                 <>
                   {/* Approved Templates list */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Pre-approved message template</label>
-                    <select
-                      value={templateName}
-                      onChange={(e) => setTemplateName(e.target.value)}
-                      className="w-full bg-white text-stone-900 border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
-                    >
-                      {templates.map((t) => (
-                        <option key={t.id} value={t.name}>{t.name} ({t.category})</option>
-                      ))}
-                    </select>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 flex justify-between items-center">
+                      <span>Pre-approved message template</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsCreateTemplateOpen(true)}
+                        className="flex items-center gap-1 text-[10px] font-bold text-stone-900 hover:text-stone-600 transition-colors cursor-pointer normal-case tracking-normal"
+                      >
+                        <FilePlus2 className="w-3.5 h-3.5" />
+                        New Template
+                      </button>
+                    </label>
+                    {templates.length === 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsCreateTemplateOpen(true)}
+                        className="w-full border border-dashed border-stone-300 bg-white py-3 px-4 text-xs text-stone-500 hover:border-stone-900 hover:text-stone-900 transition-colors cursor-pointer flex items-center justify-center gap-1.5 rounded-none"
+                      >
+                        <FilePlus2 className="w-4 h-4" />
+                        No templates yet — create your first one
+                      </button>
+                    ) : (
+                      <select
+                        value={templateName}
+                        onChange={(e) => setTemplateName(e.target.value)}
+                        className="w-full bg-white text-stone-900 border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
+                      >
+                        {templates.map((t) => (
+                          <option key={t.id} value={t.name}>{t.name} ({t.category})</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
                   {/* Dynamic Media Input */}
@@ -816,7 +821,7 @@ export const CampaignsTab: React.FC = () => {
                         <Settings2 className="w-4 h-4 text-stone-900" />
                         Template Parameter Mappings
                       </h5>
-                      
+
                       <div className="space-y-3">
                         {Object.keys(variablesMapping).map((variable) => {
                           const current = variablesMapping[variable];
@@ -837,9 +842,9 @@ export const CampaignsTab: React.FC = () => {
                                     const nextType = e.target.value as "contact_field" | "static";
                                     setVariablesMapping((prev) => ({
                                       ...prev,
-                                      [variable]: { 
-                                        type: nextType, 
-                                        value: nextType === "contact_field" ? "name" : "" 
+                                      [variable]: {
+                                        type: nextType,
+                                        value: nextType === "contact_field" ? "name" : ""
                                       }
                                     }));
                                   }}
@@ -889,7 +894,7 @@ export const CampaignsTab: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Template Body Live Preview with variables compiled */}
+                  {/* Template Body Live Preview */}
                   {activeTemplate && (
                     <div className="bg-stone-50 p-4 rounded-none border border-stone-200 space-y-3">
                       <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-600 flex items-center gap-1.5">
@@ -938,7 +943,7 @@ export const CampaignsTab: React.FC = () => {
                 </>
               )}
 
-              {/* Scheduling and Delays Advanced Parameters Drawer */}
+              {/* Scheduling and Delay Controls */}
               <div className="border border-stone-200 rounded-none p-4 bg-stone-50 space-y-4">
                 <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 flex items-center gap-1.5 border-b border-stone-200 pb-2">
                   <Sliders className="w-4 h-4 text-stone-900" />
@@ -1039,7 +1044,7 @@ export const CampaignsTab: React.FC = () => {
         </div>
       )}
 
-      {/* Analytics Slide-over Report Drawer Integration */}
+      {/* Analytics Slide-over Report Drawer */}
       <CampaignReportDrawer
         isOpen={reportDrawerOpen}
         onClose={() => {
@@ -1051,7 +1056,7 @@ export const CampaignsTab: React.FC = () => {
         systemLogs={systemLogs}
       />
 
-      {/* AI CAMPAIGN STRATEGIST MODAL */}
+      {/* AI Campaign Strategist Modal */}
       {isStrategistOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-4xl rounded-none flex flex-col overflow-hidden bg-white border border-stone-300 shadow-2xl h-[90vh]">
@@ -1063,7 +1068,7 @@ export const CampaignsTab: React.FC = () => {
                   AI Campaign Strategist & Copywriter
                 </h3>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   setIsStrategistOpen(false);
                   setStrategistStrategy(null);
@@ -1077,9 +1082,9 @@ export const CampaignsTab: React.FC = () => {
 
             {/* Content Body */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-              
+
               {!strategistStrategy ? (
-                /* Generating/Prompt State */
+                /* Prompt State */
                 <div className="max-w-xl mx-auto py-12 space-y-6 text-center">
                   <div className="space-y-2">
                     <h4 className="text-lg font-light text-stone-950 uppercase tracking-wide">
@@ -1108,45 +1113,7 @@ export const CampaignsTab: React.FC = () => {
                     <button
                       type="button"
                       disabled={isGeneratingStrategy || !strategistPrompt.trim()}
-                      onClick={async () => {
-                        setIsGeneratingStrategy(true);
-                        setStrategistError("");
-                        
-                        // Micro-animation step text cycling
-                        const steps = [
-                          "Analyzing customer purchase telemetry...",
-                          "Drafting high-converting template copy...",
-                          "Defining target segment matching rules...",
-                          "Designing 3-step follow-up drip sequence...",
-                          "Structuring campaign schedule reasoning..."
-                        ];
-                        let stepIdx = 0;
-                        setLoadingStepText(steps[0]);
-                        const stepInterval = setInterval(() => {
-                          stepIdx = (stepIdx + 1) % steps.length;
-                          setLoadingStepText(steps[stepIdx]);
-                        }, 1800);
-
-                        try {
-                          const res = await fetch("/api/ai/campaign-strategist", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              action: "generate",
-                              orgId,
-                              prompt: strategistPrompt
-                            })
-                          });
-                          const data = await res.json();
-                          if (!res.ok) throw new Error(data.error || "Failed to generate strategy");
-                          setStrategistStrategy(data.strategy);
-                        } catch (err: any) {
-                          setStrategistError(err.message || "An unexpected error occurred.");
-                        } finally {
-                          clearInterval(stepInterval);
-                          setIsGeneratingStrategy(false);
-                        }
-                      }}
+                      onClick={() => handleGenerateStrategy(strategistPrompt)}
                       className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold text-xs rounded-none cursor-pointer flex items-center justify-center gap-2 border border-emerald-600 transition-all shadow-md shadow-emerald-600/20"
                     >
                       {isGeneratingStrategy ? (
@@ -1166,8 +1133,8 @@ export const CampaignsTab: React.FC = () => {
               ) : (
                 /* Strategy Review Deck */
                 <div className="space-y-6">
-                  
-                  {/* Meta Signup / WABA warning button inline */}
+
+                  {/* Meta Signup / WABA warning */}
                   {!organization?.whatsappConnected && (
                     <div className="bg-red-50 border border-red-200 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="space-y-1">
@@ -1196,10 +1163,10 @@ export const CampaignsTab: React.FC = () => {
                   )}
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                    
-                    {/* LEFT COLUMN: Template and Segment Editing */}
+
+                    {/* LEFT COLUMN: Template and Segment */}
                     <div className="space-y-6">
-                      
+
                       {/* Draft Template Card */}
                       <div className="bg-stone-50 border border-stone-200 p-5 rounded-none space-y-4">
                         <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 flex justify-between border-b border-stone-200 pb-2">
@@ -1310,15 +1277,15 @@ export const CampaignsTab: React.FC = () => {
 
                     </div>
 
-                    {/* RIGHT COLUMN: Drip Sequence & Schedule */}
+                    {/* RIGHT COLUMN: Schedule & Sequence */}
                     <div className="space-y-6">
-                      
+
                       {/* Schedule Settings */}
                       <div className="bg-stone-50 border border-stone-200 p-5 rounded-none space-y-4">
                         <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 border-b border-stone-200 pb-2">
                           3. Launch Schedule
                         </h4>
-                        
+
                         <div className="space-y-3">
                           <p className="text-[11px] text-stone-600 leading-relaxed font-semibold italic bg-white p-3 border border-stone-200/50">
                             💡 AI Reasoning: {strategistStrategy.schedule.reasoning}
@@ -1372,7 +1339,7 @@ export const CampaignsTab: React.FC = () => {
                                   Delay: {step.delayMinutes === 0 ? "Immediate" : step.delayMinutes < 60 ? `${step.delayMinutes}m` : `${Math.round(step.delayMinutes / 60)}h`}
                                 </div>
                               </div>
-                              
+
                               <textarea
                                 rows={2}
                                 value={step.message}
@@ -1425,7 +1392,7 @@ export const CampaignsTab: React.FC = () => {
                 >
                   Cancel
                 </button>
-                
+
                 {strategistStrategy && (
                   <button
                     type="button"
@@ -1448,7 +1415,7 @@ export const CampaignsTab: React.FC = () => {
                         });
                         const data = await res.json();
                         if (!res.ok) throw new Error(data.error || "Failed to apply strategy");
-                        
+
                         notify.success("Strategy applied", "Your campaign strategy is live — check Campaigns and workflows.");
                         setIsStrategistOpen(false);
                         setStrategistStrategy(null);
@@ -1480,6 +1447,19 @@ export const CampaignsTab: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Consolidated "create" action — build a template without leaving the
+          campaign builder. On success we select it and refresh the workspace. */}
+      <CreateTemplateModal
+        isOpen={isCreateTemplateOpen}
+        onClose={() => setIsCreateTemplateOpen(false)}
+        orgId={orgId}
+        onCreated={(name) => {
+          setBroadcastMode("template");
+          setTemplateName(name);
+          if (orgId) refreshWorkspace(orgId);
+        }}
+      />
 
     </div>
   );
