@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Loader2,
   ShoppingBag,
+  CreditCard,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -50,7 +51,7 @@ const WEBHOOK_TOPICS = [
   { topic: "checkouts/create", label: "Abandoned cart started" },
 ];
 
-type IntegrationId = "shopify";
+type IntegrationId = "shopify" | "razorpay";
 
 interface IntegrationMeta {
   id: IntegrationId;
@@ -73,6 +74,16 @@ const INTEGRATIONS: IntegrationMeta[] = [
     badge: "live",
     accentColor: "#96bf48",
   },
+  {
+    id: "razorpay",
+    name: "Razorpay (Payments for Marketplace)",
+    tagline: "Accept payments directly",
+    description:
+      "Link your Razorpay account to receive payments for your marketplace orders directly into your own account. Required to enable Marketplace Bot.",
+    icon: <CreditCard className="w-5 h-5" />,
+    badge: "live",
+    accentColor: "#3395FF",
+  },
 ];
 
 
@@ -85,10 +96,15 @@ export function IntegrationsTab() {
   const searchParams = useSearchParams();
   const orgId = params.orgId as string;
 
-  const [selected] = useState<IntegrationId>("shopify");
-  const [integration, setIntegration] = useState<StoredIntegration | null>(null);
+  const [selected, setSelected] = useState<IntegrationId>("shopify");
+  const [allIntegrations, setAllIntegrations] = useState<any[]>([]);
   const [shopDomain, setShopDomain] = useState("");
   const [accessToken, setAccessToken] = useState("");
+  
+  const [keyId, setKeyId] = useState("");
+  const [keySecret, setKeySecret] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+
   const [showToken, setShowToken] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [manualMode, setManualMode] = useState(false);
@@ -104,14 +120,26 @@ export function IntegrationsTab() {
     const res = await fetch(`/api/org/${orgId}/integrations`);
     if (!res.ok) return;
     const data = await res.json();
-    setIntegration(data.integration ?? null);
-    if (data.integration?.apiKey) {
+    setAllIntegrations(data.integrations ?? []);
+  }, [orgId]);
+
+  const integration = allIntegrations.find(i => i.id === selected) || null;
+
+  useEffect(() => {
+    if (selected === "shopify" && integration?.apiKey) {
       try {
-        const creds: ShopifyCredentials = JSON.parse(data.integration.apiKey);
+        const creds = JSON.parse(integration.apiKey);
         setShopDomain(creds.shopDomain ?? "");
       } catch {}
+    } else if (selected === "razorpay" && integration?.apiKey) {
+      try {
+        const creds = JSON.parse(integration.apiKey);
+        setKeyId(creds.keyId ?? "");
+        setKeySecret(creds.keySecret ?? "");
+        setWebhookSecret(creds.webhookSecret ?? "");
+      } catch {}
     }
-  }, [orgId]);
+  }, [selected, integration]);
 
   useEffect(() => {
     // Fetch-on-mount + read one-time OAuth redirect flags: synchronizing with
@@ -161,17 +189,29 @@ export function IntegrationsTab() {
 
   // Developer Mode Manual Credentials Connect
   async function handleConnect() {
-    if (!shopDomain || !accessToken) {
-      setError("Store domain and access token are both required in Developer Mode.");
-      return;
+    let body: any = { action: "connect", integrationId: selected };
+    
+    if (selected === "shopify") {
+      if (!shopDomain || !accessToken) {
+        setError("Store domain and access token are both required in Developer Mode.");
+        return;
+      }
+      body = { ...body, shopDomain, accessToken };
+    } else if (selected === "razorpay") {
+      if (!keyId || !keySecret) {
+        setError("Key ID and Key Secret are required.");
+        return;
+      }
+      body = { ...body, keyId, keySecret, webhookSecret };
     }
+
     setError("");
     setConnecting(true);
     try {
       const res = await fetch(`/api/org/${orgId}/integrations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shopDomain, accessToken }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -195,13 +235,19 @@ export function IntegrationsTab() {
       await fetch(`/api/org/${orgId}/integrations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "disconnect" }),
+        body: JSON.stringify({ action: "disconnect", integrationId: selected }),
       });
-      setIntegration(null);
-      setShopDomain("");
-      setAccessToken("");
+      if (selected === "shopify") {
+        setShopDomain("");
+        setAccessToken("");
+      } else if (selected === "razorpay") {
+        setKeyId("");
+        setKeySecret("");
+        setWebhookSecret("");
+      }
       setSuccessBanner(null);
       setWarningBanner(null);
+      await fetchIntegration();
     } catch {
     } finally {
       setDisconnecting(false);
@@ -253,7 +299,7 @@ export function IntegrationsTab() {
             return (
               <button
                 key={intg.id}
-                onClick={() => {}}
+                onClick={() => setSelected(intg.id as IntegrationId)}
                 className={`w-full text-left px-3 py-3.5 mb-1 transition-all duration-150 border flex items-center gap-3 group ${
                   active
                     ? "bg-stone-950 border-stone-950 text-white"
@@ -386,62 +432,109 @@ export function IntegrationsTab() {
             {/* ── Section: Credentials & Connection ── */}
             <section className="space-y-4">
               <h3 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
-                Store Connection
+                {selected === "shopify" ? "Store Connection" : "Razorpay Credentials"}
               </h3>
 
               <div className="space-y-3">
-                {/* 1. Store Address URL Input */}
-                <div>
-                  <label className="block text-[10px] font-bold text-stone-600 mb-1.5">
-                    Shopify Store Domain
-                  </label>
-                  <div className="flex items-stretch border border-stone-200 bg-white focus-within:border-stone-400 transition-colors">
-                    <span className="flex items-center px-3 text-[10px] text-stone-400 font-medium border-r border-stone-200 bg-stone-50 shrink-0">
-                      https://
-                    </span>
-                    <input
-                      type="text"
-                      value={shopDomain}
-                      onChange={(e) => {
-                        setShopDomain(e.target.value);
-                        setError("");
-                      }}
-                      placeholder="yourstore.myshopify.com"
-                      disabled={isConnected}
-                      className="flex-1 px-3 py-2.5 text-xs text-stone-900 bg-transparent outline-none placeholder:text-stone-300 disabled:text-stone-400 disabled:bg-stone-50"
-                    />
-                  </div>
-                  {!isConnected && !manualMode && (
-                    <p className="text-[9px] text-stone-400 mt-1.5 font-medium italic leading-relaxed">
-                      Type your store domain (e.g. yourstore.myshopify.com) and click connect below.
-                    </p>
-                  )}
-                </div>
+                {/* Shopify Inputs */}
+                {selected === "shopify" && (
+                  <>
+                    <div>
+                      <label className="block text-[10px] font-bold text-stone-600 mb-1.5">
+                        Shopify Store Domain
+                      </label>
+                      <div className="flex items-stretch border border-stone-200 bg-white focus-within:border-stone-400 transition-colors">
+                        <span className="flex items-center px-3 text-[10px] text-stone-400 font-medium border-r border-stone-200 bg-stone-50 shrink-0">
+                          https://
+                        </span>
+                        <input
+                          type="text"
+                          value={shopDomain}
+                          onChange={(e) => {
+                            setShopDomain(e.target.value);
+                            setError("");
+                          }}
+                          placeholder="yourstore.myshopify.com"
+                          disabled={isConnected}
+                          className="flex-1 px-3 py-2.5 text-xs text-stone-900 bg-transparent outline-none placeholder:text-stone-300 disabled:text-stone-400 disabled:bg-stone-50"
+                        />
+                      </div>
+                      {!isConnected && !manualMode && (
+                        <p className="text-[9px] text-stone-400 mt-1.5 font-medium italic leading-relaxed">
+                          Type your store domain (e.g. yourstore.myshopify.com) and click connect below.
+                        </p>
+                      )}
+                    </div>
 
-                {/* 2. Admin API Access Token (Only shown in manual developer mode) */}
-                {manualMode && !isConnected && (
-                  <div className="animate-fade-in">
-                    <label className="block text-[10px] font-bold text-stone-600 mb-1.5">
-                      Admin API Access Token (Developer Mode)
-                    </label>
-                    <div className="flex items-stretch border border-stone-200 bg-white focus-within:border-stone-400 transition-colors">
+                    {manualMode && !isConnected && (
+                      <div className="animate-fade-in">
+                        <label className="block text-[10px] font-bold text-stone-600 mb-1.5">
+                          Admin API Access Token (Developer Mode)
+                        </label>
+                        <div className="flex items-stretch border border-stone-200 bg-white focus-within:border-stone-400 transition-colors">
+                          <input
+                            type={showToken ? "text" : "password"}
+                            value={accessToken}
+                            onChange={(e) => {
+                              setAccessToken(e.target.value);
+                              setError("");
+                            }}
+                            placeholder="shpat_••••••••••••••••••••••••"
+                            className="flex-1 px-3 py-2.5 text-xs font-mono text-stone-900 bg-transparent outline-none placeholder:text-stone-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowToken((v) => !v)}
+                            className="px-3 border-l border-stone-200 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+                          >
+                            {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Razorpay Inputs */}
+                {selected === "razorpay" && (
+                  <div className="space-y-3 animate-fade-in">
+                    <div>
+                      <label className="block text-[10px] font-bold text-stone-600 mb-1.5">Key ID</label>
                       <input
-                        type={showToken ? "text" : "password"}
-                        value={accessToken}
-                        onChange={(e) => {
-                          setAccessToken(e.target.value);
-                          setError("");
-                        }}
-                        placeholder="shpat_••••••••••••••••••••••••"
-                        className="flex-1 px-3 py-2.5 text-xs font-mono text-stone-900 bg-transparent outline-none placeholder:text-stone-300"
+                        type="text"
+                        value={keyId}
+                        onChange={(e) => { setKeyId(e.target.value); setError(""); }}
+                        disabled={isConnected}
+                        className="w-full px-3 py-2.5 text-xs text-stone-900 bg-white border border-stone-200 outline-none focus:border-stone-400 transition-colors disabled:text-stone-400 disabled:bg-stone-50"
+                        placeholder="rzp_live_..."
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowToken((v) => !v)}
-                        className="px-3 border-l border-stone-200 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
-                      >
-                        {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-stone-600 mb-1.5">Key Secret</label>
+                      <div className="flex items-stretch border border-stone-200 bg-white focus-within:border-stone-400 transition-colors">
+                        <input
+                          type={showToken ? "text" : "password"}
+                          value={keySecret}
+                          onChange={(e) => { setKeySecret(e.target.value); setError(""); }}
+                          disabled={isConnected}
+                          className="flex-1 px-3 py-2.5 text-xs font-mono text-stone-900 bg-transparent outline-none disabled:text-stone-400 disabled:bg-stone-50"
+                        />
+                        <button type="button" onClick={() => setShowToken(!showToken)} className="px-3 border-l border-stone-200 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer">
+                          {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-stone-600 mb-1.5">Webhook Secret (Optional)</label>
+                      <div className="flex items-stretch border border-stone-200 bg-white focus-within:border-stone-400 transition-colors">
+                        <input
+                          type={showToken ? "text" : "password"}
+                          value={webhookSecret}
+                          onChange={(e) => { setWebhookSecret(e.target.value); setError(""); }}
+                          disabled={isConnected}
+                          className="flex-1 px-3 py-2.5 text-xs font-mono text-stone-900 bg-transparent outline-none disabled:text-stone-400 disabled:bg-stone-50"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -450,7 +543,7 @@ export function IntegrationsTab() {
               {/* Action Buttons */}
               <div className="flex items-center gap-3 pt-1">
                 {!isConnected ? (
-                  !manualMode ? (
+                  (selected === "shopify" && !manualMode) ? (
                     // 1-Click Install Button (Default)
                     <button
                       type="button"
@@ -473,26 +566,28 @@ export function IntegrationsTab() {
                       ) : (
                         <Link2 className="w-3.5 h-3.5" />
                       )}
-                      {connecting ? "Connecting…" : "Connect Store (Developer)"}
+                      {connecting ? "Connecting…" : (selected === "shopify" ? "Connect Store (Developer)" : "Link Razorpay")}
                     </button>
                   )
                 ) : (
                   // Connected State Actions
                   <>
-                    <button
-                      type="button"
-                      onClick={handleSync}
-                      disabled={syncing}
-                      className="flex items-center gap-2 px-5 py-2.5 text-white text-[9px] font-black tracking-widest uppercase transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                      style={{ backgroundColor: "#96bf48" }}
-                    >
-                      {syncing ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <RefreshCw className="w-3.5 h-3.5" />
-                      )}
-                      {syncing ? "Syncing…" : "Sync Catalog Now"}
-                    </button>
+                    {selected === "shopify" && (
+                      <button
+                        type="button"
+                        onClick={handleSync}
+                        disabled={syncing}
+                        className="flex items-center gap-2 px-5 py-2.5 text-white text-[9px] font-black tracking-widest uppercase transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                        style={{ backgroundColor: "#96bf48" }}
+                      >
+                        {syncing ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        )}
+                        {syncing ? "Syncing…" : "Sync Catalog Now"}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleDisconnect}
@@ -511,7 +606,7 @@ export function IntegrationsTab() {
               </div>
 
               {/* Mode Switcher */}
-              {!isConnected && (
+              {!isConnected && selected === "shopify" && (
                 <div className="pt-2 text-left border-t border-stone-100">
                   <button
                     type="button"
@@ -530,7 +625,7 @@ export function IntegrationsTab() {
             </section>
 
             {/* ── Section: How to get your token (Developer Mode Only) ── */}
-            {!isConnected && manualMode && (
+            {!isConnected && manualMode && selected === "shopify" && (
               <section className="animate-fade-in border border-stone-200 bg-white">
                 <button
                   type="button"
@@ -576,36 +671,38 @@ export function IntegrationsTab() {
             )}
 
             {/* ── Section: Webhooks Details ── */}
-            <section className="pt-4 border-t border-stone-200">
-              {/* Webhook Receiver */}
-              <div className="space-y-2">
-                <h4 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
-                  Webhook Receiver URL
-                </h4>
-                <div className="flex items-stretch border border-stone-200 bg-stone-50 focus-within:border-stone-400 transition-colors">
-                  <input
-                    readOnly
-                    value={webhookReceiver}
-                    className="flex-1 px-3 py-2 text-[10px] font-mono text-stone-600 bg-transparent outline-none select-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={copyWebhook}
-                    className="px-3 border-l border-stone-200 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer bg-white"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
+            {selected === "shopify" && (
+              <section className="pt-4 border-t border-stone-200">
+                {/* Webhook Receiver */}
+                <div className="space-y-2">
+                  <h4 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
+                    Webhook Receiver URL
+                  </h4>
+                  <div className="flex items-stretch border border-stone-200 bg-stone-50 focus-within:border-stone-400 transition-colors">
+                    <input
+                      readOnly
+                      value={webhookReceiver}
+                      className="flex-1 px-3 py-2 text-[10px] font-mono text-stone-600 bg-transparent outline-none select-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={copyWebhook}
+                      className="px-3 border-l border-stone-200 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer bg-white"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {copied && (
+                    <p className="text-[9px] text-[#96bf48] font-bold tracking-wide">
+                      Copied to clipboard.
+                    </p>
+                  )}
                 </div>
-                {copied && (
-                  <p className="text-[9px] text-[#96bf48] font-bold tracking-wide">
-                    Copied to clipboard.
-                  </p>
-                )}
-              </div>
-            </section>
+              </section>
+            )}
 
             {/* ── Section: Active Webhooks ── */}
-            {isConnected && integration?.webhookUrl && (
+            {isConnected && integration?.webhookUrl && selected === "shopify" && (
               <section className="space-y-3">
                 <h4 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
                   Active Webhook Subscriptions

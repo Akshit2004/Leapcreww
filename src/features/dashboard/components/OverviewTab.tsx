@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { Users, Send, FileText, Zap, Wifi, WifiOff, Wallet, UploadCloud, Plus, Bot } from "lucide-react";
+import { Users, Send, FileText, Zap, Wifi, WifiOff, Wallet, UploadCloud, Plus, Bot, CheckCircle2, AlertCircle, CreditCard } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { CSVImporterModal } from "@/features/inbox/components/CSVImporterModal";
 import { ChecklistWizard } from "./ChecklistWizard";
-import { WalletTopupModal } from "@/features/wallet/components/WalletTopupModal";
+import { MetaBillingModal } from "@/features/wallet/components/MetaBillingModal";
 
 interface OverviewTabProps {
   onNavigate?: (tab: string) => void;
@@ -23,7 +23,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
   } = useApp();
 
   const [isCSVModalOpen, setIsCSVModalOpen] = useState(false);
-  const [isTopupOpen, setIsTopupOpen] = useState(false);
+  const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
 
   const totalContacts = contacts.length;
   const totalCampaigns = campaigns.length;
@@ -36,13 +36,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
   const campaignSent = campaigns.length > 0;
   const allStepsDone = fbConnected && templatesApproved && contactsImported && campaignSent;
   const showChecklist = !!(organization && !organization.onboardingDismissed && !allStepsDone);
-
-  const rawBalance = (organization?.walletBalance as number) ?? 0;
-  const formattedBalance = rawBalance.toLocaleString("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  });
 
   const recentLogs = systemLogs.slice(0, 8);
 
@@ -89,16 +82,20 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 bg-white border border-stone-200 px-3 py-2">
-            <Wallet className="w-4 h-4 text-stone-400" />
-            <span className="text-sm font-bold text-stone-900">{formattedBalance}</span>
-          </div>
-          <button
-            onClick={() => setIsTopupOpen(true)}
-            className="bg-stone-950 text-white text-xs font-bold px-4 py-2 hover:bg-stone-800 transition-colors cursor-pointer"
-          >
-            Top Up
-          </button>
+          {fbConnected ? (
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 px-3 py-2 text-emerald-700">
+              <CheckCircle2 className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">Payment Connected</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsBillingModalOpen(true)}
+              className="bg-stone-950 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 hover:bg-stone-800 transition-colors cursor-pointer flex items-center gap-2"
+            >
+              <CreditCard className="w-4 h-4" />
+              Link Payment
+            </button>
+          )}
         </div>
       </div>
 
@@ -196,11 +193,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
             onClose={() => setIsCSVModalOpen(false)}
             onSuccess={() => refreshWorkspace(organization.id)}
           />
-          <WalletTopupModal
-            isOpen={isTopupOpen}
-            onClose={() => setIsTopupOpen(false)}
+          <MetaBillingModal
+            isOpen={isBillingModalOpen}
+            onClose={() => setIsBillingModalOpen(false)}
             organizationId={organization.id}
-            refreshWorkspace={refreshWorkspace}
           />
         </>
       )}

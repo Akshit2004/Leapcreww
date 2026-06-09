@@ -219,7 +219,7 @@ export async function handleMarketplaceMessage(
       let linkStr = "";
       if (latestOrder.razorpayOrderId && latestOrder.razorpayOrderId.startsWith("plink_")) {
         try {
-          const rzp = getRazorpayInstance();
+          const rzp = await getRazorpayInstance(orgId);
           if (rzp) {
             const plink = await (rzp.paymentLink as unknown as Record<string, (id: string) => Promise<{ short_url?: string }>>).fetch(latestOrder.razorpayOrderId);
             if (plink && plink.short_url) {

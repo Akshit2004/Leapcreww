@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useApp } from "@/shared/context/AppContext";
+import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
 import {
   CheckCircle2,
   XCircle,
@@ -42,6 +43,7 @@ interface PortfolioItem {
 
 export const SettingsTab: React.FC = () => {
   const { organization, refreshWorkspace, updateBrandProfile } = useApp();
+  const confirm = useConfirm();
   const orgId = organization?.id;
 
   // ─── Brand Profile (Brand-Aware AI content generation) ────────────────
@@ -287,9 +289,12 @@ export const SettingsTab: React.FC = () => {
   const handleDisconnect = async () => {
     if (!orgId) return;
     
-    const confirmed = window.confirm(
-      "Disconnect WhatsApp? You will need to re-connect via Embedded Signup to send messages again."
-    );
+    const confirmed = await confirm({
+      title: "Disconnect WhatsApp?",
+      description: "You'll need to re-connect via Embedded Signup before you can send messages again.",
+      tone: "danger",
+      confirmLabel: "Disconnect",
+    });
     if (!confirmed) return;
 
     setDisconnecting(true);

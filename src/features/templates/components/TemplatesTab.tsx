@@ -24,10 +24,13 @@ import {
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
+import { notify } from "@/shared/lib/toast";
+import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
 import { UploadButton } from "@/shared/lib/uploadthing";
 
 export const TemplatesTab: React.FC = () => {
   const { templates, submitMetaTemplate, deleteTemplate, addSystemLog, refreshWorkspace } = useApp();
+  const confirm = useConfirm();
   
   const params = useParams();
   const orgId = params.orgId as string;
@@ -442,7 +445,12 @@ export const TemplatesTab: React.FC = () => {
                   )}
                   <button
                     onClick={async () => {
-                      if (confirm("Are you sure you want to permanently delete this template from WappFlow and Meta Business Portal?")) {
+                      if (await confirm({
+                        title: "Delete this template?",
+                        description: "This permanently removes the template from WappFlow and the Meta Business portal. This can't be undone.",
+                        tone: "danger",
+                        confirmLabel: "Delete template",
+                      })) {
                         await deleteTemplate(t.id);
                       }
                     }}
@@ -594,11 +602,11 @@ export const TemplatesTab: React.FC = () => {
                         onClientUploadComplete={(res) => {
                           if (res && res[0]) {
                             setMediaUrl(res[0].url);
-                            alert("Upload completed successfully!");
+                            notify.success("Upload complete", "Your media sample is attached to the template.");
                           }
                         }}
                         onUploadError={(error: Error) => {
-                          alert(`Upload failed: ${error.message}`);
+                          notify.error("Upload failed", error.message);
                         }}
                         appearance={{
                           button: "bg-stone-900 hover:bg-stone-800 text-white rounded-none text-xs font-bold px-3 py-2 cursor-pointer h-9 shrink-0 flex items-center justify-center border border-stone-900 transition-all",

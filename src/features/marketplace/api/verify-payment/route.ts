@@ -10,17 +10,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing payment details" }, { status: 400 });
     }
 
-    const isValid = verifyRazorpayPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
-    if (!isValid) {
-      return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
-    }
-
     const order = await prisma.order.findFirst({
       where: { razorpayOrderId: razorpay_order_id },
     });
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const isValid = await verifyRazorpayPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature, order.organizationId);
+    if (!isValid) {
+      return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
     }
 
     await prisma.order.update({

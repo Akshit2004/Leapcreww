@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
+import { notify } from "@/shared/lib/toast";
+import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
 import { 
   Sparkles, 
   Megaphone, 
@@ -40,6 +42,7 @@ interface AdCampaignWithAds {
 export const AdsTab: React.FC = () => {
   const { orgId } = useParams() as { orgId: string };
   const { templates } = useApp();
+  const confirm = useConfirm();
   
   const [campaigns, setCampaigns] = useState<AdCampaignWithAds[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(true);
@@ -175,7 +178,13 @@ export const AdsTab: React.FC = () => {
 
   // Handle Delete Campaign
   const handleDeleteCampaign = async (campaignId: string) => {
-    if (!confirm("Are you sure you want to permanently delete this campaign?")) return;
+    const ok = await confirm({
+      title: "Delete this ad campaign?",
+      description: "This permanently removes the campaign. This can't be undone.",
+      tone: "danger",
+      confirmLabel: "Delete campaign",
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/org/${orgId}/ads/campaigns/${campaignId}`, {
@@ -183,9 +192,13 @@ export const AdsTab: React.FC = () => {
       });
       if (res.ok) {
         setCampaigns((prev) => prev.filter((c) => c.id !== campaignId));
+        notify.success("Campaign deleted");
+      } else {
+        notify.error("Couldn't delete campaign", "Please try again in a moment.");
       }
     } catch (err) {
       console.error("Failed to delete campaign:", err);
+      notify.error("Couldn't delete campaign", "Check your connection and try again.");
     }
   };
 

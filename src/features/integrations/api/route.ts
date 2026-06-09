@@ -31,16 +31,16 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden: Access to workspace is denied." }, { status: 403 });
     }
 
-    const integration = await prisma.integration.findUnique({
+    const integrations = await prisma.integration.findMany({
       where: {
-        id_organizationId: {
-          id: "shopify",
-          organizationId: orgId,
-        },
+        organizationId: orgId,
       },
     });
 
-    return NextResponse.json({ integration });
+    // For backwards compatibility, still return the first shopify integration if present
+    const integration = integrations.find(i => i.id === "shopify") || null;
+
+    return NextResponse.json({ integrations, integration });
   } catch (err: unknown) {
     console.error("❌ GET integration api error:", err);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
@@ -76,14 +76,16 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { action, shopDomain, accessToken } = body;
+    const { action, integrationId, shopDomain, accessToken, keyId, keySecret, webhookSecret } = body;
+
+    const resolvedIntegrationId = integrationId || (shopDomain ? "shopify" : "razorpay");
 
     // A. Handle Disconnect Action
     if (action === "disconnect") {
       const existing = await prisma.integration.findUnique({
         where: {
           id_organizationId: {
-            id: "shopify",
+            id: resolvedIntegrationId,
             organizationId: orgId,
           },
         },
@@ -96,7 +98,7 @@ export async function POST(
       await prisma.integration.delete({
         where: {
           id_organizationId: {
-            id: "shopify",
+            id: resolvedIntegrationId,
             organizationId: orgId,
           },
         },
@@ -109,7 +111,7 @@ export async function POST(
         data: {
           timestamp: timeStr,
           type: "integration",
-          message: "Shopify Integration successfully disconnected.",
+          message: `${resolvedIntegrationId} Integration successfully disconnected.`,
           organizationId: orgId,
         },
       });
@@ -117,7 +119,49 @@ export async function POST(
       return NextResponse.json({ success: true });
     }
 
-    // B. Handle Manual Credentials Connection (Developer Mode)
+    if (resolvedIntegrationId === "razorpay") {
+      if (!keyId || !keySecret) {
+        return NextResponse.json({ error: "Key ID and Key Secret are required." }, { status: 400 });
+      }
+
+      const integrationData = {
+        name: "Razorpay",
+        description: "Receive payments directly to your Razorpay account.",
+        status: "connected",
+        icon: "CreditCard",
+        apiKey: JSON.stringify({ keyId, keySecret, webhookSecret: webhookSecret || "" }),
+      };
+
+      await prisma.integration.upsert({
+        where: {
+          id_organizationId: {
+            id: "razorpay",
+            organizationId: orgId,
+          },
+        },
+        update: integrationData,
+        create: {
+          id: "razorpay",
+          organizationId: orgId,
+          ...integrationData,
+        },
+      });
+
+      const d = new Date();
+      const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      await prisma.systemLog.create({
+        data: {
+          timestamp: timeStr,
+          type: "integration",
+          message: `Razorpay Connected via manual keys.`,
+          organizationId: orgId,
+        },
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    // B. Handle Manual Credentials Connection (Developer Mode) - SHOPIFY
     if (!shopDomain || !accessToken) {
       return NextResponse.json({ error: "Shop domain and access token are required." }, { status: 400 });
     }

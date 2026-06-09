@@ -422,10 +422,10 @@ async function handleReorderFlow(contact: any, orgId: string, timeStr: string): 
     let rzpOrderId = `plink_sim_${Math.random().toString(36).substring(2, 10)}`;
 
     const { getRazorpayInstance, createRazorpayPaymentLink } = await import("@/shared/lib/razorpay");
-    const rzp = getRazorpayInstance();
+    const rzp = await getRazorpayInstance(orgId);
     if (rzp) {
       try {
-        const rzpLink = await createRazorpayPaymentLink(total, newOrderId, contact.phone, contact.name);
+        const rzpLink = await createRazorpayPaymentLink(total, newOrderId, contact.phone, contact.name, orgId);
         paymentShortUrl = rzpLink.short_url;
         rzpOrderId = rzpLink.id;
       } catch (rzpErr) {

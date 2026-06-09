@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import type { Organization } from "@/shared/context/types";
+import { notify } from "@/shared/lib/toast";
 import {
   ShoppingBag,
   Package,
@@ -15,7 +16,6 @@ import {
   CheckCircle2,
   ExternalLink,
   Clock,
-  AlertTriangle,
 } from "lucide-react";
 
 interface Product {
@@ -52,15 +52,6 @@ interface SequenceSummary {
   id: string;
   trigger: string;
 }
-
-interface ToastState {
-  id: number;
-  type: "success" | "error";
-  title: string;
-  message: string;
-}
-
-const TOAST_DURATION_MS = 5000;
 
 /** Translate raw API error strings into plain language a non-technical user can act on. */
 function simplifyCartRecoveryError(raw?: string): string {
@@ -100,19 +91,6 @@ export const MarketplaceTab: React.FC = () => {
   // Abandoned Cart Recovery — one-click sequence setup
   const [sequences, setSequences] = useState<SequenceSummary[]>([]);
   const [creatingCartRecovery, setCreatingCartRecovery] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const toastIdRef = useRef(0);
-
-  const showToast = (type: "success" | "error", title: string, message: string) => {
-    toastIdRef.current += 1;
-    setToast({ id: toastIdRef.current, type, title, message });
-  };
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), TOAST_DURATION_MS);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const hasCartRecoverySequence = sequences.some((s) => s.trigger === "cart_abandoned");
 
@@ -145,17 +123,16 @@ export const MarketplaceTab: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok || data.error) {
-        showToast("error", "Couldn't turn this on", simplifyCartRecoveryError(data.error));
+        notify.error("Couldn't turn this on", simplifyCartRecoveryError(data.error));
       } else if (data.sequence) {
         setSequences((prev) => [...prev, { id: data.sequence.id, trigger: data.sequence.trigger }]);
-        showToast(
-          "success",
+        notify.success(
           "Cart recovery is now live",
           "Customers who leave items unpaid for an hour will automatically get a friendly reminder, with a follow-up two hours later."
         );
       }
     } catch {
-      showToast("error", "Couldn't turn this on", simplifyCartRecoveryError());
+      notify.error("Couldn't turn this on", simplifyCartRecoveryError());
     } finally {
       setCreatingCartRecovery(false);
     }
@@ -206,6 +183,13 @@ export const MarketplaceTab: React.FC = () => {
             ...prev,
             marketplaceBotEnabled: data.organization.marketplaceBotEnabled,
           } : prev);
+        }
+      } else {
+        const data = await res.json();
+        if (data.error) {
+          notify.error("Setup Incomplete", data.error);
+        } else {
+          notify.error("Failed to toggle bot", "An unexpected error occurred.");
         }
       }
     } catch (err) {
@@ -669,34 +653,6 @@ export const MarketplaceTab: React.FC = () => {
         </div>
       )}
 
-      {/* Slide-in toast with auto-dismiss timer bar */}
-      {toast && (
-        <div key={toast.id} className="fixed top-6 right-4 sm:right-8 z-[200] w-[calc(100%-2rem)] sm:w-96 animate-toast-in">
-          <div className={`bg-white border shadow-lg rounded-none overflow-hidden ${toast.type === "success" ? "border-stone-900" : "border-red-300"}`}>
-            <div className="p-4 flex items-start gap-3">
-              {toast.type === "success" ? (
-                <CheckCircle2 className="w-5 h-5 text-stone-900 shrink-0 mt-0.5" />
-              ) : (
-                <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-stone-900 uppercase tracking-wide">{toast.title}</p>
-                <p className="text-[11px] text-stone-500 leading-relaxed mt-1">{toast.message}</p>
-              </div>
-              <button
-                onClick={() => setToast(null)}
-                className="text-stone-400 hover:text-stone-900 cursor-pointer shrink-0"
-                aria-label="Dismiss notification"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div className="h-[3px] bg-stone-100 w-full overflow-hidden">
-              <div className={`h-full animate-toast-bar ${toast.type === "success" ? "bg-stone-900" : "bg-red-400"}`} />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

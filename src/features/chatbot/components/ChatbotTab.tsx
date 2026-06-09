@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useApp, ChatbotNode, Organization } from "@/shared/context/AppContext";
+import { notify } from "@/shared/lib/toast";
 import {
   Play,
   MessageSquare,
@@ -481,7 +482,7 @@ export const ChatbotTab: React.FC = () => {
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       console.error(err);
-      alert("Failed to save Visual Flow changes.");
+      notify.error("Couldn't save changes", "Your visual flow changes weren't saved. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -546,7 +547,7 @@ export const ChatbotTab: React.FC = () => {
 
   const handleDeleteNode = (nodeId: string) => {
     if (nodeId === "n1") {
-      alert("The entry trigger node (n1) cannot be deleted as it registers the incoming hook.");
+      notify.error("Can't delete this node", "The entry trigger node is required — it registers the incoming webhook.");
       return;
     }
 

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useState, useEffect, useRef, Suspense, useCallback } from "react";
+import { useParams, useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useApp } from "@/shared/context/AppContext";
 import { Sidebar } from "@/shared/components/layout/Sidebar";
@@ -18,26 +18,42 @@ import { IntegrationsTab } from "@/features/integrations/components/Integrations
 import { AnalyticsTab } from "@/features/analytics/components/AnalyticsTab";
 import { AdsTab } from "@/features/ads/components/AdsTab";
 import { AICopilotSidebar } from "@/features/ai/components/AICopilotSidebar";
+import { CommandPalette } from "@/shared/components/CommandPalette";
+import { DashboardSkeleton } from "@/shared/components/ui/Skeleton";
+import { isValidTab } from "@/shared/config/navigation";
 import { Loader, AlertCircle, Bot } from "lucide-react";
 
-export default function TenantDashboard() {
+const MAX_RETRIES = 4;
+
+function TenantDashboardInner() {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { status } = useSession();
   const { initializeWorkspace } = useApp();
 
   const orgId = params.orgId as string;
 
-  const [activeTab, setActiveTab] = useState<string>("overview");
-  const mainRef = React.useRef<HTMLElement>(null);
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    mainRef.current?.scrollTo({ top: 0 });
-  };
+  // Tab is derived from the URL (?tab=) so refresh, deep-links, and the
+  // browser back/forward buttons all work.
+  const tabParam = searchParams.get("tab");
+  const activeTab = isValidTab(tabParam) ? (tabParam as string) : "overview";
+
+  const mainRef = useRef<HTMLElement>(null);
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      router.push(`${pathname}?tab=${tab}`, { scroll: false });
+      mainRef.current?.scrollTo({ top: 0 });
+    },
+    [router, pathname]
+  );
+
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const retryRef = useRef(0);
 
   // 1. Session Redirect Guard
   useEffect(() => {
@@ -46,39 +62,61 @@ export default function TenantDashboard() {
     }
   }, [status, router]);
 
-  // 2. Fetch scoped PostgreSQL data on mount or org switch with polling
+  // 2. Fetch scoped workspace data on mount or org switch, with auto-retry.
   useEffect(() => {
     if (status !== "authenticated" || !orgId) return;
 
-    const fetchWorkspaceData = async (showLoading = false) => {
-      if (showLoading) setLoading(true);
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout>;
+
+    const fetchWorkspaceData = async () => {
       setErrorMsg("");
 
       try {
         const response = await fetch(`/api/org/${orgId}/data`);
+        if (cancelled) return;
+
         if (!response.ok) {
           if (response.status === 403) {
-            setErrorMsg("Forbidden: You do not possess active membership access to this SaaS workspace.");
-          } else {
-            setErrorMsg("An error occurred during PostgreSQL workspace sync.");
+            // Access denial is terminal — retrying won't help.
+            setErrorMsg(
+              "You don't have access to this workspace. Ask an admin to invite you, or switch accounts."
+            );
+            setLoading(false);
+            return;
           }
-          setLoading(false);
-          return;
+          throw new Error("sync_failed");
         }
 
         const data = await response.json();
+        if (cancelled) return;
         initializeWorkspace(data);
+        retryRef.current = 0;
         setLoading(false);
       } catch {
-        if (showLoading) {
-          setErrorMsg("Failed to synchronize with local PostgreSQL. Connection timeout.");
+        if (cancelled) return;
+        if (retryRef.current < MAX_RETRIES) {
+          // Exponential backoff — keep the loader up while we retry quietly.
+          const delay = Math.min(1000 * 2 ** retryRef.current, 8000);
+          retryRef.current += 1;
+          retryTimer = setTimeout(fetchWorkspaceData, delay);
+        } else {
+          setErrorMsg(
+            "We're having trouble loading your workspace. Check your connection and try again."
+          );
           setLoading(false);
         }
       }
     };
 
-    fetchWorkspaceData(true);
-  }, [orgId, status, initializeWorkspace]);
+    setLoading(true);
+    fetchWorkspaceData();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimer);
+    };
+  }, [orgId, status, initializeWorkspace, reloadKey]);
 
   const renderActiveTab = () => {
     switch (activeTab) {
@@ -107,31 +145,16 @@ export default function TenantDashboard() {
       case "settings":
         return <SettingsTab />;
       default:
-        return <OverviewTab />;
+        return <OverviewTab onNavigate={handleTabChange} />;
     }
   };
 
-  // Render authenticating screen
-  if (status === "loading" || (loading && !errorMsg)) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#f4f6f5] text-wa-green font-sans relative overflow-hidden">
-        {/* Decorative blur rings */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-wa-green/10 rounded-full blur-3xl opacity-30 animate-pulse-soft" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-wa-green-dark/10 rounded-full blur-3xl opacity-30 animate-pulse-soft" />
-        
-        <div className="flex flex-col items-center gap-4 animate-slide-up relative z-10">
-          <div className="w-16 h-16 rounded-3xl bg-wa-green flex items-center justify-center shadow-xl shadow-wa-green/30 animate-glow-pulse relative">
-            <Loader className="w-7 h-7 animate-spin text-white" />
-            <span className="absolute -inset-1 rounded-3xl border-2 border-emerald-400 opacity-20 animate-ping" />
-          </div>
-          <div className="text-center space-y-1">
-            <span className="text-[11px] tracking-widest uppercase font-extrabold text-stone-600 block">WappFlow Portal</span>
-            <span className="text-[9px] tracking-wide font-medium text-stone-400 block uppercase">Synchronizing secure PostgreSQL sandbox...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleRetry = () => {
+    retryRef.current = 0;
+    setErrorMsg("");
+    setLoading(true);
+    setReloadKey((k) => k + 1);
+  };
 
   // Render Access Error Screen
   if (errorMsg) {
@@ -147,7 +170,7 @@ export default function TenantDashboard() {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => { setErrorMsg(""); setLoading(true); }}
+              onClick={handleRetry}
               className="flex-1 bg-stone-950 hover:bg-stone-800 text-white font-bold text-xs py-2.5 transition-colors cursor-pointer"
             >
               Try Again
@@ -164,19 +187,36 @@ export default function TenantDashboard() {
     );
   }
 
+  // Initial auth check — brief, before we can even show the shell.
+  if (status === "loading") {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#f4f6f5] text-wa-green font-sans">
+        <div className="flex flex-col items-center gap-4 animate-slide-up">
+          <div className="w-14 h-14 rounded-2xl bg-wa-green flex items-center justify-center shadow-xl shadow-wa-green/30">
+            <Loader className="w-6 h-6 animate-spin text-white" />
+          </div>
+          <span className="text-[11px] tracking-widest uppercase font-extrabold text-stone-600">
+            Signing you in…
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Main shell — renders immediately; the main panel shows a skeleton while
+  // the workspace data syncs so the layout never blocks on a full-screen spinner.
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#f4f6f5] font-sans">
-      {/* 1. Left Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={handleTabChange}
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
         onOpenCopilot={() => setIsCopilotOpen(true)}
       />
 
-      {/* 2. Main Tab View Panels */}
-      <main ref={mainRef} className="flex-1 flex flex-col h-full overflow-hidden bg-[#f4f6f5] relative max-lg:pb-20 lg:pb-0">
+      <main
+        ref={mainRef}
+        className="flex-1 flex flex-col h-full overflow-hidden bg-[#f4f6f5] relative max-lg:pb-20 lg:pb-0"
+      >
         {/* Mobile Top Navigation Header */}
         <header className="h-14 px-4 bg-white/80 backdrop-blur-md border-b border-slate-200/50 items-center justify-between shrink-0 max-lg:flex lg:hidden select-none z-30">
           <div className="flex items-center gap-3">
@@ -189,16 +229,29 @@ export default function TenantDashboard() {
           </div>
         </header>
 
-        {renderActiveTab()}
+        {loading ? <DashboardSkeleton /> : renderActiveTab()}
       </main>
 
       <AICopilotSidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         orgId={orgId}
         isOpen={isCopilotOpen}
         setIsOpen={setIsCopilotOpen}
       />
+
+      <CommandPalette
+        onNavigate={handleTabChange}
+        onOpenCopilot={() => setIsCopilotOpen(true)}
+      />
     </div>
+  );
+}
+
+export default function TenantDashboard() {
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <TenantDashboardInner />
+    </Suspense>
   );
 }

@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const total = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
     const orderId = generateOrderId();
 
-    const razorpayOrder = await createRazorpayOrder(total, orderId);
+    const razorpayOrder = await createRazorpayOrder(total, orderId, orgId);
 
     const attribution = await resolveAttribution(orgId, contact);
 
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       order,
       razorpayOrderId: razorpayOrder.id,
       amount: razorpayOrder.amount,
-      keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      keyId: razorpayOrder.keyId,
     });
   } catch (err: unknown) {
     console.error("Create order error:", err);

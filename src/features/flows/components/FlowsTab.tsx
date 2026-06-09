@@ -4,11 +4,13 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Plus, RefreshCw, Layers, LayoutTemplate, Settings2, Code, Share2, ShieldAlert, Lock, Play, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
 import { VisualFlowBuilder } from "./VisualFlowBuilder";
 
 export const FlowsTab: React.FC = () => {
   const params = useParams();
   const orgId = params.orgId as string;
+  const confirm = useConfirm();
 
   const [flows, setFlows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,7 +214,13 @@ export const FlowsTab: React.FC = () => {
   };
 
   const handleDeleteFlow = async (flowId: string) => {
-    if (!confirm("Are you sure you want to delete this flow? This cannot be undone.")) return;
+    const ok = await confirm({
+      title: "Delete this flow?",
+      description: "This permanently removes the flow. This can't be undone.",
+      tone: "danger",
+      confirmLabel: "Delete flow",
+    });
+    if (!ok) return;
     
     setIsSaving(true);
     try {

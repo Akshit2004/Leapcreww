@@ -298,7 +298,7 @@ async function processInboundMessage(
     if (orderItemsToCreate.length > 0) {
       const orderIdStr = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       const { createRazorpayPaymentLink } = await import("@/shared/lib/razorpay");
-      const rzpLink = await createRazorpayPaymentLink(totalCents, orderIdStr, contact.phone, contact.name);
+      const rzpLink = await createRazorpayPaymentLink(totalCents, orderIdStr, contact.phone, contact.name, orgId);
 
       const attribution = await resolveAttribution(orgId, contact);
 

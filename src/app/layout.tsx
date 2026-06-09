@@ -4,6 +4,7 @@ import "./globals.css";
 import "@uploadthing/react/styles.css";
 import { AppProvider } from "@/shared/context/AppContext";
 import { AuthProvider } from "@/features/auth/context/AuthProvider";
+import { ConfirmProvider } from "@/shared/components/ui/ConfirmDialog";
 import { Toaster } from "react-hot-toast";
 
 const geistSans = Geist({
@@ -47,8 +48,31 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-amber-50 text-stone-900">
         <AuthProvider>
           <AppProvider>
-            {children}
-            <Toaster position="bottom-center" />
+            <ConfirmProvider>
+              {children}
+            </ConfirmProvider>
+            <Toaster
+              position="bottom-center"
+              gutter={10}
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  borderRadius: 0,
+                  border: "1px solid #1c1917",
+                  background: "#ffffff",
+                  color: "#1c1917",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  padding: "10px 14px",
+                  boxShadow: "0 8px 24px -8px rgba(28,25,23,0.25)",
+                },
+                success: { iconTheme: { primary: "#128c7e", secondary: "#ffffff" } },
+                error: {
+                  style: { border: "1px solid #fca5a5" },
+                  iconTheme: { primary: "#ef4444", secondary: "#ffffff" },
+                },
+              }}
+            />
           </AppProvider>
         </AuthProvider>
       </body>

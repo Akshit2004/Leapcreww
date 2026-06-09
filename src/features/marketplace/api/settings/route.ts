@@ -41,6 +41,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (enabled) {
+      const razorpayIntegration = await prisma.integration.findUnique({
+        where: {
+          id_organizationId: {
+            id: "razorpay",
+            organizationId: orgId,
+          },
+        },
+      });
+
+      if (!razorpayIntegration || razorpayIntegration.status !== "connected") {
+        return NextResponse.json(
+          { error: "Please link your Razorpay account in the Integrations tab before enabling the Marketplace Bot." },
+          { status: 400 }
+        );
+      }
+    }
+
     const organization = await prisma.organization.update({
       where: { id: orgId },
       data: {

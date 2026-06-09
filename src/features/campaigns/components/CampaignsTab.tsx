@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
+import { notify } from "@/shared/lib/toast";
+import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
 import { CampaignReportDrawer } from "./CampaignReportDrawer";
 import { UploadButton } from "@/shared/lib/uploadthing";
 
@@ -103,6 +105,7 @@ function evaluateSegmentRules(contact: any, rules: SegmentRules): boolean {
 
 export const CampaignsTab: React.FC = () => {
   const { organization, campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign, addSystemLog, refreshWorkspace } = useApp();
+  const confirm = useConfirm();
   const params = useParams();
   const orgId = params.orgId as string;
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -142,7 +145,7 @@ export const CampaignsTab: React.FC = () => {
   const launchEmbeddedSignup = () => {
     const fb = (window as any).FB;
     if (!fb) {
-      alert("Facebook SDK not loaded. Please refresh and try again.");
+      notify.error("WhatsApp connect unavailable", "Facebook SDK didn't load. Refresh the page and try again.");
       return;
     }
     setConnectingWaba(true);
@@ -152,7 +155,7 @@ export const CampaignsTab: React.FC = () => {
           handleSignupCallback(response.authResponse.code);
         } else {
           setConnectingWaba(false);
-          alert("Signup was cancelled or failed. Please try again.");
+          notify.error("Connection cancelled", "WhatsApp signup was cancelled or didn't complete. Please try again.");
         }
       },
       {
@@ -177,13 +180,13 @@ export const CampaignsTab: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || "Connection failed");
+        notify.error("Connection failed", data.error || "We couldn't connect your WhatsApp Business account.");
         return;
       }
-      alert("WhatsApp Business Account connected successfully!");
+      notify.success("WhatsApp connected", "Your WhatsApp Business account is connected and ready to send.");
       if (orgId) await refreshWorkspace(orgId);
     } catch {
-      alert("Network error during connection. Please try again.");
+      notify.error("Network error", "Something went wrong while connecting. Please try again.");
     } finally {
       setConnectingWaba(false);
     }
@@ -264,12 +267,27 @@ export const CampaignsTab: React.FC = () => {
     fetchSegments();
   }, [orgId]);
 
-  // Initialize selectedSegmentId once segments load
+  // Initialize selectedSegmentId once segments load (smart default to largest segment)
   useEffect(() => {
-    if (!selectedSegmentId && segments.length > 0) {
-      setSelectedSegmentId("all_contacts");
+    if (!selectedSegmentId) {
+      if (segments.length > 0) {
+        let maxMatches = -1;
+        let largestSegmentId = "all_contacts";
+        
+        segments.forEach(seg => {
+          const matches = contacts.filter((c) => evaluateSegmentRules(c, seg.rules as SegmentRules)).length;
+          if (matches > maxMatches) {
+            maxMatches = matches;
+            largestSegmentId = seg.id;
+          }
+        });
+        
+        setSelectedSegmentId(largestSegmentId);
+      } else {
+        setSelectedSegmentId("all_contacts");
+      }
     }
-  }, [segments, selectedSegmentId]);
+  }, [segments, selectedSegmentId, contacts]);
 
   // Auto-initialize template choice and variables
   useEffect(() => {
@@ -358,7 +376,7 @@ export const CampaignsTab: React.FC = () => {
         const data = await res.json();
         if (!res.ok) {
           addSystemLog("campaign", `Session broadcast failed: ${data.error}`);
-          alert(data.error);
+          notify.error("Broadcast failed", data.error);
           return;
         }
         addSystemLog("campaign", `Session broadcast launched! ${data.eligibleCount} contacts in 24h window.`);
@@ -552,7 +570,12 @@ export const CampaignsTab: React.FC = () => {
                       {getStatusBadge(camp.status)}
                       <button
                         onClick={async () => {
-                          if (confirm("Are you sure you want to permanently delete this campaign?")) {
+                          if (await confirm({
+                            title: "Delete this campaign?",
+                            description: "This permanently removes the campaign and its delivery logs. This can't be undone.",
+                            tone: "danger",
+                            confirmLabel: "Delete campaign",
+                          })) {
                             await deleteCampaign(camp.id);
                           }
                         }}
@@ -771,11 +794,11 @@ export const CampaignsTab: React.FC = () => {
                           onClientUploadComplete={(res) => {
                             if (res && res[0]) {
                               setMediaUrl(res[0].url);
-                              alert("Upload completed successfully!");
+                              notify.success("Upload complete", "Your media is attached and ready to send.");
                             }
                           }}
                           onUploadError={(error: Error) => {
-                            alert(`Upload failed: ${error.message}`);
+                            notify.error("Upload failed", error.message);
                           }}
                           appearance={{
                             button: "bg-stone-900 hover:bg-stone-850 text-white rounded-none text-xs font-bold px-3 py-2 cursor-pointer h-9 shrink-0 flex items-center justify-center border border-stone-900 transition-all",
@@ -1426,12 +1449,12 @@ export const CampaignsTab: React.FC = () => {
                         const data = await res.json();
                         if (!res.ok) throw new Error(data.error || "Failed to apply strategy");
                         
-                        alert("Campaign strategy applied successfully! Check campaigns & workflows.");
+                        notify.success("Strategy applied", "Your campaign strategy is live — check Campaigns and workflows.");
                         setIsStrategistOpen(false);
                         setStrategistStrategy(null);
                         if (orgId) await refreshWorkspace(orgId);
                       } catch (err: any) {
-                        alert(err.message || "Failed to apply strategy");
+                        notify.error("Couldn't apply strategy", err.message || "Something went wrong. Please try again.");
                       } finally {
                         setIsApplyingStrategy(false);
                       }

@@ -9,6 +9,7 @@ interface CustomersTableProps {
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
   onUpdateTags: (id: string, tags: string[]) => void;
+  onUpdateName?: (id: string, name: string) => void;
 }
 
 export const CustomersTable: React.FC<CustomersTableProps> = ({
@@ -17,9 +18,13 @@ export const CustomersTable: React.FC<CustomersTableProps> = ({
   onToggleSelect,
   onToggleSelectAll,
   onUpdateTags,
+  onUpdateName,
 }) => {
   const [editingTagContactId, setEditingTagContactId] = useState<string | null>(null);
   const [newTagValue, setNewTagValue] = useState("");
+  
+  const [editingNameContactId, setEditingNameContactId] = useState<string | null>(null);
+  const [newNameValue, setNewNameValue] = useState("");
 
   const allSelected = contacts.length > 0 && selectedIds.size === contacts.length;
   const isIndeterminate = selectedIds.size > 0 && selectedIds.size < contacts.length;
@@ -42,6 +47,13 @@ export const CustomersTable: React.FC<CustomersTableProps> = ({
       id,
       currentTags.filter((t) => t !== tagToRemove)
     );
+  };
+
+  const handleUpdateNameSubmit = (id: string) => {
+    if (newNameValue.trim() && onUpdateName) {
+      onUpdateName(id, newNameValue.trim());
+    }
+    setEditingNameContactId(null);
   };
 
   if (contacts.length === 0) {
@@ -110,7 +122,31 @@ export const CustomersTable: React.FC<CustomersTableProps> = ({
                         {contact.name.charAt(0)}
                       </div>
                       <div>
-                        <div className="font-bold text-stone-900">{contact.name}</div>
+                        {editingNameContactId === contact.id ? (
+                          <input
+                            autoFocus
+                            type="text"
+                            value={newNameValue}
+                            onChange={(e) => setNewNameValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleUpdateNameSubmit(contact.id);
+                              if (e.key === "Escape") setEditingNameContactId(null);
+                            }}
+                            onBlur={() => handleUpdateNameSubmit(contact.id)}
+                            className="font-bold text-stone-900 border-b-2 border-wa-green focus:outline-none bg-transparent w-full"
+                          />
+                        ) : (
+                          <div 
+                            className="font-bold text-stone-900 cursor-pointer hover:text-wa-green transition-colors border-b-2 border-transparent hover:border-wa-green/30"
+                            onClick={() => {
+                              setEditingNameContactId(contact.id);
+                              setNewNameValue(contact.name);
+                            }}
+                            title="Click to edit name"
+                          >
+                            {contact.name}
+                          </div>
+                        )}
                         <div className="text-xs text-stone-500 flex items-center gap-1 mt-0.5">
                           <Clock className="w-3 h-3" />
                           <span>Last msg: {contact.lastMessageTime || "Never"}</span>

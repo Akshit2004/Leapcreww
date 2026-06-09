@@ -23,6 +23,7 @@ import {
   Copy
 } from "lucide-react";
 import { useApp, Message } from "@/shared/context/AppContext";
+import { notify } from "@/shared/lib/toast";
 import { useSession } from "next-auth/react";
 
 export const InboxTab: React.FC = () => {
@@ -751,7 +752,7 @@ export const InboxTab: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 navigator.clipboard.writeText(checkoutUrl);
-                                alert("Checkout URL copied to clipboard!");
+                                notify.success("Link copied", "Checkout URL copied to your clipboard.");
                               }}
                               className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 border border-amber-200 bg-white hover:bg-amber-50/60 text-[9px] font-black uppercase tracking-wider text-amber-800 transition-all cursor-pointer rounded-xl active:scale-[0.97]"
                             >
@@ -773,10 +774,10 @@ export const InboxTab: React.FC = () => {
                                       orgId: orgId,
                                     }),
                                   });
-                                  alert("Recovery reminder dispatched!");
+                                  notify.success("Reminder sent", "The recovery reminder is on its way to the customer.");
                                   refreshWorkspace(orgId);
                                 } catch (err) {
-                                  alert("Failed to send reminder.");
+                                  notify.error("Couldn't send reminder", "Please try again in a moment.");
                                 }
                               }}
                               className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer rounded-xl active:scale-[0.97]"

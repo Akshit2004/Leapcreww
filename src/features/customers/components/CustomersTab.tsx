@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
+import { notify } from "@/shared/lib/toast";
+import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
 import { CustomersTable } from "./CustomersTable";
 import { BulkAddTagModal } from "./BulkAddTagModal";
 import { AddCustomerModal } from "./AddCustomerModal";
@@ -80,6 +82,7 @@ function evaluateSegmentRules(contact: Contact, rules: SegmentRules): boolean {
 
 export const CustomersTab: React.FC = () => {
   const { contacts, updateContact, addContact } = useApp();
+  const confirm = useConfirm();
   const params = useParams();
   const orgId = params.orgId as string;
 
@@ -179,6 +182,10 @@ export const CustomersTab: React.FC = () => {
     updateContact(id, { tags: newTags });
   };
 
+  const handleUpdateName = (id: string, newName: string) => {
+    updateContact(id, { name: newName });
+  };
+
   const handleAddCustomer = (customer: Omit<Contact, "id">) => {
     addContact(customer);
   };
@@ -203,7 +210,13 @@ export const CustomersTab: React.FC = () => {
   };
 
   const handleDeleteSegment = async (id: string) => {
-    if (!confirm("Are you sure you want to permanently delete this segment?")) return;
+    const ok = await confirm({
+      title: "Delete this segment?",
+      description: "This permanently removes the segment. Your contacts won't be affected.",
+      tone: "danger",
+      confirmLabel: "Delete segment",
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/org/${orgId}/segments/${id}`, {
         method: "DELETE",
@@ -213,12 +226,13 @@ export const CustomersTab: React.FC = () => {
         if (selectedSegmentId === id) {
           setSelectedSegmentId(null);
         }
+        notify.success("Segment deleted");
       } else {
-        alert("Failed to delete segment");
+        notify.error("Couldn't delete segment", "Please try again in a moment.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error deleting segment");
+      notify.error("Couldn't delete segment", "Check your connection and try again.");
     }
   };
 
@@ -296,12 +310,13 @@ export const CustomersTab: React.FC = () => {
         setNewRules([{ field: "tags", op: "in", value: "" }]);
         setRulesLogic("all");
         setIsSegmentBuilderOpen(false);
+        notify.success("Segment created", "Your smart folder is ready to use.");
       } else {
-        alert("Failed to create segment");
+        notify.error("Couldn't create segment", "Please check the rules and try again.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error saving segment");
+      notify.error("Couldn't save segment", "Check your connection and try again.");
     } finally {
       setIsSavingSegment(false);
     }
@@ -489,6 +504,7 @@ export const CustomersTab: React.FC = () => {
               onToggleSelect={handleToggleSelect}
               onToggleSelectAll={handleToggleSelectAll}
               onUpdateTags={handleUpdateTags}
+              onUpdateName={handleUpdateName}
             />
           </div>
         </div>
