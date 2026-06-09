@@ -116,10 +116,13 @@ export async function createTemplate(input: CreateTemplateInput) {
       metaId = metaData.id;
       metaStatus = metaData.status?.toLowerCase() || "pending";
     } else {
-      throw new ApiError(`Meta rejected template: ${metaData.error?.message || "Unknown error"}`, 400);
+      console.error("Meta message template registration failed:", JSON.stringify(metaData, null, 2));
+      const details = metaData.error?.error_data?.details || JSON.stringify(metaData.error);
+      throw new ApiError(`Meta rejected template: ${metaData.error?.message || "Unknown error"} (Details: ${details})`, 400);
     }
   } catch (err) {
     if (err instanceof ApiError) throw err;
+    console.error("Meta communications error:", err);
     throw new ApiError("Failed to communicate with Meta API", 502);
   }
 
