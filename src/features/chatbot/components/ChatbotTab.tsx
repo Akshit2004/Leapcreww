@@ -700,6 +700,30 @@ export const ChatbotTab: React.FC = () => {
     return "default";
   };
 
+  // Per-type visual accent (kept mostly monochrome; wa-green marks the entry trigger).
+  const nodeAccent = (type: string) => {
+    switch (type) {
+      case "trigger":
+        return { stripe: "bg-wa-green", icon: "bg-wa-green text-white border-wa-green", stroke: "var(--wa-green)" };
+      case "question":
+        return { stripe: "bg-stone-900", icon: "bg-stone-900 text-white border-stone-900", stroke: "#57534e" };
+      case "delay":
+        return { stripe: "bg-stone-300", icon: "bg-white text-stone-500 border-stone-300", stroke: "#a8a29e" };
+      default: // message
+        return { stripe: "bg-stone-500", icon: "bg-white text-stone-700 border-stone-300", stroke: "#78716c" };
+    }
+  };
+
+  // Live canvas stats for the header readout.
+  const nodeCount = localNodes.length;
+  const connectionCount = localNodes.reduce((acc, n) => {
+    if (n.type === "question" && n.routes) {
+      return acc + Object.values(n.routes).filter((t) => t && localNodes.some((x) => x.id === t)).length;
+    }
+    if (n.nextId && localNodes.some((x) => x.id === n.nextId)) return acc + 1;
+    return acc;
+  }, 0);
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative select-none bg-[#fafaf9]">
       {/* MOBILE FALLBACK */}
