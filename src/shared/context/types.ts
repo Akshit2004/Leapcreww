@@ -52,7 +52,7 @@ export interface Campaign {
   delivered: number;
   read: number;
   clicked: number;
-  status: "Completed" | "Active" | "Scheduled" | "Sending" | "Failed";
+  status: "Completed" | "Active" | "Scheduled" | "Sending" | "Failed" | "PendingTemplate";
   date: string;
   scheduledAt?: string;
   excludeTag?: string;

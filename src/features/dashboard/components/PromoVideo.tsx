@@ -43,7 +43,7 @@ export const PromoVideo: React.FC<PromoVideoProps> = ({
             Product Tour
           </span>
         </div>
-        <span className="text-[10px] text-stone-400 font-semibold">2 min watch</span>
+        <span className="text-[10px] text-stone-400 font-semibold">30 sec watch</span>
       </div>
 
       {/* Video frame */}

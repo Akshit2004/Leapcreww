@@ -247,6 +247,17 @@ Schema:
         });
       }
 
+      // If the resolved template (e.g. one adopted from Meta) is already rejected,
+      // parking a campaign on it would wait forever — surface it instead.
+      if (savedTemplate.metaStatus === "rejected") {
+        return NextResponse.json(
+          {
+            error: `A template named "${savedTemplate.name}" was rejected by Meta. Please revise the copy or use a different name and try again.`,
+          },
+          { status: 400 }
+        );
+      }
+
       const templateApproved = savedTemplate.metaStatus === "approved";
       const variables = Array.isArray(template.variables) ? template.variables : [];
 

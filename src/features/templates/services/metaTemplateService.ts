@@ -50,6 +50,31 @@ async function uploadMediaForHeaderHandle(
   return uploadData.h;
 }
 
+/**
+ * Look up a template by its exact name on Meta. Used to adopt a name that already
+ * exists on Meta (error_subcode 2388024) instead of failing the whole flow.
+ */
+async function fetchMetaTemplateByName(
+  name: string,
+  wabaId: string,
+  systemToken: string
+): Promise<{ metaId: string; metaStatus: string } | null> {
+  try {
+    const url =
+      `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${wabaId}/message_templates` +
+      `?name=${encodeURIComponent(name)}&fields=name,status,id&limit=50`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${systemToken}` } });
+    const data = await res.json();
+    if (!res.ok || !Array.isArray(data?.data)) return null;
+    const match = data.data.find((t: { name?: string }) => t.name === name) || data.data[0] || null;
+    if (!match?.id) return null;
+    return { metaId: match.id as string, metaStatus: (match.status || "PENDING").toLowerCase() };
+  } catch (err) {
+    console.error("[fetchMetaTemplateByName] lookup failed:", err);
+    return null;
+  }
+}
+
 /** Build Meta `components`, submit the template, persist it, and log. */
 export async function createTemplate(input: CreateTemplateInput) {
   const { category, body, buttons = [], mediaType = "none", mediaUrl = null, organizationId } = input;
@@ -115,6 +140,23 @@ export async function createTemplate(input: CreateTemplateInput) {
     if (metaRes.ok && metaData.id) {
       metaId = metaData.id;
       metaStatus = metaData.status?.toLowerCase() || "pending";
+    } else if (
+      metaData.error?.error_subcode === 2388024 ||
+      /already exists/i.test(metaData.error?.error_user_title || "")
+    ) {
+      // The name already has en_US content on Meta but our local mirror is missing
+      // it (deleted record, prior environment, etc.). Adopt the existing Meta
+      // template instead of failing so the strategist's reuse/park flow proceeds.
+      const adopted = await fetchMetaTemplateByName(formattedName, wabaId, systemToken);
+      if (!adopted) {
+        throw new ApiError(
+          `A template named "${formattedName}" already exists on Meta but could not be retrieved. Please choose a different name.`,
+          409
+        );
+      }
+      metaId = adopted.metaId;
+      metaStatus = adopted.metaStatus;
+      console.warn(`[createTemplate] Adopted existing Meta template "${formattedName}" (status: ${metaStatus}).`);
     } else {
       console.error("Meta message template registration failed:", JSON.stringify(metaData, null, 2));
       const details = metaData.error?.error_data?.details || JSON.stringify(metaData.error);
@@ -126,7 +168,10 @@ export async function createTemplate(input: CreateTemplateInput) {
     throw new ApiError("Failed to communicate with Meta API", 502);
   }
 
-  const template = await repo.createTemplate({
+  // Upsert by (organizationId, name): adopting an existing Meta template — or
+  // re-submitting a previously rejected one — must update the local row rather
+  // than create a duplicate.
+  const persistData = {
     name: formattedName,
     body,
     category,
@@ -136,7 +181,11 @@ export async function createTemplate(input: CreateTemplateInput) {
     metaStatus,
     metaId,
     organizationId,
-  });
+  };
+  const existingLocal = await repo.findByNameForOrg(organizationId, formattedName);
+  const template = existingLocal
+    ? await repo.updateTemplate(existingLocal.id, persistData)
+    : await repo.createTemplate(persistData);
 
   await repo.createLog({
     timestamp: hhmm(),

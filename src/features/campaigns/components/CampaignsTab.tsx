@@ -158,6 +158,7 @@ export const CampaignsTab: React.FC = () => {
   // Detailed Report Drawer state
   const [reportDrawerOpen, setReportDrawerOpen] = useState(false);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [reportInitialTab, setReportInitialTab] = useState<"analytics" | "setup">("analytics");
 
   // Campaign Form States
   const [campaignName, setCampaignName] = useState("");
@@ -626,22 +627,37 @@ export const CampaignsTab: React.FC = () => {
                   </div>
 
                   {/* Footer */}
-                  <div className="border-t border-stone-200 pt-4 flex justify-between items-center">
-                    <span className="text-[10px] text-stone-400 flex items-center gap-1">
+                  <div className="border-t border-stone-200 pt-4 flex justify-between items-center gap-2">
+                    <span className="text-[10px] text-stone-400 flex items-center gap-1 shrink-0">
                       <Calendar className="w-3 h-3" />
                       {camp.date}
                     </span>
-                    <button
-                      onClick={() => {
-                        setSelectedCampaignId(camp.id);
-                        setReportDrawerOpen(true);
-                      }}
-                      className="text-[10px] font-bold text-stone-900 bg-stone-100 border border-stone-300 hover:bg-stone-200 px-3 py-1.5 rounded-none flex items-center gap-1 transition-all cursor-pointer"
-                    >
-                      <BarChart4 className="w-3.5 h-3.5" />
-                      View Analytics
-                      <Maximize2 className="w-3 h-3 text-stone-500" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedCampaignId(camp.id);
+                          setReportInitialTab("setup");
+                          setReportDrawerOpen(true);
+                        }}
+                        className="text-[10px] font-bold text-stone-600 bg-white border border-stone-300 hover:bg-stone-100 px-3 py-1.5 rounded-none flex items-center gap-1 transition-all cursor-pointer"
+                        title="View read-only campaign setup"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        View Setup
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedCampaignId(camp.id);
+                          setReportInitialTab("analytics");
+                          setReportDrawerOpen(true);
+                        }}
+                        className="text-[10px] font-bold text-stone-900 bg-stone-100 border border-stone-300 hover:bg-stone-200 px-3 py-1.5 rounded-none flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <BarChart4 className="w-3.5 h-3.5" />
+                        View Analytics
+                        <Maximize2 className="w-3 h-3 text-stone-500" />
+                      </button>
+                    </div>
                   </div>
 
                 </div>
@@ -1068,6 +1084,8 @@ export const CampaignsTab: React.FC = () => {
         campaign={activeReportCampaign}
         contacts={contacts}
         systemLogs={systemLogs}
+        templates={templates}
+        initialTab={reportInitialTab}
       />
 
       {/* AI Campaign Strategist Modal */}
