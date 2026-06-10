@@ -54,13 +54,11 @@ function slotState(s: Slot): SlotState {
 }
 
 function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString("en-IN", {
+  return new Date(iso).toLocaleDateString("en-IN", {
     weekday: "short",
     day: "numeric",
     month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
+    timeZone: "UTC",
   });
 }
 
@@ -110,7 +108,7 @@ export const AppointmentConsole: React.FC<AppointmentConsoleProps> = ({ orgId, p
           slots: [
             {
               serviceName: form.serviceName,
-              startTime: new Date(form.startTime).toISOString(),
+              startTime: new Date(`${form.startTime}T00:00:00Z`).toISOString(),
               durationMinutes: parseInt(form.durationMinutes) || 30,
               price: Math.round(parseFloat(form.price || "0") * 100),
             },
@@ -174,10 +172,13 @@ export const AppointmentConsole: React.FC<AppointmentConsoleProps> = ({ orgId, p
     }
   };
 
-  const now = Date.now();
+  const todayStartUtc = new Date();
+  todayStartUtc.setUTCHours(0, 0, 0, 0);
   const stats = {
     total: slots.length,
-    available: slots.filter((s) => slotState(s) === "available" && new Date(s.startTime).getTime() > now).length,
+    available: slots.filter(
+      (s) => slotState(s) === "available" && new Date(s.startTime).getTime() >= todayStartUtc.getTime()
+    ).length,
     booked: slots.filter((s) => s.isBooked).length,
     revenue: slots.filter((s) => s.isBooked && s.paymentStatus === "paid").reduce((sum, s) => sum + s.price, 0),
   };
@@ -250,7 +251,7 @@ export const AppointmentConsole: React.FC<AppointmentConsoleProps> = ({ orgId, p
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label={terms.slotLabel} value={form.serviceName} onChange={(v) => setForm({ ...form, serviceName: v })} required />
-            <Field label="Date & Time" type="datetime-local" value={form.startTime} onChange={(v) => setForm({ ...form, startTime: v })} required />
+            <Field label="Date" type="date" value={form.startTime} onChange={(v) => setForm({ ...form, startTime: v })} required />
             <Field label="Duration (min)" type="number" value={form.durationMinutes} onChange={(v) => setForm({ ...form, durationMinutes: v })} />
             <Field label={`${terms.feeLabel} (₹) — 0 for free`} type="number" value={form.price} onChange={(v) => setForm({ ...form, price: v })} />
           </div>

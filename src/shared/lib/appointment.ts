@@ -36,13 +36,11 @@ async function getOrgPreset(orgId: string): Promise<AppointmentPreset> {
 }
 
 function formatSlotTime(start: Date): string {
-  return start.toLocaleString("en-IN", {
+  return start.toLocaleDateString("en-IN", {
     weekday: "short",
     day: "numeric",
     month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
+    timeZone: "UTC",
   });
 }
 
@@ -91,11 +89,13 @@ Tap a button below or reply with a number.`;
 // ─── Browse available slots ─────────────────────────────────────────────────
 
 async function getAvailableSlots(orgId: string) {
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
   return prisma.appointmentSlot.findMany({
     where: {
       organizationId: orgId,
       isBooked: false,
-      startTime: { gt: new Date() },
+      startTime: { gte: todayStart },
       ...activeHoldFilter(),
     },
     orderBy: { startTime: "asc" },
@@ -134,7 +134,7 @@ export async function sendAvailableSlots(phone: string, contactId: string, orgId
   if (slots.length <= 10) {
     const sectionsMap: Record<string, typeof slots> = {};
     for (const s of slots) {
-      const day = s.startTime.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" });
+      const day = s.startTime.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" });
       if (!sectionsMap[day]) sectionsMap[day] = [];
       sectionsMap[day].push(s);
     }

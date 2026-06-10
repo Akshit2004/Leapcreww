@@ -17,6 +17,43 @@ interface CustomSessionUser {
   id: string;
 }
 
+function sanitizeStrategyPlaceholders(strategy: any) {
+  if (!strategy) return;
+
+  // 1. Sanitize template body
+  if (strategy.template && typeof strategy.template.body === "string") {
+    let body = strategy.template.body;
+    const leadNameRegex = /\[Lead\s*Name\]|\[Contact\s*Name\]|\[Name\]|\[Lead's\s*Name\]|\{\{contact\.name\}\}/gi;
+    if (leadNameRegex.test(body)) {
+      body = body.replace(leadNameRegex, "{{1}}");
+      strategy.template.body = body;
+      
+      if (!Array.isArray(strategy.template.variables)) {
+        strategy.template.variables = [];
+      }
+      const hasNameVar = strategy.template.variables.some(
+        (v: any) => v.type === "contact_field" && v.value === "name"
+      );
+      if (!hasNameVar) {
+        strategy.template.variables.unshift({
+          type: "contact_field",
+          value: "name"
+        });
+      }
+    }
+  }
+
+  // 2. Sanitize sequence step messages
+  if (strategy.sequence && Array.isArray(strategy.sequence.steps)) {
+    strategy.sequence.steps.forEach((step: any) => {
+      if (step.actionType === "send_message" && typeof step.message === "string") {
+        const leadNameRegex = /\[Lead\s*Name\]|\[Contact\s*Name\]|\[Name\]|\[Lead's\s*Name\]|\{\{1\}\}/gi;
+        step.message = step.message.replace(leadNameRegex, "{{contact.name}}");
+      }
+    });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -181,6 +218,7 @@ Schema:
 
       try {
         const strategy = JSON.parse(cleanJson);
+        sanitizeStrategyPlaceholders(strategy);
 
         // ── Server-side guards on the AI's template decision ──────────────
         // The model can hallucinate a reuse (templateExists:true with a name
@@ -215,6 +253,7 @@ Schema:
 
     // ─── ACTION: APPLY ───
     if (action === "apply") {
+      sanitizeStrategyPlaceholders(body);
       const { template, segment, schedule, sequence } = body;
 
       if (!template || !segment || !schedule || !sequence) {

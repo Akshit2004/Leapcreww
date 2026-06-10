@@ -27,6 +27,126 @@ const pct = (num: number, den: number) => (den === 0 ? 0 : Math.round((num / den
 const fmt = (n: number) => n.toLocaleString("en-US");
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
+function renderTextWithBold(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={idx} className="font-bold text-stone-950">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("*") && part.endsWith("*")) {
+      return <strong key={idx} className="font-bold text-stone-950">{part.slice(1, -1)}</strong>;
+    }
+    return part;
+  });
+}
+
+function parseMarkdown(text: string): React.ReactNode[] {
+  const lines = text.split("\n");
+  const elements: React.ReactNode[] = [];
+  let currentList: React.ReactNode[] = [];
+  let keyCounter = 0;
+
+  const flushList = () => {
+    if (currentList.length > 0) {
+      elements.push(
+        <ul key={`ul-${keyCounter++}`} className="list-disc pl-4 space-y-1 mb-2 text-stone-600">
+          {currentList}
+        </ul>
+      );
+      currentList = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) {
+      flushList();
+      continue;
+    }
+
+    if (line.startsWith("#### ")) {
+      flushList();
+      elements.push(
+        <h4 key={`h4-${keyCounter++}`} className="text-stone-800 text-[10px] font-bold uppercase mt-3 mb-1">
+          {line.replace("#### ", "")}
+        </h4>
+      );
+    } else if (line.startsWith("### ")) {
+      flushList();
+      elements.push(
+        <h3 key={`h3-${keyCounter++}`} className="text-stone-900 text-[11px] font-bold uppercase mt-4 mb-1.5 border-b border-stone-100 pb-1">
+          {line.replace("### ", "")}
+        </h3>
+      );
+    } else if (line.startsWith("## ")) {
+      flushList();
+      elements.push(
+        <h2 key={`h2-${keyCounter++}`} className="text-stone-955 text-xs font-bold uppercase mt-5 mb-2 border-b border-stone-200 pb-1">
+          {line.replace("## ", "")}
+        </h2>
+      );
+    } else if (line.startsWith("* ") || line.startsWith("- ")) {
+      const textContent = line.replace(/^[\*\-]\s+/, "");
+      currentList.push(
+        <li key={`li-${keyCounter++}`} className="text-xs text-stone-650 font-semibold pl-1 leading-relaxed">
+          {renderTextWithBold(textContent)}
+        </li>
+      );
+    } else {
+      flushList();
+      elements.push(
+        <p key={`p-${keyCounter++}`} className="text-xs text-stone-650 font-semibold mb-2 leading-relaxed">
+          {renderTextWithBold(line)}
+        </p>
+      );
+    }
+  }
+
+  flushList();
+  return elements;
+}
+
+interface BriefSections {
+  revenue: string;
+  engagement: string;
+  recommendations: string;
+}
+
+function parseBriefIntoSections(text: string): BriefSections {
+  const lines = text.split("\n");
+  const sections: BriefSections = {
+    revenue: "",
+    engagement: "",
+    recommendations: ""
+  };
+  
+  let currentSection: keyof BriefSections | null = null;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    
+    if (trimmed.includes("Revenue Performance")) {
+      currentSection = "revenue";
+      continue;
+    } else if (trimmed.includes("Engagement Health")) {
+      currentSection = "engagement";
+      continue;
+    } else if (trimmed.includes("Underperforming Campaigns") || trimmed.includes("Recommendations")) {
+      currentSection = "recommendations";
+      continue;
+    } else if (trimmed.startsWith("### ")) {
+      continue;
+    }
+    
+    if (currentSection) {
+      sections[currentSection] += line + "\n";
+    }
+  }
+  
+  return sections;
+}
+
 /* ─── Radial Gauge (SVG) ─── */
 const RadialGauge: React.FC<{ value: number; label: string; color: string; icon: React.ReactNode }> = ({
   value,
@@ -371,11 +491,11 @@ export const AnalyticsTab: React.FC = () => {
       </div>
 
       {/* AI Analytics Narrator Briefing */}
-      <div className="bg-stone-50 border border-stone-200 p-6 rounded-none space-y-4 hover:border-stone-400 transition-all select-none">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 select-none">
+        <div className="flex items-center justify-between border-b border-stone-200 pb-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-emerald-600 animate-pulse" />
-            <h3 className="text-sm font-bold uppercase tracking-wider text-stone-900">
+            <Sparkles className="w-5 h-5 text-stone-950" />
+            <h3 className="text-xs font-bold uppercase tracking-widest text-stone-900">
               AI Analytics Narrator & Diagnostic Brief
             </h3>
           </div>
@@ -390,18 +510,71 @@ export const AnalyticsTab: React.FC = () => {
         </div>
 
         {loadingNarration ? (
-          <div className="space-y-2.5 animate-pulse">
-            <div className="h-3.5 bg-stone-200 w-1/3" />
-            <div className="h-3 bg-stone-200 w-full" />
-            <div className="h-3 bg-stone-200 w-5/6" />
-            <div className="h-3 bg-stone-200 w-4/5" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white border border-stone-200 p-6 h-40 animate-pulse space-y-3">
+              <div className="h-3 bg-stone-200 w-1/2" />
+              <div className="h-2.5 bg-stone-100 w-full" />
+              <div className="h-2.5 bg-stone-100 w-5/6" />
+            </div>
+            <div className="bg-white border border-stone-200 p-6 h-40 animate-pulse space-y-3">
+              <div className="h-3 bg-stone-200 w-1/2" />
+              <div className="h-2.5 bg-stone-100 w-full" />
+              <div className="h-2.5 bg-stone-100 w-5/6" />
+            </div>
+            <div className="bg-white border border-stone-200 p-6 h-40 animate-pulse space-y-3">
+              <div className="h-3 bg-stone-200 w-1/2" />
+              <div className="h-2.5 bg-stone-100 w-full" />
+              <div className="h-2.5 bg-stone-100 w-5/6" />
+            </div>
           </div>
         ) : narration ? (
-          <div className="text-xs text-stone-700 font-semibold leading-relaxed whitespace-pre-wrap select-text max-w-4xl text-left">
-            {narration}
-          </div>
+          (() => {
+            const sections = parseBriefIntoSections(narration);
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Card 1: Revenue Performance */}
+                <div className="bg-white border border-stone-200 p-6 hover:border-stone-400 transition-colors duration-300 shadow-sm rounded-none">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-stone-900 border-b border-stone-100 pb-2">
+                      <TrendingUp className="w-4 h-4 text-stone-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Revenue Performance</span>
+                    </div>
+                    <div className="text-xs text-stone-600 leading-relaxed font-semibold pl-1 select-text">
+                      {parseMarkdown(sections.revenue || "No revenue performance telemetry recorded.")}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 2: Engagement Health */}
+                <div className="bg-white border border-stone-200 p-6 hover:border-stone-400 transition-colors duration-300 shadow-sm rounded-none">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-stone-900 border-b border-stone-100 pb-2">
+                      <Eye className="w-4 h-4 text-stone-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Engagement Health</span>
+                    </div>
+                    <div className="text-xs text-stone-600 leading-relaxed font-semibold pl-1 select-text">
+                      {parseMarkdown(sections.engagement || "No engagement metrics recorded.")}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 3: Actionable Diagnostics */}
+                <div className="bg-white border border-stone-200 p-6 hover:border-stone-400 transition-colors duration-300 shadow-sm rounded-none">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-stone-900 border-b border-stone-100 pb-2">
+                      <Sparkles className="w-4 h-4 text-stone-500" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Actionable Diagnostics</span>
+                    </div>
+                    <div className="text-xs text-stone-600 leading-relaxed font-semibold pl-1 select-text">
+                      {parseMarkdown(sections.recommendations || "No optimization recommendations recorded.")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()
         ) : (
-          <p className="text-xs text-stone-400 italic">No telemetry briefing generated yet. Click refresh to narrate.</p>
+          <p className="text-xs text-stone-500 italic relative z-10">No telemetry briefing generated yet. Click refresh to narrate.</p>
         )}
       </div>
 
