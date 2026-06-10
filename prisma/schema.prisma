@@ -86,6 +86,7 @@ model Organization {
   webhookSubscriptions WebhookSubscription[]
   attributionTouches   AttributionTouch[]
   appointmentSlots     AppointmentSlot[]
+  bookings             Booking[]
 
   // Flow Encryption automation state
   flowsPrivateKey      String?    @db.Text
@@ -134,7 +135,7 @@ model Contact {
   enrollments    SequenceEnrollment[]
   flowResponses  FlowResponse[]
   attributionTouches AttributionTouch[]
-  appointmentSlots   AppointmentSlot[]
+  bookings       Booking[]
   sourceAdId     String?      // Tracks the Meta Ad ID that originated this contact
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -328,29 +329,52 @@ model OrderItem {
   quantity  Int
 }
 
-// Appointment Booking use-case agent: a bookable time slot (doctor, table,
-// interviewer, service desk — label depends on the org's appointmentPreset).
-// Paid slots (price > 0) are soft-held while a Razorpay payment link is
-// outstanding and confirmed by the payment webhook; free slots book instantly.
+// Appointment Booking use-case agent. AppointmentSlot is pure availability
+// inventory (doctor, table, interviewer, service desk — label depends on the
+// org's appointmentPreset). Payment is collected offline; `price` is purely
+// informational ("pay at venue"). A slot is claimed atomically via `isBooked`;
+// the customer-facing booking record lives in `Booking`.
 model AppointmentSlot {
   id                    String       @id @default(uuid())
   serviceName           String       // preset-dependent label: doctor / table / interviewer / agent
   startTime             DateTime
   durationMinutes       Int          @default(30)
-  price                 Int          @default(0) // in paise; 0 = free slot
+  price                 Int          @default(0) // in paise; 0 = free, >0 = fee shown to customer (pay at venue)
   isBooked              Boolean      @default(false)
-  paymentStatus         String       @default("none") // "none" | "pending" | "paid" | "free"
-  razorpayPaymentLinkId String?      @unique          // plink_ id while checkout is outstanding
-  holdExpiresAt         DateTime?                     // soft-hold expiry (30 min) for paid checkouts
-  contactId             String?
-  contact               Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
   organizationId        String
   organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bookings              Booking[]
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
 
+  // Prevents duplicate slots and powers the recurring generator's skipDuplicates.
+  @@unique([organizationId, serviceName, startTime])
   @@index([organizationId, isBooked, startTime])
+}
+
+// A customer's claim on a slot. Persists across cancellation (status="cancelled")
+// so the merchant's bookings list keeps history while the slot reopens
+// (isBooked=false). serviceName/startTime/price are snapshotted so the record
+// survives slot edits or deletion.
+model Booking {
+  id              String           @id @default(uuid())
+  slotId          String?
+  slot            AppointmentSlot? @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  serviceName     String           // snapshot of slot.serviceName at booking time
+  startTime       DateTime         // snapshot of slot.startTime at booking time
+  price           Int              @default(0) // snapshot of slot.price (paise)
+  bookingForName  String           // who the booking is for (patient / guest / student)
+  status          String           @default("booked") // "booked" | "completed" | "no_show" | "cancelled"
+  contactId       String
+  contact         Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  organizationId  String
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([organizationId, status, startTime])
   @@index([organizationId, contactId])
+  @@index([slotId])
 }
 
 model WhatsAppLoginAttempt {

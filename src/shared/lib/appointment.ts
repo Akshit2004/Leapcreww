@@ -5,26 +5,63 @@
  * when it owns the inbound message, false to let the autoresponder take over.
  *
  * Flow:
- *   menu → Book Slot / My Bookings
- *   Book Slot → interactive list of available future slots (numbered fallback)
- *   select slot → free: confirm instantly · paid: 30-min soft-hold + Razorpay link
- *   CONFIRM/Paid → re-check Razorpay payment-link status, lock booking if paid
+ *   menu → Book / My Bookings
+ *   Book → pick service/provider → pick day & time (two-step browse)
+ *   pick slot → capture "who is this for?" (reused one-tap on later bookings)
+ *           → instant confirmation (no online payment; fee shown as pay-at-venue)
+ *   My Bookings → pick a booking → Reschedule (same service, new time) / Cancel
  *
- * Terminology (doctor vs. table vs. interviewer …) comes from the org's
- * appointmentPreset via shared/config/useCasePresets.
+ * State machine lives in contact.attributes.appt_state; the saved booking name
+ * lives in contact.attributes.appt_name for one-tap reuse. Terminology
+ * (doctor vs. table vs. interviewer …) comes from the org's appointmentPreset.
  */
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { sendWhatsAppMessage, formatPhoneNumber } from "./whatsapp";
-import { getRazorpayInstance, createRazorpayPaymentLink } from "./razorpay";
-import { formatPrice, logBotMessage, CURRENCY_SYMBOL } from "./botMessaging";
+import { logBotMessage, formatPrice } from "./botMessaging";
+import { formatSlotDateTime, formatSlotDayLong, formatSlotTime } from "./datetime";
 import { getPreset, type AppointmentPreset } from "@/shared/config/useCasePresets";
 
-const HOLD_MINUTES = 30;
+// Conversation states held in contact.attributes.appt_state.
+type ApptState =
+  | "MENU"
+  | "AWAITING_SERVICE"
+  | "AWAITING_SLOT"
+  | "AWAITING_NAME"
+  | "AWAITING_NAME_CONFIRM"
+  | "MANAGING"
+  | "RESCHEDULE_SLOT";
 
-/** Soft-hold predicate: a paid slot is held while its hold has not expired. */
-function activeHoldFilter() {
-  return { OR: [{ holdExpiresAt: null }, { holdExpiresAt: { lt: new Date() } }] };
+const NAV_WORDS = new Set(["menu", "hi", "hello", "start", "help", "back", "cancel", "main menu"]);
+
+// ─── attribute helpers ───────────────────────────────────────────────────────
+
+type Attrs = Record<string, unknown>;
+
+async function getAttrs(contactId: string): Promise<Attrs> {
+  const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { attributes: true } });
+  return ((contact?.attributes as Attrs) || {}) as Attrs;
+}
+
+async function saveAttrs(contactId: string, attrs: Attrs) {
+  await prisma.contact.update({
+    where: { id: contactId },
+    data: { attributes: attrs as Prisma.InputJsonValue },
+  });
+}
+
+// ─── outbound helpers ────────────────────────────────────────────────────────
+
+async function reply(
+  phone: string,
+  contactId: string,
+  orgId: string,
+  text: string,
+  buttons?: { type: "reply"; reply: { id: string; title: string } }[],
+) {
+  const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text, buttons }, orgId);
+  await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
+  return result;
 }
 
 async function getOrgPreset(orgId: string): Promise<AppointmentPreset> {
@@ -35,17 +72,12 @@ async function getOrgPreset(orgId: string): Promise<AppointmentPreset> {
   return getPreset(org?.appointmentPreset);
 }
 
-function formatSlotTime(start: Date): string {
-  return start.toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
+function feeLabel(price: number, preset: AppointmentPreset): string {
+  return price > 0 ? `${preset.feeLabel}: ${formatPrice(price)}` : "Free";
 }
 
-function slotPriceLabel(price: number, preset: AppointmentPreset): string {
-  return price > 0 ? `${preset.feeLabel}: ${formatPrice(price)}` : "Free";
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 // ─── Main Menu ────────────────────────────────────────────────────────────────
@@ -53,377 +85,468 @@ function slotPriceLabel(price: number, preset: AppointmentPreset): string {
 export async function sendAppointmentMenu(phone: string, contactId: string, orgId: string) {
   const preset = await getOrgPreset(orgId);
 
-  // Clear any stale slot offering so a menu "1"/"2" reply isn't mistaken for a
-  // slot selection from an earlier browse, and mark the contact as being at the
-  // menu so numbered replies route to menu options, not stale slot ids.
-  const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { attributes: true } });
-  const attrs = (contact?.attributes as Record<string, unknown>) || {};
-  delete attrs.appt_offered;
-  attrs.appt_state = "MENU";
-  await prisma.contact.update({ where: { id: contactId }, data: { attributes: attrs as Prisma.InputJsonValue } });
+  // Reset transient browse/management state so a "1"/"2" reply maps to the menu,
+  // not a stale slot/service/booking offering. The saved booking name is kept.
+  const attrs = await getAttrs(contactId);
+  for (const k of ["appt_services", "appt_slots", "appt_service", "appt_pending_slot", "appt_bookings", "appt_active_booking", "appt_reschedule_booking"]) {
+    delete attrs[k];
+  }
+  attrs.appt_state = "MENU" satisfies ApptState;
+  await saveAttrs(contactId, attrs);
 
-  const text = `📅 *Appointment Booking*
+  const text = `📅 *${capitalize(preset.bookingNoun)} Booking*
 
 What would you like to do?
 
-1️⃣ *Book Slot* — see available ${preset.bookingNoun} times
-2️⃣ *My Bookings* — view your confirmed ${preset.bookingNoun}s
+1️⃣ *Book* — see available ${preset.bookingNoun} times
+2️⃣ *My Bookings* — view or change your ${preset.bookingNoun}s
 
 Tap a button below or reply with a number.`;
 
-  const result = await sendWhatsAppMessage(
-    {
-      to: formatPhoneNumber(phone),
-      text,
-      buttons: [
-        { type: "reply", reply: { id: "appt_book", title: "📅 Book Slot" } },
-        { type: "reply", reply: { id: "appt_bookings", title: "📋 My Bookings" } },
-      ],
-    },
-    orgId
-  );
-
-  await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
+  await reply(phone, contactId, orgId, text, [
+    { type: "reply", reply: { id: "appt_book", title: "📅 Book" } },
+    { type: "reply", reply: { id: "appt_bookings", title: "📋 My Bookings" } },
+  ]);
 }
 
-// ─── Browse available slots ─────────────────────────────────────────────────
+// ─── Step 1: choose a service / provider ──────────────────────────────────────
 
-async function getAvailableSlots(orgId: string) {
-  const todayStart = new Date();
-  todayStart.setUTCHours(0, 0, 0, 0);
-  return prisma.appointmentSlot.findMany({
-    where: {
-      organizationId: orgId,
-      isBooked: false,
-      startTime: { gte: todayStart },
-      ...activeHoldFilter(),
-    },
+function nowInstant(): Date {
+  return new Date();
+}
+
+async function distinctAvailableServices(orgId: string): Promise<string[]> {
+  const slots = await prisma.appointmentSlot.findMany({
+    where: { organizationId: orgId, isBooked: false, startTime: { gte: nowInstant() } },
     orderBy: { startTime: "asc" },
-    take: 20,
+    select: { serviceName: true },
   });
+  return [...new Set(slots.map((s) => s.serviceName))];
 }
 
-export async function sendAvailableSlots(phone: string, contactId: string, orgId: string) {
+export async function sendServiceChoices(phone: string, contactId: string, orgId: string) {
   const preset = await getOrgPreset(orgId);
-  const slots = await getAvailableSlots(orgId);
+  const services = await distinctAvailableServices(orgId);
 
-  if (slots.length === 0) {
-    const text = `Sorry, there are no open ${preset.bookingNoun} slots right now. Please check back later! 😊`;
-    const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
-    await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
+  if (services.length === 0) {
+    await reply(phone, contactId, orgId, `Sorry, there are no open ${preset.bookingNoun} slots right now. Please check back later! 😊`);
     return;
   }
 
-  // Persist the offered ordering so a numbered reply ("2") resolves to a slot id.
-  const offered = slots.map((s) => s.id);
-  const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { attributes: true } });
-  const attrs = (contact?.attributes as Record<string, unknown>) || {};
-  await prisma.contact.update({
-    where: { id: contactId },
-    data: {
-      attributes: {
-        ...attrs,
-        appt_offered: offered,
-        appt_state: "AWAITING_SLOT_SELECTION",
-      } as Prisma.InputJsonValue,
-    },
-  });
+  // One provider → skip straight to its slots; nothing to choose.
+  if (services.length === 1) {
+    await sendSlotsForService(phone, contactId, orgId, services[0], "AWAITING_SLOT");
+    return;
+  }
 
-  // Interactive list (≤10 rows). Group by date into sections; fall back to a
-  // numbered text list when there are too many slots or the list send fails.
-  if (slots.length <= 10) {
-    const sectionsMap: Record<string, typeof slots> = {};
-    for (const s of slots) {
-      const day = s.startTime.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" });
-      if (!sectionsMap[day]) sectionsMap[day] = [];
-      sectionsMap[day].push(s);
-    }
-    const sections = Object.keys(sectionsMap).slice(0, 10).map((day) => ({
-      title: day.substring(0, 24),
-      rows: sectionsMap[day].map((s) => ({
-        id: `appt_slot_${s.id}`,
-        title: s.serviceName.substring(0, 24),
-        description: `${formatSlotTime(s.startTime)} · ${slotPriceLabel(s.price, preset)}`.substring(0, 72),
-      })),
-    }));
+  const attrs = await getAttrs(contactId);
+  attrs.appt_services = services;
+  attrs.appt_state = "AWAITING_SERVICE" satisfies ApptState;
+  delete attrs.appt_reschedule_booking; // a fresh Book flow is not a reschedule
+  await saveAttrs(contactId, attrs);
 
+  // Interactive list (≤10 rows); numbered text fallback otherwise / on failure.
+  if (services.length <= 10) {
     const result = await sendWhatsAppMessage(
       {
         to: formatPhoneNumber(phone),
         list: {
-          buttonText: "View Slots",
-          title: "Available Slots",
-          description: `Pick a ${preset.bookingNoun} slot below. ${preset.slotLabel} and timings are shown for each.`,
-          sections,
+          buttonText: `Choose ${preset.slotLabel.split(" ")[0]}`.substring(0, 20),
+          title: `Choose a ${preset.bookingNoun}`.substring(0, 24),
+          description: `Pick the ${preset.slotLabel.toLowerCase()} you'd like to book with.`,
+          sections: [
+            {
+              title: preset.slotLabel.substring(0, 24),
+              rows: services.map((name, i) => ({
+                id: `appt_svc_${i}`,
+                title: name.substring(0, 24),
+              })),
+            },
+          ],
         },
       },
-      orgId
+      orgId,
     );
-
     if (result.ok) {
-      await logBotMessage(contactId, orgId, "Sent available appointment slots.", result.data?.messages?.[0]?.id);
+      await logBotMessage(contactId, orgId, `Sent ${preset.slotLabel} choices.`, result.data?.messages?.[0]?.id);
       return;
     }
   }
 
-  // Numbered text fallback.
-  let text = `📅 *Available Slots*\n\n`;
-  slots.forEach((s, i) => {
-    text += `*${i + 1}.* ${s.serviceName}\n   ${formatSlotTime(s.startTime)} · ${slotPriceLabel(s.price, preset)}\n\n`;
+  let text = `📅 *Choose a ${preset.slotLabel}*\n\n`;
+  services.forEach((name, i) => {
+    text += `*${i + 1}.* ${name}\n`;
   });
-  text += `Reply with the *number* of the slot you'd like to book.`;
-  const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
-  await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
+  text += `\nReply with the *number* of your choice.`;
+  await reply(phone, contactId, orgId, text);
 }
 
-// ─── Select a slot ───────────────────────────────────────────────────────────
+// ─── Step 2: choose a day & time for that service ─────────────────────────────
 
-/** Resolve a slot id from an interactive list reply id or a numbered reply. */
-async function resolveSelectedSlotId(text: string, contactId: string): Promise<string | null> {
+async function sendSlotsForService(
+  phone: string,
+  contactId: string,
+  orgId: string,
+  serviceName: string,
+  state: Extract<ApptState, "AWAITING_SLOT" | "RESCHEDULE_SLOT">,
+) {
+  const preset = await getOrgPreset(orgId);
+  const slots = await prisma.appointmentSlot.findMany({
+    where: { organizationId: orgId, isBooked: false, serviceName, startTime: { gte: nowInstant() } },
+    orderBy: { startTime: "asc" },
+    take: 10, // WhatsApp interactive lists allow at most 10 rows total
+  });
+
+  if (slots.length === 0) {
+    await reply(phone, contactId, orgId, `No open times left for *${serviceName}* right now. Reply *BOOK* to pick another option. 😊`);
+    return;
+  }
+
+  const attrs = await getAttrs(contactId);
+  attrs.appt_slots = slots.map((s) => s.id);
+  attrs.appt_service = serviceName;
+  attrs.appt_state = state;
+  await saveAttrs(contactId, attrs);
+
+  // Group times into per-day sections for the interactive list.
+  const sectionsMap: Record<string, typeof slots> = {};
+  for (const s of slots) {
+    const day = formatSlotDayLong(s.startTime);
+    (sectionsMap[day] ||= []).push(s);
+  }
+  const sections = Object.keys(sectionsMap)
+    .slice(0, 10)
+    .map((day) => ({
+      title: day.substring(0, 24),
+      rows: sectionsMap[day].map((s) => ({
+        id: `appt_slot_${s.id}`,
+        title: formatSlotTime(s.startTime).substring(0, 24),
+        description: `${s.durationMinutes} min · ${feeLabel(s.price, preset)}`.substring(0, 72),
+      })),
+    }));
+
+  const verb = state === "RESCHEDULE_SLOT" ? "Reschedule" : "Book";
+  const result = await sendWhatsAppMessage(
+    {
+      to: formatPhoneNumber(phone),
+      list: {
+        buttonText: "View Times",
+        title: `${verb}: ${serviceName}`.substring(0, 24),
+        description: `Pick a time for your ${preset.bookingNoun} with ${serviceName}.`.substring(0, 72),
+        sections,
+      },
+    },
+    orgId,
+  );
+  if (result.ok) {
+    await logBotMessage(contactId, orgId, `Sent available times for ${serviceName}.`, result.data?.messages?.[0]?.id);
+    return;
+  }
+
+  // Numbered text fallback.
+  let text = `📅 *${verb}: ${serviceName}*\n\n`;
+  slots.forEach((s, i) => {
+    text += `*${i + 1}.* ${formatSlotDateTime(s.startTime)} · ${feeLabel(s.price, preset)}\n`;
+  });
+  text += `\nReply with the *number* of the time you'd like.`;
+  await reply(phone, contactId, orgId, text);
+}
+
+// ─── Slot selection → name capture ────────────────────────────────────────────
+
+/** Resolve a slot id from an interactive list id or a numbered reply. */
+function resolveSlotId(text: string, attrs: Attrs, activeStates: ApptState[]): string | null {
   const lower = text.trim().toLowerCase();
   const listMatch = lower.match(/^appt_slot_(.+)$/);
   if (listMatch) return listMatch[1];
-
-  if (/^\d+$/.test(lower)) {
+  if (/^\d+$/.test(lower) && activeStates.includes(attrs.appt_state as ApptState)) {
     const idx = parseInt(lower, 10) - 1;
-    const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { attributes: true } });
-    const attrs = (contact?.attributes as Record<string, unknown>) || {};
-    // Only treat a bare number as a slot pick when the contact is actively
-    // choosing a slot. Otherwise "1"/"2" belong to the main menu.
-    if (attrs.appt_state !== "AWAITING_SLOT_SELECTION") return null;
-    const offered = (attrs.appt_offered as string[] | undefined) || [];
+    const offered = (attrs.appt_slots as string[] | undefined) || [];
     if (idx >= 0 && idx < offered.length) return offered[idx];
   }
   return null;
 }
 
-async function bookSlotInstantly(
-  slotId: string,
-  phone: string,
-  contactId: string,
-  orgId: string,
-  preset: AppointmentPreset
-) {
-  // Atomically claim the free slot: only succeeds if still unbooked.
+async function handleSlotSelected(phone: string, contactId: string, orgId: string, slotId: string) {
+  const preset = await getOrgPreset(orgId);
+  const slot = await prisma.appointmentSlot.findFirst({ where: { id: slotId, organizationId: orgId } });
+  if (!slot || slot.isBooked) {
+    await reply(phone, contactId, orgId, "That time was just taken. Reply *BOOK* to see what's still available.");
+    return;
+  }
+
+  const attrs = await getAttrs(contactId);
+  attrs.appt_pending_slot = slotId;
+  const savedName = typeof attrs.appt_name === "string" ? attrs.appt_name : "";
+
+  if (savedName) {
+    attrs.appt_state = "AWAITING_NAME_CONFIRM" satisfies ApptState;
+    await saveAttrs(contactId, attrs);
+    const text = `Booking *${slot.serviceName}* on ${formatSlotDateTime(slot.startTime)}.
+
+Who is this ${preset.bookingNoun} for?`;
+    await reply(phone, contactId, orgId, text, [
+      { type: "reply", reply: { id: "appt_name_yes", title: `✅ ${savedName}`.substring(0, 20) } },
+      { type: "reply", reply: { id: "appt_name_new", title: "✏️ Someone else" } },
+    ]);
+    return;
+  }
+
+  attrs.appt_state = "AWAITING_NAME" satisfies ApptState;
+  await saveAttrs(contactId, attrs);
+  await reply(phone, contactId, orgId, `Who is this ${preset.bookingNoun} for? Please reply with the ${preset.clientLabel.toLowerCase()}.`);
+}
+
+async function confirmBookingForName(phone: string, contactId: string, orgId: string, name: string) {
+  const preset = await getOrgPreset(orgId);
+  const attrs = await getAttrs(contactId);
+  const slotId = typeof attrs.appt_pending_slot === "string" ? attrs.appt_pending_slot : "";
+  if (!slotId) {
+    await sendAppointmentMenu(phone, contactId, orgId);
+    return;
+  }
+
+  // Atomically claim the slot — only the first booker wins.
   const claimed = await prisma.appointmentSlot.updateMany({
     where: { id: slotId, organizationId: orgId, isBooked: false },
-    data: { isBooked: true, paymentStatus: "free", contactId, holdExpiresAt: null },
+    data: { isBooked: true },
   });
-
   if (claimed.count === 0) {
-    const text = "Sorry, that slot was just taken. Reply *BOOK* to see what's still available.";
-    const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
-    await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
+    await reply(phone, contactId, orgId, "Sorry, that time was just taken. Reply *BOOK* to see what's still available.");
+    await sendAppointmentMenu(phone, contactId, orgId);
     return;
   }
 
   const slot = await prisma.appointmentSlot.findUnique({ where: { id: slotId } });
+  if (!slot) return;
+
+  await prisma.booking.create({
+    data: {
+      slotId: slot.id,
+      serviceName: slot.serviceName,
+      startTime: slot.startTime,
+      price: slot.price,
+      bookingForName: name,
+      status: "booked",
+      contactId,
+      organizationId: orgId,
+    },
+  });
+
+  // Remember the name for one-tap reuse; clear transient browse state.
+  attrs.appt_name = name;
+  attrs.appt_state = "MENU" satisfies ApptState;
+  delete attrs.appt_pending_slot;
+  delete attrs.appt_slots;
+  delete attrs.appt_service;
+  await saveAttrs(contactId, attrs);
+
+  const feeNote = slot.price > 0
+    ? `💳 ${preset.feeLabel}: *${formatPrice(slot.price)}* — pay at the venue.`
+    : `💳 No payment required.`;
   const text = `✅ *${capitalize(preset.bookingNoun)} Confirmed!* 🎉
 
-*${slot?.serviceName}*
-🗓️ ${slot ? formatSlotTime(slot.startTime) : ""}
-💳 No payment required — you're all set!
-
-Reply *MY BOOKINGS* anytime to review your ${preset.bookingNoun}s.`;
-  const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
-  await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
-
-  await logSystemEvent(orgId, `Free ${preset.bookingNoun} booked: ${slot?.serviceName}`);
-}
-
-async function reserveAndSendPaymentLink(
-  slotId: string,
-  phone: string,
-  contactId: string,
-  contactName: string,
-  orgId: string,
-  preset: AppointmentPreset
-) {
-  // Soft-hold the slot: claim it only if currently free or its prior hold lapsed.
-  const holdExpiresAt = new Date(Date.now() + HOLD_MINUTES * 60 * 1000);
-  const held = await prisma.appointmentSlot.updateMany({
-    where: {
-      id: slotId,
-      organizationId: orgId,
-      isBooked: false,
-      ...activeHoldFilter(),
-    },
-    data: { paymentStatus: "pending", holdExpiresAt, contactId },
-  });
-
-  if (held.count === 0) {
-    const text = "Sorry, that slot is no longer available. Reply *BOOK* to see open slots.";
-    const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
-    await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
-    return;
-  }
-
-  const slot = await prisma.appointmentSlot.findUnique({ where: { id: slotId } });
-  if (!slot) return;
-
-  let link: { id: string; short_url: string };
-  try {
-    link = await createRazorpayPaymentLink(slot.price, `APPT-${slot.id.slice(0, 8)}`, phone, contactName, orgId);
-  } catch (err) {
-    console.error("[Appointment] Failed to create payment link", err);
-    // Release the hold so the slot isn't stranded.
-    await prisma.appointmentSlot.updateMany({
-      where: { id: slotId },
-      data: { paymentStatus: "none", holdExpiresAt: null, contactId: null },
-    });
-    // Surface the failure on the merchant's dashboard so they can diagnose
-    // a broken / disconnected Razorpay integration without reading server logs.
-    await logIntegrationError(
-      orgId,
-      `Appointment booking failed: ${(err as Error)?.message || String(err)}`
-    );
-    const text = "We couldn't generate a payment link right now. Please try again in a moment.";
-    const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
-    await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
-    return;
-  }
-
-  await prisma.appointmentSlot.update({
-    where: { id: slotId },
-    data: { razorpayPaymentLinkId: link.id },
-  });
-
-  const text = `🧾 *${capitalize(preset.bookingNoun)} Reservation*
-
 *${slot.serviceName}*
-🗓️ ${formatSlotTime(slot.startTime)}
-💰 ${preset.feeLabel}: *${formatPrice(slot.price)}*
+👤 ${preset.clientLabel}: ${name}
+🗓️ ${formatSlotDateTime(slot.startTime)}
+${feeNote}
 
-This slot is held for you for *${HOLD_MINUTES} minutes*.
-
-💳 *Pay to confirm:*
-${link.short_url}
-
-After paying, tap *✅ Paid* below to lock your ${preset.bookingNoun}.`;
-
-  const result = await sendWhatsAppMessage(
-    {
-      to: formatPhoneNumber(phone),
-      text,
-      buttons: [{ type: "reply", reply: { id: "appt_confirm", title: "✅ Paid" } }],
-    },
-    orgId
-  );
-  await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
+Reply *MY BOOKINGS* anytime to view, reschedule, or cancel.`;
+  await reply(phone, contactId, orgId, text);
+  await logSystemEvent(orgId, `${capitalize(preset.bookingNoun)} booked: ${slot.serviceName} for ${name}`);
 }
 
-// ─── Confirm receipt (manual re-check) ──────────────────────────────────────
-
-async function confirmAppointmentPayment(phone: string, contactId: string, orgId: string, preset: AppointmentPreset) {
-  // The most recent slot this contact is holding/has paid for.
-  const slot = await prisma.appointmentSlot.findFirst({
-    where: { contactId, organizationId: orgId },
-    orderBy: { updatedAt: "desc" },
-  });
-
-  if (!slot || slot.paymentStatus === "none") {
-    const text = "You don't have a pending reservation. Reply *BOOK* to see available slots.";
-    const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
-    await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
-    return;
-  }
-
-  if (slot.isBooked && slot.paymentStatus === "paid") {
-    await sendBookingConfirmed(phone, contactId, orgId, slot.id, preset);
-    return;
-  }
-
-  // Re-check the live payment-link status with Razorpay.
-  let paid = false;
-  let shortUrl = "";
-  if (slot.razorpayPaymentLinkId) {
-    try {
-      const rzp = await getRazorpayInstance(orgId);
-      const plink = await (rzp.paymentLink as unknown as Record<string, (id: string) => Promise<{ status?: string; short_url?: string }>>).fetch(slot.razorpayPaymentLinkId);
-      paid = plink?.status === "paid";
-      shortUrl = plink?.short_url || "";
-    } catch (err) {
-      console.error("[Appointment] Failed to fetch payment link status", err);
-    }
-  }
-
-  if (paid) {
-    await prisma.appointmentSlot.update({
-      where: { id: slot.id },
-      data: { isBooked: true, paymentStatus: "paid", holdExpiresAt: null },
-    });
-    await sendBookingConfirmed(phone, contactId, orgId, slot.id, preset);
-    await logSystemEvent(orgId, `Paid ${preset.bookingNoun} confirmed: ${slot.serviceName}`);
-    return;
-  }
-
-  const linkStr = shortUrl ? `\n\n💳 *Pay here:* ${shortUrl}` : "";
-  const text = `⚠️ We haven't received payment for *${slot.serviceName}* yet.${linkStr}\n\nOnce paid, tap *✅ Paid* again.`;
-  const result = await sendWhatsAppMessage(
-    {
-      to: formatPhoneNumber(phone),
-      text,
-      buttons: shortUrl ? [{ type: "reply", reply: { id: "appt_confirm", title: "✅ Paid" } }] : undefined,
-    },
-    orgId
-  );
-  await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
-}
-
-/** Dispatch the confirmation receipt for a locked booking (used by bot + webhook). */
-export async function sendBookingConfirmed(
-  phone: string,
-  contactId: string,
-  orgId: string,
-  slotId: string,
-  preset?: AppointmentPreset
-) {
-  const resolved = preset || (await getOrgPreset(orgId));
-  const slot = await prisma.appointmentSlot.findUnique({ where: { id: slotId } });
-  if (!slot) return;
-
-  const text = `✅ *${capitalize(resolved.bookingNoun)} Confirmed!* 🎉
-
-*${slot.serviceName}*
-🗓️ ${formatSlotTime(slot.startTime)}
-💳 Paid: *${formatPrice(slot.price)}*
-
-Thank you! Reply *MY BOOKINGS* anytime to review your ${resolved.bookingNoun}s.`;
-  const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
-  await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
-}
-
-// ─── My bookings ─────────────────────────────────────────────────────────────
+// ─── My bookings & management ─────────────────────────────────────────────────
 
 export async function sendMyBookings(phone: string, contactId: string, orgId: string) {
   const preset = await getOrgPreset(orgId);
-  const slots = await prisma.appointmentSlot.findMany({
-    where: { contactId, organizationId: orgId, isBooked: true },
+  const bookings = await prisma.booking.findMany({
+    where: { contactId, organizationId: orgId, status: "booked", startTime: { gte: nowInstant() } },
     orderBy: { startTime: "asc" },
     take: 10,
   });
 
-  if (slots.length === 0) {
-    const text = `You don't have any confirmed ${preset.bookingNoun}s yet. Reply *BOOK* to schedule one! 😊`;
-    const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
-    await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
+  if (bookings.length === 0) {
+    await reply(phone, contactId, orgId, `You don't have any upcoming ${preset.bookingNoun}s. Reply *BOOK* to schedule one! 😊`);
+    return;
+  }
+
+  const attrs = await getAttrs(contactId);
+  attrs.appt_bookings = bookings.map((b) => b.id);
+  attrs.appt_state = "MANAGING" satisfies ApptState;
+  delete attrs.appt_active_booking;
+  await saveAttrs(contactId, attrs);
+
+  const result = await sendWhatsAppMessage(
+    {
+      to: formatPhoneNumber(phone),
+      list: {
+        buttonText: "View Bookings",
+        title: `Your ${preset.bookingNoun}s`.substring(0, 24),
+        description: "Tap a booking to reschedule or cancel it.",
+        sections: [
+          {
+            title: "Upcoming".substring(0, 24),
+            rows: bookings.map((b) => ({
+              id: `appt_bk_${b.id}`,
+              title: b.serviceName.substring(0, 24),
+              description: `${formatSlotDateTime(b.startTime)} · ${b.bookingForName}`.substring(0, 72),
+            })),
+          },
+        ],
+      },
+    },
+    orgId,
+  );
+  if (result.ok) {
+    await logBotMessage(contactId, orgId, "Sent upcoming bookings.", result.data?.messages?.[0]?.id);
     return;
   }
 
   let text = `📋 *Your ${capitalize(preset.bookingNoun)}s*\n\n`;
-  slots.forEach((s) => {
-    const fee = s.price > 0 ? `${CURRENCY_SYMBOL}${(s.price / 100).toFixed(2)}` : "Free";
-    text += `*${s.serviceName}*\n🗓️ ${formatSlotTime(s.startTime)} · ${fee}\n\n`;
+  bookings.forEach((b, i) => {
+    text += `*${i + 1}.* ${b.serviceName}\n   ${formatSlotDateTime(b.startTime)} · ${b.bookingForName}\n\n`;
   });
-  const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text }, orgId);
-  await logBotMessage(contactId, orgId, text, result.data?.messages?.[0]?.id);
+  text += `Reply with the *number* of the ${preset.bookingNoun} to manage it.`;
+  await reply(phone, contactId, orgId, text);
+}
+
+function resolveBookingId(text: string, attrs: Attrs): string | null {
+  const lower = text.trim().toLowerCase();
+  const listMatch = lower.match(/^appt_bk_(.+)$/);
+  if (listMatch) return listMatch[1];
+  if (/^\d+$/.test(lower) && attrs.appt_state === "MANAGING") {
+    const idx = parseInt(lower, 10) - 1;
+    const offered = (attrs.appt_bookings as string[] | undefined) || [];
+    if (idx >= 0 && idx < offered.length) return offered[idx];
+  }
+  return null;
+}
+
+async function manageBooking(phone: string, contactId: string, orgId: string, bookingId: string) {
+  const preset = await getOrgPreset(orgId);
+  const booking = await prisma.booking.findFirst({ where: { id: bookingId, contactId, organizationId: orgId } });
+  if (!booking || booking.status !== "booked") {
+    await reply(phone, contactId, orgId, "That booking isn't available anymore. Reply *MY BOOKINGS* to refresh.");
+    return;
+  }
+
+  const attrs = await getAttrs(contactId);
+  attrs.appt_active_booking = bookingId;
+  attrs.appt_state = "MANAGING" satisfies ApptState;
+  await saveAttrs(contactId, attrs);
+
+  const text = `📋 *${booking.serviceName}*
+👤 ${preset.clientLabel}: ${booking.bookingForName}
+🗓️ ${formatSlotDateTime(booking.startTime)}
+💳 ${feeLabel(booking.price, preset)}
+
+What would you like to do?`;
+  await reply(phone, contactId, orgId, text, [
+    { type: "reply", reply: { id: "appt_resched", title: "🔁 Reschedule" } },
+    { type: "reply", reply: { id: "appt_cancel", title: "❌ Cancel" } },
+  ]);
+}
+
+async function cancelActiveBooking(phone: string, contactId: string, orgId: string) {
+  const preset = await getOrgPreset(orgId);
+  const attrs = await getAttrs(contactId);
+  const bookingId = typeof attrs.appt_active_booking === "string" ? attrs.appt_active_booking : "";
+  const booking = bookingId
+    ? await prisma.booking.findFirst({ where: { id: bookingId, contactId, organizationId: orgId } })
+    : null;
+
+  if (!booking || booking.status !== "booked") {
+    await reply(phone, contactId, orgId, "That booking isn't active anymore. Reply *MY BOOKINGS* to refresh.");
+    await sendAppointmentMenu(phone, contactId, orgId);
+    return;
+  }
+
+  await prisma.booking.update({ where: { id: booking.id }, data: { status: "cancelled" } });
+  if (booking.slotId) {
+    await prisma.appointmentSlot.updateMany({ where: { id: booking.slotId }, data: { isBooked: false } });
+  }
+
+  attrs.appt_state = "MENU" satisfies ApptState;
+  delete attrs.appt_active_booking;
+  await saveAttrs(contactId, attrs);
+
+  await reply(phone, contactId, orgId, `✅ Your ${preset.bookingNoun} for *${booking.serviceName}* on ${formatSlotDateTime(booking.startTime)} has been cancelled. Reply *BOOK* to schedule a new one.`);
+  await logSystemEvent(orgId, `${capitalize(preset.bookingNoun)} cancelled by customer: ${booking.serviceName}`);
+}
+
+async function startReschedule(phone: string, contactId: string, orgId: string) {
+  const attrs = await getAttrs(contactId);
+  const bookingId = typeof attrs.appt_active_booking === "string" ? attrs.appt_active_booking : "";
+  const booking = bookingId
+    ? await prisma.booking.findFirst({ where: { id: bookingId, contactId, organizationId: orgId } })
+    : null;
+
+  if (!booking || booking.status !== "booked") {
+    await reply(phone, contactId, orgId, "That booking isn't active anymore. Reply *MY BOOKINGS* to refresh.");
+    await sendAppointmentMenu(phone, contactId, orgId);
+    return;
+  }
+
+  attrs.appt_reschedule_booking = booking.id;
+  await saveAttrs(contactId, attrs);
+  // Reschedule keeps the same service; only the time changes.
+  await sendSlotsForService(phone, contactId, orgId, booking.serviceName, "RESCHEDULE_SLOT");
+}
+
+async function completeReschedule(phone: string, contactId: string, orgId: string, newSlotId: string) {
+  const preset = await getOrgPreset(orgId);
+  const attrs = await getAttrs(contactId);
+  const bookingId = typeof attrs.appt_reschedule_booking === "string" ? attrs.appt_reschedule_booking : "";
+  const booking = bookingId
+    ? await prisma.booking.findFirst({ where: { id: bookingId, contactId, organizationId: orgId } })
+    : null;
+
+  if (!booking || booking.status !== "booked") {
+    await reply(phone, contactId, orgId, "That booking isn't active anymore. Reply *MY BOOKINGS* to refresh.");
+    await sendAppointmentMenu(phone, contactId, orgId);
+    return;
+  }
+
+  // Claim the new time atomically before releasing the old one.
+  const claimed = await prisma.appointmentSlot.updateMany({
+    where: { id: newSlotId, organizationId: orgId, isBooked: false },
+    data: { isBooked: true },
+  });
+  if (claimed.count === 0) {
+    await reply(phone, contactId, orgId, "Sorry, that time was just taken. Reply *MY BOOKINGS* to try a different time.");
+    return;
+  }
+
+  const newSlot = await prisma.appointmentSlot.findUnique({ where: { id: newSlotId } });
+  if (!newSlot) return;
+
+  // Free the old slot and repoint the booking at the new time.
+  if (booking.slotId && booking.slotId !== newSlotId) {
+    await prisma.appointmentSlot.updateMany({ where: { id: booking.slotId }, data: { isBooked: false } });
+  }
+  await prisma.booking.update({
+    where: { id: booking.id },
+    data: { slotId: newSlot.id, serviceName: newSlot.serviceName, startTime: newSlot.startTime, price: newSlot.price },
+  });
+
+  attrs.appt_state = "MENU" satisfies ApptState;
+  delete attrs.appt_reschedule_booking;
+  delete attrs.appt_active_booking;
+  delete attrs.appt_slots;
+  delete attrs.appt_service;
+  await saveAttrs(contactId, attrs);
+
+  await reply(phone, contactId, orgId, `🔁 *${capitalize(preset.bookingNoun)} Rescheduled!* 🎉
+
+*${newSlot.serviceName}*
+🗓️ ${formatSlotDateTime(newSlot.startTime)}
+
+Reply *MY BOOKINGS* anytime to review.`);
+  await logSystemEvent(orgId, `${capitalize(preset.bookingNoun)} rescheduled: ${newSlot.serviceName}`);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
 
 function nowTimeStr(): string {
   const d = new Date();
@@ -436,60 +559,94 @@ async function logSystemEvent(orgId: string, message: string) {
   });
 }
 
-async function logIntegrationError(orgId: string, message: string) {
-  await prisma.systemLog.create({
-    data: { timestamp: nowTimeStr(), type: "integration", message, organizationId: orgId },
-  });
-}
-
 // ─── Router ──────────────────────────────────────────────────────────────────
 
 export async function handleAppointmentMessage(
   text: string,
   phone: string,
   contactId: string,
-  orgId: string
+  orgId: string,
 ): Promise<boolean> {
   const lower = text.trim().toLowerCase();
-  const preset = await getOrgPreset(orgId);
+  const attrs = await getAttrs(contactId);
+  const state = attrs.appt_state as ApptState | undefined;
 
-  // Slot selection (interactive list id or numbered reply) takes priority.
-  const slotId = await resolveSelectedSlotId(text, contactId);
+  // 1. Slot selection (interactive id or numbered reply while browsing/rescheduling).
+  const slotId = resolveSlotId(text, attrs, ["AWAITING_SLOT", "RESCHEDULE_SLOT"]);
   if (slotId) {
-    const slot = await prisma.appointmentSlot.findFirst({
-      where: { id: slotId, organizationId: orgId },
-    });
-    if (!slot) {
-      const t = "That slot is no longer available. Reply *BOOK* to see open slots.";
-      const result = await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: t }, orgId);
-      await logBotMessage(contactId, orgId, t, result.data?.messages?.[0]?.id);
+    if (state === "RESCHEDULE_SLOT") {
+      await completeReschedule(phone, contactId, orgId, slotId);
+    } else {
+      await handleSlotSelected(phone, contactId, orgId, slotId);
+    }
+    return true;
+  }
+
+  // 2. Service / provider selection.
+  const svcMatch = lower.match(/^appt_svc_(\d+)$/);
+  if (svcMatch || (/^\d+$/.test(lower) && state === "AWAITING_SERVICE")) {
+    const idx = svcMatch ? parseInt(svcMatch[1], 10) : parseInt(lower, 10) - 1;
+    const services = (attrs.appt_services as string[] | undefined) || [];
+    if (idx >= 0 && idx < services.length) {
+      await sendSlotsForService(phone, contactId, orgId, services[idx], "AWAITING_SLOT");
       return true;
     }
-    const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { name: true } });
-    if (slot.price > 0) {
-      await reserveAndSendPaymentLink(slotId, phone, contactId, contact?.name || "Customer", orgId, preset);
-    } else {
-      await bookSlotInstantly(slotId, phone, contactId, orgId, preset);
+  }
+
+  // 3. Booking selection (manage an existing booking).
+  const bookingId = resolveBookingId(text, attrs);
+  if (bookingId) {
+    await manageBooking(phone, contactId, orgId, bookingId);
+    return true;
+  }
+
+  // 4. Name confirmation buttons.
+  if (lower === "appt_name_yes") {
+    const savedName = typeof attrs.appt_name === "string" ? attrs.appt_name : "";
+    if (savedName) {
+      await confirmBookingForName(phone, contactId, orgId, savedName);
+      return true;
     }
+  }
+  if (lower === "appt_name_new") {
+    const preset = await getOrgPreset(orgId);
+    attrs.appt_state = "AWAITING_NAME" satisfies ApptState;
+    await saveAttrs(contactId, attrs);
+    await reply(phone, contactId, orgId, `Who is this ${preset.bookingNoun} for? Please reply with the ${preset.clientLabel.toLowerCase()}.`);
     return true;
   }
 
-  if (lower === "appt_book" || lower === "1" || ["book", "slots", "slot", "booking"].includes(lower) || lower.includes("book")) {
-    await sendAvailableSlots(phone, contactId, orgId);
+  // 5. Free-text name capture (only while we're actually waiting for a name and
+  //    the message isn't a navigation keyword).
+  if ((state === "AWAITING_NAME" || state === "AWAITING_NAME_CONFIRM") && !NAV_WORDS.has(lower) && text.trim().length > 0) {
+    await confirmBookingForName(phone, contactId, orgId, text.trim().slice(0, 80));
     return true;
   }
 
-  if (lower === "appt_bookings" || lower === "2" || ["bookings", "my bookings", "appointments"].includes(lower)) {
+  // 6. Manage-booking actions.
+  if (lower === "appt_resched") {
+    await startReschedule(phone, contactId, orgId);
+    return true;
+  }
+  if (lower === "appt_cancel") {
+    await cancelActiveBooking(phone, contactId, orgId);
+    return true;
+  }
+
+  // 7. Book.
+  if (lower === "appt_book" || (lower === "1" && (state === "MENU" || state === undefined)) || ["book", "slots", "slot", "booking"].includes(lower)) {
+    await sendServiceChoices(phone, contactId, orgId);
+    return true;
+  }
+
+  // 8. My Bookings.
+  if (lower === "appt_bookings" || (lower === "2" && (state === "MENU" || state === undefined)) || ["bookings", "my bookings", "appointments"].includes(lower)) {
     await sendMyBookings(phone, contactId, orgId);
     return true;
   }
 
-  if (lower === "appt_confirm" || lower === "confirm_order" || lower === "confirm" || lower.includes("paid")) {
-    await confirmAppointmentPayment(phone, contactId, orgId, preset);
-    return true;
-  }
-
-  if (["menu", "hi", "hello", "start", "help"].includes(lower) || lower.includes("main menu")) {
+  // 9. Menu / greetings / nav.
+  if (NAV_WORDS.has(lower)) {
     await sendAppointmentMenu(phone, contactId, orgId);
     return true;
   }
