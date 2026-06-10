@@ -41,8 +41,16 @@ model Organization {
   // Onboarding state
   onboardingDismissed      Boolean    @default(false)
 
-  // Marketplace Bot state
+  // Marketplace Bot state (legacy flag, kept in sync with activeUseCase)
   marketplaceBotEnabled    Boolean    @default(false)
+
+  // Active WhatsApp use-case agent: "NONE" | "MARKETPLACE" | "APPOINTMENT".
+  // Exactly one agent type is active at a time; switching deactivates the previous one.
+  activeUseCase            String     @default("NONE")
+
+  // Terminology preset for the appointment agent:
+  // "HEALTHCARE" | "HOSPITALITY" | "EDUCATION" | "CORPORATE"
+  appointmentPreset        String     @default("HEALTHCARE")
 
   // Chatbot Builder state
   chatbotBuilderEnabled    Boolean    @default(true)
@@ -77,6 +85,7 @@ model Organization {
   apiKeys              ApiKey[]
   webhookSubscriptions WebhookSubscription[]
   attributionTouches   AttributionTouch[]
+  appointmentSlots     AppointmentSlot[]
 
   // Flow Encryption automation state
   flowsPrivateKey      String?    @db.Text
@@ -125,6 +134,7 @@ model Contact {
   enrollments    SequenceEnrollment[]
   flowResponses  FlowResponse[]
   attributionTouches AttributionTouch[]
+  appointmentSlots   AppointmentSlot[]
   sourceAdId     String?      // Tracks the Meta Ad ID that originated this contact
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -316,6 +326,31 @@ model OrderItem {
   name      String
   price     Int
   quantity  Int
+}
+
+// Appointment Booking use-case agent: a bookable time slot (doctor, table,
+// interviewer, service desk — label depends on the org's appointmentPreset).
+// Paid slots (price > 0) are soft-held while a Razorpay payment link is
+// outstanding and confirmed by the payment webhook; free slots book instantly.
+model AppointmentSlot {
+  id                    String       @id @default(uuid())
+  serviceName           String       // preset-dependent label: doctor / table / interviewer / agent
+  startTime             DateTime
+  durationMinutes       Int          @default(30)
+  price                 Int          @default(0) // in paise; 0 = free slot
+  isBooked              Boolean      @default(false)
+  paymentStatus         String       @default("none") // "none" | "pending" | "paid" | "free"
+  razorpayPaymentLinkId String?      @unique          // plink_ id while checkout is outstanding
+  holdExpiresAt         DateTime?                     // soft-hold expiry (30 min) for paid checkouts
+  contactId             String?
+  contact               Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@index([organizationId, isBooked, startTime])
+  @@index([organizationId, contactId])
 }
 
 model WhatsAppLoginAttempt {

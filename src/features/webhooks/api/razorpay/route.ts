@@ -55,6 +55,27 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "No order identifier in payload" }, { status: 400 });
       }
 
+      // ─── Appointment slot paid via payment link ──────────────────
+      // Appointments track payment on the slot itself (slot-native), so they
+      // never create Order rows. Check slots first and short-circuit.
+      const slot = await prisma.appointmentSlot.findUnique({
+        where: { razorpayPaymentLinkId: razorpayOrderId },
+        include: { contact: true },
+      });
+      if (slot) {
+        if (!slot.isBooked) {
+          await prisma.appointmentSlot.update({
+            where: { id: slot.id },
+            data: { isBooked: true, paymentStatus: "paid", holdExpiresAt: null },
+          });
+        }
+        if (slot.contact && slot.contactId) {
+          const { sendBookingConfirmed } = await import("@/shared/lib/appointment");
+          await sendBookingConfirmed(slot.contact.phone, slot.contactId, slot.organizationId, slot.id);
+        }
+        return NextResponse.json({ status: "ok" });
+      }
+
       const order = await prisma.order.findFirst({
         where: { razorpayOrderId },
         include: { contact: true },
@@ -99,6 +120,20 @@ We'll notify you when it ships. Reply *ORDERS* to check status anytime.`;
         razorpayOrderId = payload.payload?.payment_link?.entity?.id;
       }
       if (razorpayOrderId) {
+        // Release a soft-held appointment slot so it becomes bookable again.
+        const failedSlot = await prisma.appointmentSlot.findUnique({
+          where: { razorpayPaymentLinkId: razorpayOrderId },
+        });
+        if (failedSlot) {
+          if (!failedSlot.isBooked) {
+            await prisma.appointmentSlot.update({
+              where: { id: failedSlot.id },
+              data: { paymentStatus: "none", holdExpiresAt: null, contactId: null, razorpayPaymentLinkId: null },
+            });
+          }
+          return NextResponse.json({ status: "ok" });
+        }
+
         const order = await prisma.order.findFirst({
           where: { razorpayOrderId },
           include: { contact: true },

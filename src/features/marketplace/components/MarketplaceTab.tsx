@@ -65,7 +65,7 @@ function simplifyCartRecoveryError(raw?: string): string {
   return "Something went wrong while turning this on. Please wait a moment and try again.";
 }
 
-export const MarketplaceTab: React.FC = () => {
+export const MarketplaceTab: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const params = useParams();
   const orgId = params.orgId as string;
 
@@ -284,18 +284,20 @@ export const MarketplaceTab: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 pb-12 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9]">
+    <div className={embedded ? "space-y-6 sm:space-y-8" : "flex-1 overflow-y-auto p-4 pb-12 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9]"}>
       {/* Dynamic Header Layout */}
-      <div className="flex max-lg:flex-col gap-4 lg:flex-row lg:items-center justify-between border-b border-stone-200 pb-6 select-none">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-none bg-stone-950 flex items-center justify-center border border-stone-950 shrink-0">
-            <ShoppingBag className="w-5 h-5 text-white" />
+      <div className={`flex max-lg:flex-col gap-4 lg:flex-row lg:items-center select-none ${embedded ? "justify-end" : "justify-between border-b border-stone-200 pb-6"}`}>
+        {!embedded && (
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-none bg-stone-950 flex items-center justify-center border border-stone-950 shrink-0">
+              <ShoppingBag className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-stone-900 uppercase">Marketplace</h1>
+              <p className="text-xs text-stone-500">Manage products and orders</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-stone-900 uppercase">Marketplace</h1>
-            <p className="text-xs text-stone-500">Manage products and orders</p>
-          </div>
-        </div>
+        )}
         <div className="grid grid-cols-3 max-lg:w-full lg:flex lg:w-auto gap-1">
           <button
             onClick={() => setActiveSection("overview")}
@@ -333,6 +335,7 @@ export const MarketplaceTab: React.FC = () => {
             <StatCard icon={ExternalLink} label="Revenue (paid)" value={`₹${(stats.revenue / 100).toFixed(2)}`} />
           </div>
 
+          {!embedded && (
           <div className="bg-white rounded-none p-5 sm:p-8 border border-stone-200 hover:border-stone-400 transition-colors duration-300 animate-fade-in flex max-md:flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
@@ -363,6 +366,7 @@ export const MarketplaceTab: React.FC = () => {
               </button>
             </div>
           </div>
+          )}
 
           <div className="bg-white rounded-none p-5 sm:p-8 border border-stone-200 hover:border-stone-400 transition-colors duration-300 animate-fade-in flex max-md:flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2">

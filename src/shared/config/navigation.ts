@@ -4,7 +4,7 @@ import {
   Megaphone,
   FileText,
   Cpu,
-  ShoppingBag,
+  LayoutGrid,
   Settings,
   BarChart3,
   Users,
@@ -37,7 +37,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "analytics", label: "Analytics", icon: BarChart3, keywords: ["reports", "stats", "metrics"] },
   { id: "ads", label: "Ads", icon: Target, keywords: ["advertising", "marketing"] },
   { id: "integrations", label: "Integrations", icon: Plug, keywords: ["shopify", "connect", "apps"] },
-  { id: "marketplace", label: "Marketplace", icon: ShoppingBag, keywords: ["products", "store", "catalog", "orders"] },
+  { id: "usecases", label: "Use Cases", icon: LayoutGrid, keywords: ["marketplace", "products", "store", "catalog", "orders", "appointment", "booking", "slots", "agent", "bot"] },
   { id: "settings", label: "Settings", icon: Settings, keywords: ["preferences", "account", "whatsapp"] },
 ];
 

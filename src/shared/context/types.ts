@@ -11,6 +11,9 @@ export interface Organization {
   onboardingDismissed?: boolean;
   walletBalance?: number;
   brandProfile?: BrandProfile | null;
+  marketplaceBotEnabled?: boolean;
+  activeUseCase?: "NONE" | "MARKETPLACE" | "APPOINTMENT";
+  appointmentPreset?: "HEALTHCARE" | "HOSPITALITY" | "EDUCATION" | "CORPORATE";
   [key: string]: unknown;
 }
 

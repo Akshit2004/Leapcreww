@@ -147,14 +147,14 @@ function generateSuggestions(
   const hasAbandonedCart = contacts.some((c) =>
     c.tags?.includes("abandoned_cart")
   );
-  if (hasAbandonedCart && activeTab !== "marketplace") {
+  if (hasAbandonedCart && activeTab !== "usecases") {
     suggestions.push({
       id: "abandoned-carts",
       title: "Abandoned carts detected",
       description: "Follow up with customers who left items in cart",
       icon: <ShoppingBag className="w-4 h-4 text-pink-500" />,
       priority: "medium",
-      action: { type: "go_to_tab", data: { tab: "marketplace" } },
+      action: { type: "go_to_tab", data: { tab: "usecases" } },
     });
   }
 

@@ -12,7 +12,7 @@ import { CampaignsTab } from "@/features/campaigns/components/CampaignsTab";
 import { TemplatesTab } from "@/features/templates/components/TemplatesTab";
 import { FlowsTab } from "@/features/flows/components/FlowsTab";
 import { ChatbotTab } from "@/features/chatbot/components/ChatbotTab";
-import { MarketplaceTab } from "@/features/marketplace/components/MarketplaceTab";
+import { UseCasesTab } from "@/features/usecases/components/UseCasesTab";
 import { SettingsTab } from "@/features/settings/components/SettingsTab";
 import { IntegrationsTab } from "@/features/integrations/components/IntegrationsTab";
 import { AnalyticsTab } from "@/features/analytics/components/AnalyticsTab";
@@ -138,8 +138,8 @@ function TenantDashboardInner() {
         return <FlowsTab />;
       case "chatbot":
         return <ChatbotTab />;
-      case "marketplace":
-        return <MarketplaceTab />;
+      case "usecases":
+        return <UseCasesTab />;
       case "integrations":
         return <IntegrationsTab />;
       case "settings":

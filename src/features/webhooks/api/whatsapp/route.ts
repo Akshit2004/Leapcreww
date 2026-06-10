@@ -4,6 +4,7 @@ import { prisma } from "@/shared/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { handleAutoResponder } from "@/shared/lib/autoresponder";
 import { handleMarketplaceMessage } from "@/shared/lib/marketplace";
+import { handleAppointmentMessage } from "@/shared/lib/appointment";
 import { resolveAttribution } from "@/features/analytics/services/attribution";
 import { handleNfmReply } from "../../services/webhookService";
 import {
@@ -449,20 +450,19 @@ async function processInboundMessage(
   if (contact.assignedAgent === "Bot") {
     const org = await prisma.organization.findUnique({
       where: { id: orgId },
-      select: { marketplaceBotEnabled: true },
+      select: { activeUseCase: true },
     });
 
-    if (org?.marketplaceBotEnabled) {
-      const marketplaceHandled = await handleMarketplaceMessage(
-        text,
-        contact.phone,
-        contact.id,
-        orgId
-      );
-      if (!marketplaceHandled) {
-        await handleAutoResponder(contact.id, orgId);
-      }
-    } else {
+    // Route to the active use-case agent; fall through to the AI autoresponder
+    // when no agent owns the message (or none is active).
+    let handled = false;
+    if (org?.activeUseCase === "MARKETPLACE") {
+      handled = await handleMarketplaceMessage(text, contact.phone, contact.id, orgId);
+    } else if (org?.activeUseCase === "APPOINTMENT") {
+      handled = await handleAppointmentMessage(text, contact.phone, contact.id, orgId);
+    }
+
+    if (!handled) {
       await handleAutoResponder(contact.id, orgId);
     }
   }

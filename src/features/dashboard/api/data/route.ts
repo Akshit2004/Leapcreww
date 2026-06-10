@@ -47,6 +47,8 @@ export async function GET(
         walletBalance: true,
         onboardingDismissed: true,
         marketplaceBotEnabled: true,
+        activeUseCase: true,
+        appointmentPreset: true,
         chatbotBuilderEnabled: true,
         brandProfile: true,
       }

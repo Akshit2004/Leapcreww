@@ -8,7 +8,7 @@ import {
   FileText,
   Cpu,
   LogOut,
-  ShoppingBag,
+  LayoutGrid,
   Settings,
   BarChart3,
   Users,
@@ -82,7 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "analytics", label: "Analytics", icon: BarChart3 },
     { id: "ads", label: "Ads", icon: Target },
     { id: "integrations", label: "Integrations", icon: Plug },
-    { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
+    { id: "usecases", label: "Use Cases", icon: LayoutGrid },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
