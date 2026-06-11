@@ -1,0 +1,26 @@
+{
+  "name": "@wappflow/sdk",
+  "version": "1.0.0",
+  "description": "Official TypeScript / Node.js SDK for the WappFlow API",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest --passWithNoTests",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["whatsapp", "wappflow", "sdk", "messaging", "crm"],
+  "license": "MIT",
+  "engines": { "node": ">=18" },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "typescript": "^5.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wappflow/sdk-node"
+  }
+}

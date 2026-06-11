@@ -87,7 +87,7 @@ Return ONLY the raw JSON string array. Do not include any explanations, markdown
 
     // Server-side guardrail: sanitize all id/name fields to only contain alphabets and underscores
     function sanitize(val: string): string {
-      let s = val.replace(/[^a-zA-Z_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+      const s = val.replace(/[^a-zA-Z_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
       return s || "field_default";
     }
 
@@ -104,7 +104,7 @@ Return ONLY the raw JSON string array. Do not include any explanations, markdown
     // Ensure unique screen IDs
     const seenScreenIds = new Set<string>();
     for (const screen of sanitizedScreens) {
-      let base = screen.id;
+      const base = screen.id;
       let suffix = "";
       const letters = "abcdefghijklmnopqrstuvwxyz";
       let counter = 0;

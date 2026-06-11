@@ -1203,7 +1203,7 @@ export const CampaignsTab: React.FC = () => {
                           Approved Template Matched
                         </span>
                         <p className="text-[11px] text-emerald-700 leading-relaxed font-semibold">
-                          An approved template named <strong className="text-emerald-950 font-bold">"{strategistStrategy.template.name}"</strong> fits your objective.
+                          An approved template named <strong className="text-emerald-950 font-bold">&quot;{strategistStrategy.template.name}&quot;</strong> fits your objective.
                           WappFlow will reuse this template, so no new Meta registration is needed and you can launch immediately!
                         </p>
                       </div>
@@ -1217,7 +1217,7 @@ export const CampaignsTab: React.FC = () => {
                         </span>
                         <p className="text-[11px] text-amber-700 leading-relaxed font-semibold">
                           No suitable approved template was found in your library for this objective.
-                          To launch this strategy, WappFlow will submit the proposed template <strong className="text-amber-950 font-bold">"{strategistStrategy.template.name}"</strong> to Meta for approval.
+                          To launch this strategy, WappFlow will submit the proposed template <strong className="text-amber-950 font-bold">&quot;{strategistStrategy.template.name}&quot;</strong> to Meta for approval.
                         </p>
                       </div>
                     </div>

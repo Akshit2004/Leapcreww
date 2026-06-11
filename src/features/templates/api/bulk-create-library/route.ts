@@ -209,11 +209,8 @@ export async function POST(request: NextRequest) {
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;
 
-    const d = new Date();
-    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "crm",
         message: `Library template submission: ${successCount} succeeded, ${failCount} failed.`,
         organizationId,

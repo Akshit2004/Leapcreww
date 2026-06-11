@@ -8,6 +8,7 @@
 import type { SequenceStep, Contact } from "@prisma/client";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
 import { recordTouch } from "@/features/analytics/services/attribution";
+import { recordUsage } from "@/features/billing/services/billingService";
 import * as repo from "../repositories/sequenceRepo";
 import type { SequenceInput, SequenceTrigger } from "../types";
 
@@ -40,15 +41,24 @@ export function createSequence(input: SequenceInput) {
 /**
  * Enroll a contact into every active sequence matching a trigger.
  * Idempotent per (sequence, contact) while an enrollment is active.
+ * `triggerMeta.tag` narrows tag_added sequences: only sequences whose
+ * triggerConfig.tag matches are enrolled.
  */
 export async function enrollOnTrigger(
   organizationId: string,
   trigger: SequenceTrigger,
-  contactId: string
+  contactId: string,
+  triggerMeta?: { tag?: string }
 ) {
   const sequences = await repo.findActiveSequencesByTrigger(organizationId, trigger);
   for (const seq of sequences) {
     if (!seq.steps.length) continue;
+
+    // For tag_added sequences that specify a tag filter, enforce it.
+    if (trigger === "tag_added" && triggerMeta?.tag) {
+      const config = seq.triggerConfig as Record<string, unknown> | null;
+      if (config?.tag && config.tag !== triggerMeta.tag) continue;
+    }
 
     // Check segment restrictions if defined
     if (seq.segmentId) {
@@ -153,11 +163,8 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
         sentPreview = `[Template: ${templateName}]`;
       } else {
         // Log warning in DB system logs
-        const d = new Date();
-        const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
         await prisma.systemLog.create({
           data: {
-            timestamp: timeStr,
             type: "campaign",
             message: `⚠️ Skipped sequence step for ${contact.name}: Contact is outside the 24h window and no approved 'cart_recovery' template was successfully sent.`,
             organizationId,
@@ -179,6 +186,10 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
       bodyParameters.push({ type: "text" as const, text: contact.name });
       bodyParameters.push({ type: "text" as const, text: attrs.last_tracking_carrier || "DHL" });
       bodyParameters.push({ type: "text" as const, text: attrs.last_tracking_url || "" });
+    } else if (templateName === "review_request") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+    } else if (templateName === "win_back") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
     } else {
       // Default fallback parameter mappings
       bodyParameters.push({ type: "text" as const, text: contact.name });
@@ -216,7 +227,6 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
       data: {
         sender: "agent",
         text: preview,
-        timestamp: timeStr,
         contactId: contact.id,
         organizationId,
       },
@@ -225,6 +235,10 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
       where: { id: contact.id },
       data: { lastMessage: preview, lastMessageTime: timeStr },
     });
+
+    // Debit wallet for the successful send (service for free-form, marketing for templates).
+    const billingCategory = step.actionType === "send_template" ? "marketing" : "service";
+    await recordUsage({ type: "message", category: billingCategory, organizationId }).catch(() => {});
 
     await recordTouch({
       organizationId,
@@ -310,7 +324,6 @@ export async function sweepAbandonedCarts(thresholdMinutes = 60) {
 
     const d = new Date();
     const timestampStr = `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
-    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
     attrs.cart_abandoned_at = attrs.cart_abandoned_at || timestampStr;
     attrs.cart_recovery_enrolled = true;
@@ -323,7 +336,6 @@ export async function sweepAbandonedCarts(thresholdMinutes = 60) {
 
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "integration",
         message: `WhatsApp Marketplace: Cart abandoned by ${order.contact.name} (₹${attrs.cart_total || "0.00"}). Scheduling drip recovery sequence.`,
         organizationId: order.organizationId,
@@ -334,7 +346,6 @@ export async function sweepAbandonedCarts(thresholdMinutes = 60) {
       data: {
         sender: "system",
         text: `[Marketplace Automations] Cart abandoned (₹${attrs.cart_total || "0.00"}). Enrolled ${order.contact.name} into the Cart Recovery sequence.`,
-        timestamp: timestampStr,
         contactId: order.contactId,
         organizationId: order.organizationId,
       },

@@ -8,6 +8,7 @@ import MessageMarquee from "./components/MessageMarquee";
 import Features from "./components/Features";
 import HowItWorks from "./components/HowItWorks";
 import Stats from "./components/Stats";
+import DeveloperPlatform from "./components/DeveloperPlatform";
 import TrustedBy from "./components/TrustedBy";
 import Pricing from "./components/Pricing";
 import Testimonials from "./components/Testimonials";
@@ -26,6 +27,7 @@ export default function LandingPage() {
       <Features />
       <HowItWorks />
       <Stats />
+      <DeveloperPlatform />
       <TrustedBy />
       <Pricing />
       <Testimonials />

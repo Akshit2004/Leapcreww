@@ -109,7 +109,6 @@ export async function POST(request: NextRequest) {
             console.error(`Session broadcast failed to ${phone}:`, result.error);
             await prisma.systemLog.create({
               data: {
-                timestamp: timeStr,
                 type: "campaign",
                 message: `Session broadcast delivery failed to ${contact.name} (${phone}): ${result.error}`,
                 organizationId,
@@ -123,7 +122,6 @@ export async function POST(request: NextRequest) {
               data: {
                 sender: "agent",
                 text: previewText,
-                timestamp: timeStr,
                 contactId: contact.id,
                 organizationId,
                 waMessageId,
@@ -139,7 +137,6 @@ export async function POST(request: NextRequest) {
             });
             await prisma.systemLog.create({
               data: {
-                timestamp: timeStr,
                 type: "campaign",
                 message: `Session broadcast sent to ${contact.name} (${phone})`,
                 organizationId,
@@ -165,7 +162,6 @@ export async function POST(request: NextRequest) {
 
         await prisma.systemLog.create({
           data: {
-            timestamp: timeHelper(),
             type: "campaign",
             message: `Session broadcast '${name}' completed.`,
             organizationId,

@@ -12,15 +12,13 @@
  * strategist route, the WhatsApp webhook, and the template-status poll route.
  */
 import { prisma } from "@/shared/lib/prisma";
-import { runBroadcast } from "./broadcastService";
+import { processCampaignChunk } from "./broadcastService";
 import * as campaignRepo from "../repositories/campaignRepo";
 import { resolveSegmentContacts } from "@/features/segments/services/segmentService";
 import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
 
 export const PENDING_TEMPLATE_STATUS = "PendingTemplate";
 
-const hhmm = (d = new Date()) =>
-  `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
 /**
  * Tag the contacts resolved by a segment with the sequence trigger tag and enroll
@@ -82,28 +80,16 @@ export async function resumeCampaignsAwaitingTemplate(
       await campaignRepo.logCampaignEvent(
         organizationId,
         campaign.id,
-        `Template "${templateName}" approved — campaign scheduled for ${campaign.scheduledAt?.toISOString()}.`,
-        hhmm()
+        `Template "${templateName}" approved — campaign scheduled for ${campaign.scheduledAt?.toISOString()}.`
       );
     } else {
-      const contacts = await campaignRepo.findTargetContacts(
-        organizationId,
-        campaign.targetTag,
-        campaign.excludeTag ?? undefined,
-        campaign.segmentId
-      );
-      await campaignRepo.updateCampaign(campaign.id, { status: "Sending", sent: contacts.length });
+      // Transition to Sending — the queue engine (cron) will process it in chunks.
+      await campaignRepo.updateCampaign(campaign.id, { status: "Sending" });
       await campaignRepo.logCampaignEvent(
         organizationId,
         campaign.id,
-        `Template "${templateName}" approved — broadcasting to ${contacts.length} contact(s).`,
-        hhmm()
+        `Template "${templateName}" approved — campaign queued for broadcast.`
       );
-      // Fire-and-forget background worker, mirroring launchCampaign's behaviour.
-      void runBroadcast(campaign, contacts).catch(async (err) => {
-        console.error("[Strategist Resume Broadcast Error]:", err);
-        await campaignRepo.updateCampaign(campaign.id, { status: "Failed" }).catch(() => {});
-      });
     }
 
     // Enroll the audience into the follow-up sequence now that a session is opened.
@@ -141,8 +127,7 @@ export async function failCampaignsAwaitingTemplate(
     await campaignRepo.logCampaignEvent(
       organizationId,
       campaign.id,
-      `Template "${templateName}" was rejected by Meta${reason ? `: ${reason}` : ""}. Campaign cancelled.`,
-      hhmm()
+      `Template "${templateName}" was rejected by Meta${reason ? `: ${reason}` : ""}. Campaign cancelled.`
     );
   }
 

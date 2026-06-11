@@ -103,11 +103,17 @@ async function upsertShopifyContact(
   source: string,
   tags: string[]
 ) {
-  if (email) {
-    return prisma.contact.upsert({
-      where: { organizationId_email: { organizationId: orgId, email } },
-      update: { name, phone, source, tags: { set: tags }, status: "Active" },
-      create: { name, phone, email, source, tags, status: "Active", organizationId: orgId },
+  // Phone is the identity key — upsert on (org, phone)
+  if (phone) {
+    const existing = await prisma.contact.findFirst({ where: { phone, organizationId: orgId } });
+    if (existing) {
+      return prisma.contact.update({
+        where: { id: existing.id },
+        data: { name, email: email || existing.email, source, tags: { set: tags }, status: "Active" },
+      });
+    }
+    return prisma.contact.create({
+      data: { name, phone, email: email || null, source, tags, status: "Active", organizationId: orgId },
     });
   }
 
@@ -128,7 +134,6 @@ async function upsertShopifyContact(
 // ─── 3. CORE WEBHOOK EVENT PARSER & HANDLER ────────────────────────────
 async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload, orgId: string) {
   const d = new Date();
-  const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   const timestampStr = `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
 
   // Helper to extract clean phone number
@@ -213,7 +218,6 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
     // 2. Log event in DB system log
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "integration",
         message: `Shopify Webhook: checkouts/create - Cart abandoned by ${name} (₹${payload.total_price || "0.00"}). Saved to database, scheduling drip recovery sequence.`,
         organizationId: orgId,
@@ -228,7 +232,6 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       data: {
         sender: "system",
         text: `[Shopify Automations] Cart abandoned by ${name} (₹${payload.total_price || "0.00"}). Enrolled contact into Cart Recovery sequence.`,
-        timestamp: timestampStr,
         contactId: contact.id,
         organizationId: orgId,
       },
@@ -293,6 +296,24 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       },
     });
 
+    // Sequence trigger: enroll into order_placed sequences (e.g. order_confirmation, review).
+    await enrollOnTrigger(orgId, "order_placed", contact.id);
+
+    // Outbound webhook (T-08): notify subscribers of the new order.
+    const { emitEvent } = await import("@/features/webhooks/services/webhookDeliveryService");
+    await emitEvent(orgId, "order.placed", {
+      orderId: savedOrder.orderId,
+      total: totalPriceInPaise,
+      currency: "INR",
+      source: "shopify",
+      contact: { id: contact.id, name: contact.name, phone: contact.phone },
+      items: orderItems.map((i: { title?: string; quantity?: number; price?: string }) => ({
+        name: i.title ?? "Item",
+        quantity: i.quantity ?? 1,
+        price: Math.round(parseFloat(i.price || "0") * 100),
+      })),
+    });
+
     // Insert order items
     for (const item of orderItems) {
       const itemPriceInPaise = Math.round(parseFloat(item.price || "0") * 100);
@@ -330,7 +351,6 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
     // 3. Log event
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "integration",
         message: `Shopify Webhook: orders/create - Order #${payload.order_number || payload.id} received from ${name} (₹${(
           totalPriceInPaise / 100
@@ -388,7 +408,6 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       data: {
         sender: "system",
         text: `[Shopify Automations] Order confirmed! Dispatched confirmation alert: "${textSent.slice(0, 80)}..."`,
-        timestamp: timestampStr,
         contactId: contact.id,
         organizationId: orgId,
       },
@@ -479,7 +498,6 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
         data: {
           sender: "system",
           text: `[Shopify Automations] Order shipped notification: "${textSent.slice(0, 80)}..."`,
-          timestamp: timestampStr,
           contactId: contact.id,
           organizationId: orgId,
         },
@@ -489,7 +507,6 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
     // 2. Log fulfillment
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "integration",
         message: `Shopify Webhook: orders/fulfilled - Order #${payload.order_number || payload.id} fulfilled via ${trackingCompany} (Tracking: ${trackingNumber}).`,
         organizationId: orgId,

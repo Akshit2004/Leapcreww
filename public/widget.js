@@ -63,8 +63,10 @@
       } catch {
         /* beacon is best-effort */
       }
+      // Append attribution marker so the server can tag widget-originated contacts.
+      var prefill = (cfg.prefilledText || "") + (key ? "\n[ref:" + key + "]" : "");
       window.open(
-        "https://wa.me/" + cfg.phoneNumber + "?text=" + encodeURIComponent(cfg.prefilledText || ""),
+        "https://wa.me/" + cfg.phoneNumber + "?text=" + encodeURIComponent(prefill),
         "_blank",
         "noopener"
       );

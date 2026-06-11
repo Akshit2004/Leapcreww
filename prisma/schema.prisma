@@ -88,6 +88,13 @@ model Organization {
   appointmentSlots     AppointmentSlot[]
   bookings             Booking[]
   widgetConfig         WidgetConfig?
+  webhookDeliveries    WebhookDelivery[]
+  idempotencyKeys      IdempotencyKey[]
+  events               Event[]
+  phoneNumbers         PhoneNumber[]
+  workingHours         Json?          // { enabled, timezone, schedule: { [day]: { open, from, to } }, awayMessage }
+  cannedReplies        CannedReply[]
+  internalNotes        InternalNote[]
 
   // Flow Encryption automation state
   flowsPrivateKey      String?    @db.Text
@@ -117,7 +124,7 @@ model Contact {
   id             String       @id @default(uuid())
   name           String
   phone          String
-  email          String
+  email          String?
   source         String
   tags           String[]     // Postgres scalar list support
   status         String       // "Active" | "Inactive"
@@ -137,20 +144,20 @@ model Contact {
   flowResponses  FlowResponse[]
   attributionTouches AttributionTouch[]
   bookings       Booking[]
+  internalNotes  InternalNote[]
   sourceAdId     String?      // Tracks the Meta Ad ID that originated this contact
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  // Contacts are tenant-scoped: a customer email is unique within an org, never
-  // globally. Prevents cross-tenant collision on shared customer emails.
-  @@unique([organizationId, email])
+  // Contacts are tenant-scoped: a customer phone is unique within an org, never
+  // globally. Prevents cross-tenant collision on shared customer phones.
+  @@unique([organizationId, phone])
 }
 
 model Message {
   id             String       @id @default(uuid())
   sender         String       // "user" | "agent" | "system"
   text           String       @db.Text
-  timestamp      String
   status         String?      // "sent" | "delivered" | "read"
   buttons        String[]     // Postgres scalar list support
   contactId      String
@@ -183,6 +190,7 @@ model Campaign {
   mediaUrl       String?
   variables      Json?
   delay          Int?         @default(1)
+  currentOffset  Int          @default(0)  // queue engine: contacts processed so far
   segmentId      String?      // Target a saved segment instead of a single tag (T-04)
   segment        Segment?     @relation(fields: [segmentId], references: [id], onDelete: SetNull)
   timezone       String?      // IANA tz for timezone-aware scheduling (T-11)
@@ -245,7 +253,6 @@ model Integration {
 
 model SystemLog {
   id             String       @id @default(uuid())
-  timestamp      String
   type           String       // "campaign" | "chat" | "integration" | "crm"
   message        String       @db.Text
   organizationId String
@@ -568,6 +575,7 @@ model ApiKey {
   scopes         String[]
   lastUsedAt     DateTime?
   revokedAt      DateTime?
+  isSandbox      Boolean      @default(false)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
@@ -581,7 +589,57 @@ model WebhookSubscription {
   enabled        Boolean      @default(true)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries     WebhookDelivery[]
   createdAt      DateTime     @default(now())
+}
+
+// Outbound webhook delivery attempts (T-08). A row is created per matching
+// subscription on emit, tried immediately, then retried by cron with
+// exponential backoff until delivered or attempts are exhausted.
+model WebhookDelivery {
+  id             String              @id @default(uuid())
+  subscriptionId String
+  subscription   WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  event          String
+  payload        Json
+  status         String              @default("pending") // "pending" | "delivered" | "failed"
+  attempts       Int                 @default(0)
+  lastError      String?
+  nextAttemptAt  DateTime            @default(now())
+  deliveredAt    DateTime?
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime            @default(now())
+
+  @@index([status, nextAttemptAt])
+}
+
+// Public API idempotency (T-08): replaying a request with the same
+// Idempotency-Key header returns the stored response instead of re-executing.
+model IdempotencyKey {
+  id             String       @id @default(uuid())
+  key            String
+  response       Json
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, key])
+  @@index([createdAt])
+}
+
+// Append-only domain event log — immutable audit trail for all significant
+// business events. Consumers fan-out to webhooks, analytics, and replays.
+model Event {
+  id             String       @id @default(uuid())
+  type           String       // "message.received" | "message.status" | "order.placed" | "contact.created"
+  payload        Json
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, type, createdAt])
 }
 
 // Embeddable website chat-button widget (one per org). `publicKey` is the only
@@ -635,6 +693,51 @@ model AttributionTouch {
 
   @@index([contactId, createdAt])
   @@index([organizationId, createdAt])
+}
+
+// P1-6 — Team inbox: pre-written agent responses (inserted via /shortcut)
+model CannedReply {
+  id             String       @id @default(uuid())
+  shortcut       String       // e.g. "thanks" — agent types /thanks to insert
+  title          String
+  body           String       @db.Text
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+}
+
+// P1-6 — Team inbox: agent-only notes on a conversation, never sent to customer
+model InternalNote {
+  id             String       @id @default(uuid())
+  body           String       @db.Text
+  authorName     String
+  contactId      String
+  contact        Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([contactId])
+}
+
+// P1-11 — Multi-number: each org can have N registered WhatsApp phone numbers
+model PhoneNumber {
+  id                        String       @id @default(uuid())
+  displayName               String
+  phoneNumber               String       // dialable E.164 digits, e.g. "919876543210"
+  phoneNumberId             String       // Meta's internal phone number ID
+  whatsappBusinessAccountId String?
+  accessToken               String?      @db.Text
+  isDefault                 Boolean      @default(false)
+  organizationId            String
+  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+
+  @@unique([organizationId, phoneNumberId])
+  @@index([organizationId])
 }
 
 model EmailOtpAttempt {

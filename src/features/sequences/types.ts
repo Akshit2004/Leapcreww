@@ -5,7 +5,8 @@ export type SequenceTrigger =
   | "form_submit"
   | "ad_click"
   | "cart_abandoned"
-  | "signup";
+  | "signup"
+  | "order_placed";
 
 export type StepAction = "send_template" | "send_message" | "add_tag" | "branch";
 

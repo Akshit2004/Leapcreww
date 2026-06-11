@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import { 
-  Search, 
-  Send, 
-  Check, 
+import {
+  Search,
+  Send,
+  Check,
   CheckCheck,
   User,
   Phone,
@@ -20,7 +20,10 @@ import {
   Laptop,
   ArrowLeft,
   Sparkles,
-  Copy
+  Copy,
+  Zap,
+  StickyNote,
+  UserCheck
 } from "lucide-react";
 import { useApp, Message } from "@/shared/context/AppContext";
 import { notify } from "@/shared/lib/toast";
@@ -55,6 +58,17 @@ export const InboxTab: React.FC = () => {
   const [replySuggestions, setReplySuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
+  // ─── Team inbox additions (P1-6) ───────────────────────────────────
+  type InboxFilter = "all" | "mine" | "unassigned" | "bot";
+  interface CannedReplyItem { id: string; shortcut: string; title: string; body: string }
+  interface InternalNoteItem { id: string; body: string; authorName: string; createdAt: string }
+
+  const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
+  const [cannedReplies, setCannedReplies] = useState<CannedReplyItem[]>([]);
+  const [showCannedPicker, setShowCannedPicker] = useState(false);
+  const [noteMode, setNoteMode] = useState(false);
+  const [contactNotes, setContactNotes] = useState<Record<string, InternalNoteItem[]>>({});
+
   const fetchReplySuggestions = React.useCallback(async () => {
     if (!activeContactId || !orgId) return;
     setLoadingSuggestions(true);
@@ -84,6 +98,40 @@ export const InboxTab: React.FC = () => {
     const interval = setInterval(() => refreshWorkspace(orgId), 5000);
     return () => clearInterval(interval);
   }, [autoRefresh, orgId, refreshWorkspace]);
+
+  // Fetch canned replies once per org
+  useEffect(() => {
+    if (!orgId) return;
+    fetch(`/api/org/${orgId}/canned-replies`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => d?.cannedReplies && setCannedReplies(d.cannedReplies))
+      .catch(() => {/* ignore — non-critical */});
+  }, [orgId]);
+
+  // Fetch internal notes for the active contact
+  const fetchNotes = React.useCallback(async (contactId: string) => {
+    if (!orgId) return;
+    try {
+      const res = await fetch(`/api/org/${orgId}/contacts/${contactId}/notes`);
+      if (res.ok) {
+        const data = await res.json();
+        setContactNotes((prev) => ({ ...prev, [contactId]: data.notes || [] }));
+      }
+    } catch {/* ignore */}
+  }, [orgId]);
+
+  useEffect(() => {
+    if (activeContactId) fetchNotes(activeContactId);
+  }, [activeContactId, fetchNotes]);
+
+  // Auto-open canned picker when input starts with "/"
+  useEffect(() => {
+    if (inputText.startsWith("/")) {
+      setShowCannedPicker(true);
+    } else {
+      setShowCannedPicker(false);
+    }
+  }, [inputText]);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -92,11 +140,23 @@ export const InboxTab: React.FC = () => {
   const activeChat = activeContactId ? chatHistory[activeContactId] || [] : [];
 
   // Filter contacts
-  const filteredContacts = contacts.filter((c) => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.phone.includes(searchQuery) ||
-    c.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const agentName = session?.user?.name || "";
+  const filteredContacts = contacts.filter((c) => {
+    const matchesSearch =
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.phone.includes(searchQuery) ||
+      c.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (!matchesSearch) return false;
+    if (inboxFilter === "mine") return c.assignedAgent === agentName;
+    if (inboxFilter === "unassigned") return c.assignedAgent === "None";
+    if (inboxFilter === "bot") return c.assignedAgent === "Bot";
+    return true;
+  });
+
+  const filteredCannedReplies = cannedReplies.filter((r) => {
+    const q = inputText.startsWith("/") ? inputText.slice(1).toLowerCase() : "";
+    return !q || r.shortcut.startsWith(q) || r.title.toLowerCase().includes(q);
+  });
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -110,6 +170,7 @@ export const InboxTab: React.FC = () => {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (noteMode) { await handleSubmitNote(); return; }
     if (!inputText.trim() || !activeContactId || !orgId) return;
 
     const text = inputText.trim();
@@ -145,6 +206,40 @@ export const InboxTab: React.FC = () => {
       console.error("Failed to sync live chat message with backend:", err);
     } finally {
       unlockSync();
+    }
+  };
+
+  const handleSubmitNote = async () => {
+    if (!inputText.trim() || !activeContactId || !orgId) return;
+    const noteBody = inputText.trim();
+    setInputText("");
+    setNoteMode(false);
+    const author = session?.user?.name || "Agent";
+    try {
+      const res = await fetch(`/api/org/${orgId}/contacts/${activeContactId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: noteBody }),
+      });
+      if (res.ok) {
+        const { note } = await res.json();
+        setContactNotes((prev) => ({
+          ...prev,
+          [activeContactId]: [...(prev[activeContactId] || []), { ...note, createdAt: note.createdAt || new Date().toISOString() }],
+        }));
+      }
+    } catch {
+      // optimistic fallback
+      const optimistic: InternalNoteItem = {
+        id: `note-${Date.now()}`,
+        body: noteBody,
+        authorName: author,
+        createdAt: new Date().toISOString(),
+      };
+      setContactNotes((prev) => ({
+        ...prev,
+        [activeContactId]: [...(prev[activeContactId] || []), optimistic],
+      }));
     }
   };
 
@@ -284,6 +379,26 @@ export const InboxTab: React.FC = () => {
             </div>
           </div>
 
+          {/* Inbox filter tabs */}
+          <div className="flex border-b border-stone-200 shrink-0">
+            {(["all", "mine", "unassigned", "bot"] as const).map((f) => {
+              const labels: Record<string, string> = { all: "All", mine: "Mine", unassigned: "Open", bot: "Bot" };
+              return (
+                <button
+                  key={f}
+                  onClick={() => setInboxFilter(f)}
+                  className={`flex-1 py-2 text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    inboxFilter === f
+                      ? "text-stone-950 border-b-2 border-stone-950 bg-white"
+                      : "text-stone-400 hover:text-stone-700 bg-[#fafaf9]"
+                  }`}
+                >
+                  {labels[f]}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Contacts Stream */}
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             {filteredContacts.length === 0 ? (
@@ -407,6 +522,19 @@ export const InboxTab: React.FC = () => {
                   <Laptop className="w-3.5 h-3.5 text-stone-400" />
                   Agent: <span className="font-bold text-stone-800">{activeContact.assignedAgent}</span>
                 </span>
+
+                {/* Assign to me quick-action */}
+                {activeContact.assignedAgent !== agentName && (
+                  <button
+                    type="button"
+                    onClick={() => updateContact(activeContact.id, { assignedAgent: agentName })}
+                    className="max-sm:hidden text-[9px] px-2.5 py-1.5 bg-white text-stone-600 hover:bg-stone-50 border border-stone-200 hover:border-stone-400 font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0 cursor-pointer rounded-lg transition-all"
+                    title="Assign this conversation to yourself"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Claim</span>
+                  </button>
+                )}
                 
                 {/* Profile panel toggle — mobile only */}
                 <button
@@ -529,6 +657,32 @@ export const InboxTab: React.FC = () => {
                   );
                 })
               )}
+              {/* ─── Internal Notes ─── */}
+              {(contactNotes[activeContactId ?? ""] || []).length > 0 && (
+                <>
+                  <div className="flex items-center gap-3 my-3 select-none">
+                    <div className="flex-1 border-t border-amber-200" />
+                    <span className="text-[9px] font-bold text-amber-600 uppercase tracking-widest flex items-center gap-1">
+                      <StickyNote className="w-3 h-3" />
+                      Internal Notes
+                    </span>
+                    <div className="flex-1 border-t border-amber-200" />
+                  </div>
+                  {(contactNotes[activeContactId ?? ""] || []).map((note: InternalNoteItem) => (
+                    <div key={note.id} className="flex justify-start animate-slide-up">
+                      <div className="max-w-[78%] px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl rounded-bl-sm">
+                        <div className="flex items-center gap-1.5 mb-1.5 select-none">
+                          <StickyNote className="w-3 h-3 text-amber-500 shrink-0" />
+                          <span className="text-[9px] font-bold text-amber-700 uppercase tracking-wider">{note.authorName}</span>
+                          <span className="text-[9px] text-amber-400">· Only visible to your team</span>
+                        </div>
+                        <p className="text-[13px] leading-relaxed whitespace-pre-line select-text text-stone-800">{note.body}</p>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
               <div ref={chatEndRef} />
             </div>
 
@@ -561,24 +715,96 @@ export const InboxTab: React.FC = () => {
               )}
             </div>
 
+            {/* ─── Canned Replies Picker ─── */}
+            {showCannedPicker && (
+              <div className="bg-white border-t border-stone-200 px-4 py-2 shrink-0 animate-slide-up z-10 relative max-h-52 overflow-y-auto custom-scrollbar select-none">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-amber-500" />
+                    Canned Replies
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { setShowCannedPicker(false); setInputText(""); }}
+                    className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-stone-100 cursor-pointer transition-colors"
+                  >
+                    <X className="w-3 h-3 text-stone-400" />
+                  </button>
+                </div>
+                {filteredCannedReplies.length === 0 ? (
+                  <p className="text-xs text-stone-400 py-2">No matching canned replies. Type a shortcut like <span className="font-mono">/thanks</span>.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {filteredCannedReplies.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => { setInputText(r.body); setShowCannedPicker(false); }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 bg-stone-50 hover:bg-stone-100 border border-stone-100 rounded-xl text-left transition-all cursor-pointer group"
+                      >
+                        <span className="text-[10px] font-mono font-bold text-amber-600 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded shrink-0">/{r.shortcut}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-stone-800 truncate">{r.title}</p>
+                          <p className="text-[10px] text-stone-400 truncate mt-0.5">{r.body}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ─── Input Bar ─── */}
-            <form 
+            <form
               onSubmit={handleSendMessage}
-              className="p-3 lg:p-4 bg-white border-t border-stone-200 flex items-center gap-2.5 shrink-0 relative z-10"
+              className={`p-3 lg:p-4 border-t flex items-center gap-2.5 shrink-0 relative z-10 transition-colors ${
+                noteMode ? "bg-amber-50 border-amber-200" : "bg-white border-stone-200"
+              }`}
             >
+              {/* Canned replies trigger */}
+              <button
+                type="button"
+                onClick={() => setShowCannedPicker((p) => !p)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-stone-100 text-stone-400 hover:text-amber-600 cursor-pointer transition-colors shrink-0"
+                title="Canned replies (or type / to search)"
+              >
+                <Zap className="w-4 h-4" />
+              </button>
+
               <input
                 type="text"
-                placeholder="Type a message..."
+                placeholder={noteMode ? "Write internal note (only visible to team)…" : "Type a message…"}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                className="flex-1 bg-stone-50 border border-stone-200 rounded-2xl py-3 px-4 text-sm font-medium focus:outline-none focus:border-stone-400 transition-all placeholder:text-stone-400"
+                className={`flex-1 border rounded-2xl py-3 px-4 text-sm font-medium focus:outline-none transition-all placeholder:text-stone-400 ${
+                  noteMode
+                    ? "bg-amber-50 border-amber-300 focus:border-amber-500 text-amber-900"
+                    : "bg-stone-50 border-stone-200 focus:border-stone-400"
+                }`}
               />
+
+              {/* Note mode toggle */}
+              <button
+                type="button"
+                onClick={() => setNoteMode((p) => !p)}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors shrink-0 ${
+                  noteMode
+                    ? "bg-amber-500 text-white"
+                    : "hover:bg-stone-100 text-stone-400 hover:text-amber-600"
+                }`}
+                title={noteMode ? "Switch to message mode" : "Switch to note mode (internal only)"}
+              >
+                <StickyNote className="w-4 h-4" />
+              </button>
+
               <button
                 type="submit"
                 disabled={!inputText.trim()}
-                className="w-11 h-11 rounded-full bg-stone-950 text-white hover:bg-stone-800 flex items-center justify-center disabled:opacity-30 transition-all shadow-sm cursor-pointer shrink-0 active:scale-95"
+                className={`w-11 h-11 rounded-full flex items-center justify-center disabled:opacity-30 transition-all shadow-sm cursor-pointer shrink-0 active:scale-95 ${
+                  noteMode ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-stone-950 hover:bg-stone-800 text-white"
+                }`}
               >
-                <Send className="w-4 h-4" />
+                {noteMode ? <StickyNote className="w-4 h-4" /> : <Send className="w-4 h-4" />}
               </button>
             </form>
           </>

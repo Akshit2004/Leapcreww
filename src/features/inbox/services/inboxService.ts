@@ -31,7 +31,6 @@ export async function sendAgentMessage(input: SendMessageInput, agentName: strin
   const dbMsg = await repo.createMessage({
     sender: "agent",
     text: input.text,
-    timestamp: ts,
     contactId: input.contactId,
     organizationId: input.orgId,
   });
@@ -44,7 +43,6 @@ export async function sendAgentMessage(input: SendMessageInput, agentName: strin
       lastMessageTime: ts,
     });
     await repo.createLog({
-      timestamp: ts,
       type: "crm",
       message: `Agent ${agentName} took over conversation from AI Bot for contact ${contact.name}`,
       organizationId: input.orgId,
@@ -63,7 +61,6 @@ export async function sendAgentMessage(input: SendMessageInput, agentName: strin
 
   if (!result.ok) {
     await repo.createLog({
-      timestamp: ts,
       type: "chat",
       message: `Agent sent sandbox message: "${input.text.slice(0, 45)}" (Meta: ${result.error})`,
       organizationId: input.orgId,
@@ -72,7 +69,6 @@ export async function sendAgentMessage(input: SendMessageInput, agentName: strin
   }
 
   await repo.createLog({
-    timestamp: ts,
     type: "chat",
     message: `Agent sent WhatsApp message: "${input.text.slice(0, 50)}"`,
     organizationId: input.orgId,

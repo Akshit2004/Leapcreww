@@ -18,6 +18,10 @@ import {
 } from "lucide-react";
 import type { BrandProfile } from "@/shared/context/types";
 import { WidgetCard } from "@/features/widget/components/WidgetCard";
+import { WebhooksCard } from "@/features/webhooks/components/WebhooksCard";
+import { DevQuickstartCard } from "@/features/public-api/components/DevQuickstartCard";
+import { PhoneNumbersCard } from "./PhoneNumbersCard";
+import { WorkingHoursCard } from "@/features/inbox/components/WorkingHoursCard";
 
 // ─── Facebook SDK helpers (avoids conflicts with @types/facebook-js-sdk) ────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -548,6 +552,18 @@ export const SettingsTab: React.FC = () => {
 
       {/* Website Chat Button (embeddable widget) */}
       <WidgetCard />
+
+      {/* Outbound Webhooks */}
+      <WebhooksCard />
+
+      {/* Developer Quickstart */}
+      <DevQuickstartCard />
+
+      {/* Phone Numbers */}
+      <PhoneNumbersCard />
+
+      {/* Working Hours */}
+      <WorkingHoursCard />
 
       {/* Brand Profile Card */}
       <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">

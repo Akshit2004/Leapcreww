@@ -72,11 +72,8 @@ export async function DELETE(
     });
 
     // 4. Create system log trace
-    const d = new Date();
-    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "crm",
         message: `Permanently deleted template: "${template.name}" from WappFlow${!isMock ? " and Meta Business Manager" : ""}.`,
         organizationId: template.organizationId

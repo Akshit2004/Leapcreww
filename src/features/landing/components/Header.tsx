@@ -6,8 +6,8 @@ import Link from "next/link";
 
 const navItems = [
   { label: "Features", href: "#features" },
-  { label: "Workspace Sim", href: "#simulator" },
   { label: "How it works", href: "#how" },
+  { label: "Developers", href: "#developers" },
   { label: "Pricing", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
 ];

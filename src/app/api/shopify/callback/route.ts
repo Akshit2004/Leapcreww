@@ -144,11 +144,8 @@ export async function GET(request: NextRequest) {
     }
 
     // 5. Create System Log
-    const d = new Date();
-    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "integration",
         message: `Shopify Connected: Store "${shopName}" (${shop}) successfully authenticated via 1-Click OAuth.${
           webhooksRegistered.length > 0

@@ -39,7 +39,7 @@ export default function MessageMarquee() {
     <section aria-label="Live operations feed"
       className="bg-[#1D211F] text-[#FAF7F2] py-8 border-y border-[#1D211F]/15 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6 md:px-12 mb-5 flex items-center justify-between font-mono text-[10px] tracking-widest text-[#FAF7F2]/40 uppercase">
-        <span>// Live operations stream — observed across active tenants</span>
+        <span>{'// Live operations stream — observed across active tenants'}</span>
         <span className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-ring" />
           <span className="text-emerald-400">streaming</span>

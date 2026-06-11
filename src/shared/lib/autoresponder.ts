@@ -119,7 +119,6 @@ async function sendReply(
     data: {
       sender: "agent",
       text,
-      timestamp: timeStr,
       contactId,
       organizationId: orgId,
       buttons: buttons?.map((b) => b.reply.title) || [],
@@ -134,7 +133,6 @@ async function sendReply(
 
   await prisma.systemLog.create({
     data: {
-      timestamp: timeStr,
       type: "chat",
       message: `Bot replied to ${contactName}: "${text.slice(0, 50)}"`,
       organizationId: orgId,
@@ -334,7 +332,6 @@ async function applyCrmAnalysis(analysis: CrmAnalysis, contact: BotContact, orgI
     });
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "crm",
         message: `Autonomous CRM Agent updated tags for ${contact.name}: ${updatedTags.join(", ")}`,
         organizationId: orgId,
@@ -363,7 +360,6 @@ async function applyCrmAnalysis(analysis: CrmAnalysis, contact: BotContact, orgI
 
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "crm",
         message: `[Escalation Alert] Lead ${contact.name} was autonomously re-assigned to agent '${escalationAgent}' due to ${reason}.`,
         organizationId: orgId,
@@ -374,7 +370,6 @@ async function applyCrmAnalysis(analysis: CrmAnalysis, contact: BotContact, orgI
       data: {
         sender: "system",
         text: `[Autonomous Escalation: Chat re-assigned to human agent '${escalationAgent}' due to ${reason}]`,
-        timestamp: timeStr,
         contactId: contact.id,
         organizationId: orgId,
       },
@@ -451,6 +446,17 @@ async function handleReorderFlow(contact: any, orgId: string, timeStr: string): 
           create: orderItemsToCreate,
         },
       },
+    });
+
+    // Outbound webhook (T-08): notify subscribers of the new order.
+    const { emitEvent } = await import("@/features/webhooks/services/webhookDeliveryService");
+    await emitEvent(orgId, "order.placed", {
+      orderId: newOrderId,
+      total,
+      currency: "INR",
+      source: "whatsapp_reorder",
+      contact: { id: contact.id, name: contact.name, phone: contact.phone },
+      items: orderItemsToCreate.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price })),
     });
 
     const CURRENCY_SYMBOL = "₹";
@@ -552,11 +558,8 @@ export async function handleAutoResponder(contactId: string, orgId: string) {
   } catch (error: unknown) {
     console.error("Error in handleAutoResponder:", error);
     try {
-      const d = new Date();
-      const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
       await prisma.systemLog.create({
         data: {
-          timestamp: timeStr,
           type: "chat",
           message: `AI Bot Error: ${error instanceof Error ? (error instanceof Error ? error.message : String(error)) : "Unknown error"}`,
           organizationId: orgId,

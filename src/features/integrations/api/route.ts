@@ -105,11 +105,8 @@ export async function POST(
       });
 
       // Create disconnect log
-      const d = new Date();
-      const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
       await prisma.systemLog.create({
         data: {
-          timestamp: timeStr,
           type: "integration",
           message: `${resolvedIntegrationId} Integration successfully disconnected.`,
           organizationId: orgId,
@@ -147,11 +144,8 @@ export async function POST(
         },
       });
 
-      const d = new Date();
-      const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
       await prisma.systemLog.create({
         data: {
-          timestamp: timeStr,
           type: "integration",
           message: `Razorpay Connected via manual keys.`,
           organizationId: orgId,
@@ -270,11 +264,8 @@ export async function POST(
     }
 
     // Save System Log
-    const d = new Date();
-    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "integration",
         message: `Shopify Connected: Store "${shopName}" (${cleanShop}) connected manually via Developer Mode token.${
           webhooksRegistered.length > 0

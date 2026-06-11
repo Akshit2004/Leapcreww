@@ -231,11 +231,8 @@ export async function POST(request: NextRequest) {
       }
 
       // Log the connection
-      const d = new Date();
-      const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
       await prisma.systemLog.create({
         data: {
-          timestamp: timeStr,
           type: "crm",
           message: `WhatsApp connected: WABA "${selectedWaba.name}" (${selectedWaba.wabaId}), Phone: ${selectedPhone.display_phone_number}`,
           organizationId: orgId,

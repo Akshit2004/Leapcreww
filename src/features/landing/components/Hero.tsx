@@ -77,7 +77,7 @@ export default function Hero() {
           </h1>
 
           <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.6 }} className="text-[#1D211F]/70 text-sm sm:text-base leading-relaxed max-w-xl font-medium">
-            Scale client communications with complete clarity. WappFlow orchestrates pre-approved Meta broadcasts, visual chatbot automation nodes, and transactional webhook relays under a unified, high-security dashboard workspace.
+            Scale client communications with complete clarity. WappFlow orchestrates Meta-approved broadcasts, visual chatbot automation, AI-composed drip sequences — and a full developer platform with REST API, typed SDKs, and an MCP server for AI agents — under one unified workspace.
           </motion.p>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.75 }} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4">
@@ -90,9 +90,9 @@ export default function Hero() {
           </motion.div>
 
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 2 }} className="pt-6 border-t border-[#1D211F]/8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[9px] tracking-widest text-[#1D211F]/40 uppercase">
-            <div>[ RELEASE v2.4.0 ]</div>
+            <div>[ AI-NATIVE AUTOMATION ]</div>
+            <div>[ OPEN API · SDKS · MCP ]</div>
             <div>[ SECURE POSTGRES STORAGE ]</div>
-            <div>[ ZERO LATENCY API ]</div>
           </motion.div>
         </motion.div>
 

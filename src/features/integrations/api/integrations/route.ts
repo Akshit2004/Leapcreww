@@ -131,7 +131,6 @@ export async function POST(
 
   await prisma.systemLog.create({
     data: {
-      timestamp: logTime(),
       type: "integration",
       message: `Shopify store "${shopName}" connected (${domain}). Webhooks registered: ${webhooksRegistered.join(", ") || "none"}.`,
       organizationId: orgId,

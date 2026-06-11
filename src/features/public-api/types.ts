@@ -4,9 +4,11 @@ export interface CreateApiKeyInput {
   name: string;
   scopes?: string[];
   organizationId: string;
+  isSandbox?: boolean;
 }
 
 export interface ApiKeyContext {
   organizationId: string;
   scopes: string[];
+  isSandbox: boolean;
 }
