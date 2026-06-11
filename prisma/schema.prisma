@@ -87,6 +87,7 @@ model Organization {
   attributionTouches   AttributionTouch[]
   appointmentSlots     AppointmentSlot[]
   bookings             Booking[]
+  widgetConfig         WidgetConfig?
 
   // Flow Encryption automation state
   flowsPrivateKey      String?    @db.Text
@@ -581,6 +582,27 @@ model WebhookSubscription {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
+}
+
+// Embeddable website chat-button widget (one per org). `publicKey` is the only
+// identifier exposed on customer websites — never the org id. The phone number
+// is stored here (E.164 digits) because Organization only keeps Meta's internal
+// phoneNumberId, and the wa.me deep link needs the dialable number.
+model WidgetConfig {
+  id             String       @id @default(uuid())
+  publicKey      String       @unique // "wfw_<hex>" — embed snippet identifier
+  enabled        Boolean      @default(true)
+  phoneNumber    String       @default("") // digits only, e.g. "919876543210"
+  position       String       @default("bottom-right") // "bottom-right" | "bottom-left"
+  color          String       @default("#25D366")
+  greeting       String       @default("Hi there 👋 How can we help?")
+  prefilledText  String       @default("Hi! I have a question.")
+  showGreeting   Boolean      @default(true)
+  clicks         Int          @default(0) // lifetime button-click counter
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 // T-09 — White-label / partner / agency

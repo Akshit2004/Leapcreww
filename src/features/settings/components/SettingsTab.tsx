@@ -17,6 +17,7 @@ import {
   Save,
 } from "lucide-react";
 import type { BrandProfile } from "@/shared/context/types";
+import { WidgetCard } from "@/features/widget/components/WidgetCard";
 
 // ─── Facebook SDK helpers (avoids conflicts with @types/facebook-js-sdk) ────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -544,6 +545,9 @@ export const SettingsTab: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Website Chat Button (embeddable widget) */}
+      <WidgetCard />
 
       {/* Brand Profile Card */}
       <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
