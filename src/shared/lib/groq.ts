@@ -1,32 +1,119 @@
-export async function getGroqChatCompletion(
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const DEFAULT_MODEL = "llama-3.3-70b-versatile";
+const MAX_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 500;
+
+export interface GroqTool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+export interface GroqToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+
+export interface GroqMessage {
+  role: string;
+  content: string | null;
+  tool_calls?: GroqToolCall[];
+}
+
+interface GroqCompletionOptions {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  tools?: GroqTool[];
+  toolChoice?: "auto" | "none" | "required";
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function callGroq(
   messages: { role: string; content: string }[],
-  modelOverride?: string
-) {
+  options: GroqCompletionOptions = {}
+): Promise<GroqMessage> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error("Groq API key not configured (missing GROQ_API_KEY environment variable)");
   }
-  const model = modelOverride || "llama-3.3-70b-versatile";
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.7,
-      max_tokens: 1024,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error?.message || "Groq API call failed");
+  const body: Record<string, unknown> = {
+    model: options.model || DEFAULT_MODEL,
+    messages,
+    temperature: options.temperature ?? 0.7,
+    max_tokens: options.maxTokens ?? 1024,
+  };
+  if (options.tools && options.tools.length > 0) {
+    body.tools = options.tools;
+    body.tool_choice = options.toolChoice ?? "auto";
   }
 
-  const data = await response.json();
-  return data.choices[0]?.message?.content || "";
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const message = errorData?.error?.message || `Groq API call failed with status ${response.status}`;
+        // Retry on rate limiting / transient server errors only
+        if ((response.status === 429 || response.status >= 500) && attempt < MAX_RETRIES) {
+          lastError = new Error(message);
+          await sleep(RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
+          continue;
+        }
+        throw new Error(message);
+      }
+
+      const data = await response.json();
+      const message: GroqMessage | undefined = data.choices?.[0]?.message;
+      return message || { role: "assistant", content: "" };
+    } catch (err) {
+      lastError = err;
+      if (attempt < MAX_RETRIES) {
+        await sleep(RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
+        continue;
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Groq API call failed");
+}
+
+/**
+ * Returns just the text content of the model's reply. Retries on rate limits/5xx.
+ */
+export async function getGroqChatCompletion(
+  messages: { role: string; content: string }[],
+  modelOverride?: string,
+  options?: Omit<GroqCompletionOptions, "model" | "tools" | "toolChoice">
+): Promise<string> {
+  const message = await callGroq(messages, { ...options, model: modelOverride });
+  return message.content || "";
+}
+
+/**
+ * Returns the full assistant message (content + tool_calls) so callers can
+ * implement tool-calling / function-calling flows.
+ */
+export async function getGroqChatCompletionWithTools(
+  messages: { role: string; content: string }[],
+  options: GroqCompletionOptions = {}
+): Promise<GroqMessage> {
+  return callGroq(messages, options);
 }

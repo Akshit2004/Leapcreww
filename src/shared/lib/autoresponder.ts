@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { getGroqChatCompletion } from "./groq";
+import { getGroqChatCompletion, getGroqChatCompletionWithTools, GroqTool } from "./groq";
 import { sendWhatsAppMessage } from "./whatsapp";
 import { resolveAttribution } from "@/features/analytics/services/attribution";
 
@@ -24,7 +24,13 @@ interface BotContact {
   tags: string[];
   assignedAgent?: string | null;
   currentNodeId?: string | null;
-  organization?: { name: string };
+  conversationSummary?: string | null;
+  organization?: {
+    name: string;
+    aiKnowledgeBase?: string | null;
+    aiPersona?: string | null;
+    aiTemperature?: number | null;
+  };
 }
 
 interface CrmAnalysis {
@@ -34,6 +40,45 @@ interface CrmAnalysis {
   frustrated: boolean;
   needsEscalation: boolean;
 }
+
+const FALLBACK_REPLY =
+  "Sorry, I'm having a little trouble responding right now 🙏 — one of our team members will follow up with you shortly.";
+
+const FREE_FORM_TOOLS: GroqTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "show_catalog",
+      description:
+        "Show the customer the product catalog/shop. Use when the customer asks to see products, browse, shop, or what you sell.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "check_order_status",
+      description:
+        "Look up and show the status of the customer's most recent order(s). Use when the customer asks about their order, delivery, or shipment status.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "escalate_to_human",
+      description:
+        "Escalate the conversation to a human team member. Use when the customer explicitly asks to speak to a person, has a complex issue automated help can't resolve, or is clearly frustrated.",
+      parameters: {
+        type: "object",
+        properties: {
+          reason: { type: "string", description: "Short reason for the escalation" },
+        },
+        required: ["reason"],
+      },
+    },
+  },
+];
 
 function extractJsonFromString(str: string): Record<string, unknown> | null {
   try {
@@ -51,6 +96,18 @@ function extractJsonFromString(str: string): Record<string, unknown> | null {
     }
     return null;
   }
+}
+
+async function logSystemError(orgId: string, timeStr: string, label: string, err: unknown) {
+  const detail = err instanceof Error ? err.message : String(err);
+  await prisma.systemLog.create({
+    data: {
+      timestamp: timeStr,
+      type: "chat",
+      message: `${label}: ${detail}`,
+      organizationId: orgId,
+    },
+  }).catch((logErr) => console.error("Failed to write error log to DB:", logErr));
 }
 
 async function analyzeConversationAgent(recentMessages: BotMessage[]): Promise<CrmAnalysis | null> {
@@ -104,6 +161,39 @@ Do not include any explanation, code fences, or markdown wrapping. Return ONLY t
   }
 }
 
+async function summarizeOlderMessages(
+  olderMessages: { sender: string; text: string }[],
+  existingSummary: string | null | undefined,
+  orgName: string
+): Promise<string | null> {
+  try {
+    const transcript = olderMessages
+      .map((m) => `${m.sender === "user" ? "Customer" : "Bot"}: ${m.text}`)
+      .join("\n");
+
+    const summaryPrompt = [
+      {
+        role: "system",
+        content: `You maintain a running memory of a WhatsApp sales/support conversation for "${orgName}".
+Write a concise summary (max 5 sentences) capturing: who the customer is, what they need, any budget/timeline/preferences mentioned, decisions already made, and anything promised to them.
+Be factual and dense. No commentary, no markdown, plain text only.`,
+      },
+      {
+        role: "user",
+        content: existingSummary
+          ? `Existing summary of earlier conversation:\n${existingSummary}\n\nNew messages to fold into the summary:\n${transcript}\n\nReturn the updated combined summary.`
+          : `Conversation so far:\n${transcript}\n\nReturn a summary.`,
+      },
+    ];
+
+    const summary = await getGroqChatCompletion(summaryPrompt);
+    return summary.trim() || existingSummary || null;
+  } catch (err) {
+    console.error("Conversation summarization failed:", err);
+    return existingSummary || null;
+  }
+}
+
 // ─── Chatbot Node Tree Traversal ─────────────────────────────────────────────
 
 async function sendReply(
@@ -146,6 +236,43 @@ async function sendReply(
   if (!result.ok) {
     console.warn("WhatsApp dispatch failed:", result.error);
   }
+}
+
+async function escalateContact(contact: BotContact, orgId: string, timeStr: string, reason: string) {
+  const memberships = await prisma.membership.findMany({
+    where: { organizationId: orgId },
+    include: { user: true },
+  });
+  const escalationAgent =
+    memberships.length > 0 && memberships[0].user.name
+      ? memberships[0].user.name
+      : "Support Team";
+
+  await prisma.contact.update({
+    where: { id: contact.id },
+    data: { assignedAgent: escalationAgent },
+  });
+
+  await prisma.systemLog.create({
+    data: {
+      timestamp: timeStr,
+      type: "crm",
+      message: `[Escalation Alert] Lead ${contact.name} was autonomously re-assigned to agent '${escalationAgent}': ${reason}`,
+      organizationId: orgId,
+    },
+  });
+
+  await prisma.message.create({
+    data: {
+      sender: "system",
+      text: `[Autonomous Escalation: Chat re-assigned to human agent '${escalationAgent}' — ${reason}]`,
+      timestamp: timeStr,
+      contactId: contact.id,
+      organizationId: orgId,
+    },
+  });
+
+  console.log(`[Agentic CRM] Autonomously escalated contact ${contact.name} to ${escalationAgent}.`);
 }
 
 async function advanceFlow(
@@ -246,12 +373,46 @@ async function freeFormAiReply(
   orgName: string,
   timeStr: string
 ) {
+  const totalCount = await prisma.message.count({ where: { contactId: contact.id } });
+
   const recentMessages = await prisma.message.findMany({
     where: { contactId: contact.id },
     orderBy: { createdAt: "desc" },
     take: 10,
   });
   recentMessages.reverse();
+
+  // Roll older history into a summary so long conversations stay within context limits
+  let conversationSummary = contact.conversationSummary || null;
+  if (totalCount > 20 && totalCount % 5 === 0) {
+    const olderMessages = await prisma.message.findMany({
+      where: { contactId: contact.id },
+      orderBy: { createdAt: "asc" },
+      take: totalCount - 10,
+    });
+    conversationSummary = await summarizeOlderMessages(
+      olderMessages.map((m) => ({ sender: m.sender, text: m.text })),
+      conversationSummary,
+      orgName
+    );
+    if (conversationSummary) {
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: { conversationSummary },
+      }).catch(() => {});
+    }
+  }
+
+  const org = contact.organization;
+  const knowledgeSection = org?.aiKnowledgeBase
+    ? `\n\nBusiness Knowledge Base — use this to answer questions accurately, do not contradict it:\n${org.aiKnowledgeBase}`
+    : "";
+  const personaSection = org?.aiPersona
+    ? `\n\nAdditional Persona & Tone Instructions:\n${org.aiPersona}`
+    : "";
+  const summarySection = conversationSummary
+    ? `\n\nSummary of earlier conversation with this customer:\n${conversationSummary}`
+    : "";
 
   const botContextMessages = [
     {
@@ -264,17 +425,14 @@ Your role:
 - BOOK appointments or escalate to a human agent when the prospect is ready
 - NEVER make up pricing or features — say "I'll have our team share the details with you"
 
-Special Command:
-- If the customer asks to see your products, catalog, shop, or what you sell, you MUST reply with exactly this exact phrase: [SHOW_CATALOG]
-- Do not add any other text when using [SHOW_CATALOG].
-
 Response guidelines:
 - Keep responses under 3-4 sentences. WhatsApp is conversational, not email.
 - Use *bold* for emphasis and occasional emojis for warmth (😊 👍 🎉)
 - Ask qualifying questions naturally: "What kind of setup are you looking for?", "Do you have a timeline in mind?"
 - If the customer sounds ready to buy → say "Great! I'll connect you with our team to get this going."
 - If you don't know the answer → "I'm not sure about that. Let me have a specialist reach out to you shortly."
-- NEVER be pushy or salesy — be helpful and consultative.`,
+- NEVER be pushy or salesy — be helpful and consultative.
+- Use the available tools (show_catalog, check_order_status, escalate_to_human) when the situation calls for them, instead of describing them in text.${knowledgeSection}${personaSection}${summarySection}`,
     },
     ...recentMessages.map((m) => ({
       role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
@@ -282,13 +440,50 @@ Response guidelines:
     })),
   ];
 
-  const botReplyText = await getGroqChatCompletion(botContextMessages);
+  let message;
+  try {
+    message = await getGroqChatCompletionWithTools(botContextMessages, {
+      temperature: org?.aiTemperature ?? 0.7,
+      tools: FREE_FORM_TOOLS,
+    });
+  } catch (err) {
+    console.error("Groq completion failed in freeFormAiReply:", err);
+    await logSystemError(orgId, timeStr, "AI Bot Error (Groq request failed)", err);
+    await sendReply(FALLBACK_REPLY, contact.id, orgId, timeStr, contact.name, contact.phone);
+    return;
+  }
 
-  if (botReplyText.includes("[SHOW_CATALOG]")) {
-    const { sendCatalog } = await import("./marketplace");
-    await sendCatalog(contact.phone, contact.id, orgId);
+  const botReplyText = message.content?.trim() || "";
+
+  if (message.tool_calls && message.tool_calls.length > 0) {
+    for (const call of message.tool_calls) {
+      try {
+        if (call.function.name === "show_catalog") {
+          const { sendCatalog } = await import("./marketplace");
+          await sendCatalog(contact.phone, contact.id, orgId);
+        } else if (call.function.name === "check_order_status") {
+          const { sendOrderStatus } = await import("./marketplace");
+          await sendOrderStatus(contact.phone, contact.id, orgId);
+        } else if (call.function.name === "escalate_to_human") {
+          let reason = "Customer requested human assistance.";
+          try {
+            const args = JSON.parse(call.function.arguments || "{}");
+            if (args.reason) reason = args.reason;
+          } catch {
+            // ignore malformed args, use default reason
+          }
+          await escalateContact(contact, orgId, timeStr, reason);
+        }
+      } catch (toolErr) {
+        console.error(`Tool execution failed for ${call.function.name}:`, toolErr);
+        await logSystemError(orgId, timeStr, `AI Bot Error (tool '${call.function.name}' failed)`, toolErr);
+      }
+    }
+    if (botReplyText) {
+      await sendReply(botReplyText, contact.id, orgId, timeStr, contact.name, contact.phone);
+    }
   } else {
-    await sendReply(botReplyText, contact.id, orgId, timeStr, contact.name, contact.phone);
+    await sendReply(botReplyText || FALLBACK_REPLY, contact.id, orgId, timeStr, contact.name, contact.phone);
   }
 
   const crmHistory = [
@@ -296,7 +491,7 @@ Response guidelines:
       role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
       content: m.text,
     })),
-    { role: "assistant" as const, content: botReplyText },
+    { role: "assistant" as const, content: botReplyText || "" },
   ];
 
   console.log(`[Agentic CRM] Triggering background qualification audit for ${contact.name}...`);
@@ -343,44 +538,10 @@ async function applyCrmAnalysis(analysis: CrmAnalysis, contact: BotContact, orgI
   }
 
   if (analysis.frustrated || analysis.needsEscalation) {
-    const memberships = await prisma.membership.findMany({
-      where: { organizationId: orgId },
-      include: { user: true },
-    });
-    const escalationAgent =
-      memberships.length > 0 && memberships[0].user.name
-        ? memberships[0].user.name
-        : "Support Team";
-
-    await prisma.contact.update({
-      where: { id: contact.id },
-      data: { assignedAgent: escalationAgent },
-    });
-
     const reason = analysis.frustrated
       ? "detected high customer frustration and negative sentiment"
       : "a complex technical/unresolved support inquiry";
-
-    await prisma.systemLog.create({
-      data: {
-        timestamp: timeStr,
-        type: "crm",
-        message: `[Escalation Alert] Lead ${contact.name} was autonomously re-assigned to agent '${escalationAgent}' due to ${reason}.`,
-        organizationId: orgId,
-      },
-    });
-
-    await prisma.message.create({
-      data: {
-        sender: "system",
-        text: `[Autonomous Escalation: Chat re-assigned to human agent '${escalationAgent}' due to ${reason}]`,
-        timestamp: timeStr,
-        contactId: contact.id,
-        organizationId: orgId,
-      },
-    });
-
-    console.log(`[Agentic CRM] Autonomously escalated contact ${contact.name} to ${escalationAgent}.`);
+    await escalateContact(contact, orgId, timeStr, reason);
   }
 }
 
@@ -583,48 +744,51 @@ async function handleNodeFlow(
   const incomingText = lastMsg.text.trim().toLowerCase();
 
   if (!contact.currentNodeId) {
-    // No active flow — check trigger match
-    const trigger = nodes.find((n) => n.id === "n1" && n.type === "trigger");
-    if (!trigger) return false;
+    // No active flow — check all trigger nodes for a match
+    const triggers = nodes.filter((n) => n.type === "trigger");
+    if (triggers.length === 0) return false;
 
-    const triggerPhrase = trigger.content.toLowerCase().trim();
-    if (!triggerPhrase) return false;
+    for (const trigger of triggers) {
+      const triggerPhrase = trigger.content.toLowerCase().trim();
+      if (!triggerPhrase) continue;
 
-    // 1. Fast exact/substring match
-    let isMatch = incomingText.includes(triggerPhrase);
+      // 1. Fast exact/substring match
+      let isMatch = incomingText.includes(triggerPhrase);
 
-    // 2. Semantic AI Intent Match (if fast match fails)
-    if (!isMatch) {
-      try {
-        const intentPrompt = [
-          {
-            role: "system",
-            content: `You are an intent classification engine. The user wants to trigger a workflow defined by the phrase/intent: "${triggerPhrase}".
+      // 2. Semantic AI Intent Match (if fast match fails)
+      if (!isMatch) {
+        try {
+          const intentPrompt = [
+            {
+              role: "system",
+              content: `You are an intent classification engine. The user wants to trigger a workflow defined by the phrase/intent: "${triggerPhrase}".
 Does the following user message match this intent, mean the same thing, or represent a clear desire to start this process?
 Reply ONLY with the exact word "true" or "false". No explanations.`
-          },
-          {
-            role: "user",
-            content: `User message: "${incomingText}"`
-          }
-        ];
-        // Note: getGroqChatCompletion is already imported at the top of the file
-        const response = await getGroqChatCompletion(intentPrompt);
-        isMatch = response.toLowerCase().includes("true");
-      } catch (err) {
-        console.error("Semantic intent match failed:", err);
+            },
+            {
+              role: "user",
+              content: `User message: "${incomingText}"`
+            }
+          ];
+          const response = await getGroqChatCompletion(intentPrompt);
+          isMatch = response.toLowerCase().includes("true");
+        } catch (err) {
+          console.error("Semantic intent match failed:", err);
+        }
       }
+
+      if (!isMatch) continue;
+
+      // Trigger matched — advance along the flow
+      if (trigger.nextId) {
+        await advanceFlow(trigger.nextId, nodes, contact.id, orgId, timeStr, contact.name, contact.phone);
+        // Run CRM analysis after flow reply
+        await runCrmAnalysis(contact, orgId, timeStr);
+      }
+      return true;
     }
 
-    if (!isMatch) return false;
-
-    // Trigger matched — advance along the flow
-    if (trigger.nextId) {
-      await advanceFlow(trigger.nextId, nodes, contact.id, orgId, timeStr, contact.name, contact.phone);
-      // Run CRM analysis after flow reply
-      await runCrmAnalysis(contact, orgId, timeStr);
-    }
-    return true;
+    return false;
   }
 
   // Resume from currentNodeId
@@ -730,5 +894,6 @@ async function runCrmAnalysis(contact: BotContact, orgId: string, timeStr: strin
     }
   } catch (err) {
     console.error("CRM analysis failed:", err);
+    await logSystemError(orgId, timeStr, "AI Bot Error (CRM analysis failed)", err);
   }
 }

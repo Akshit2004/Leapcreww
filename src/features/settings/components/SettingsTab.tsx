@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Sparkles,
   Save,
+  Bot,
 } from "lucide-react";
 import type { BrandProfile } from "@/shared/context/types";
 
@@ -55,6 +56,15 @@ export const SettingsTab: React.FC = () => {
   const [brandSaved, setBrandSaved] = useState(false);
   const [brandError, setBrandError] = useState<string | null>(null);
   const [syncedBrandKey, setSyncedBrandKey] = useState<string | null>(null);
+
+  // ─── AI Agent Settings (knowledge base, persona, temperature) ─────────
+  const [aiKnowledgeBase, setAiKnowledgeBase] = useState("");
+  const [aiPersona, setAiPersona] = useState("");
+  const [aiTemperature, setAiTemperature] = useState(0.7);
+  const [savingAiSettings, setSavingAiSettings] = useState(false);
+  const [aiSettingsSaved, setAiSettingsSaved] = useState(false);
+  const [aiSettingsError, setAiSettingsError] = useState<string | null>(null);
+  const [syncedAiSettingsKey, setSyncedAiSettingsKey] = useState<string | null>(null);
 
   const [whatsappStatus, setWhatsappStatus] = useState<{
     connected: boolean;
@@ -140,6 +150,49 @@ export const SettingsTab: React.FC = () => {
     setBrandTone(persistedBrand?.toneOfVoice || "");
     setBrandWebsite(persistedBrand?.websiteUrl || "");
   }
+
+  // ─── Seed AI Agent settings from loaded organization ──────────────────
+  const aiSettingsKey = JSON.stringify({
+    kb: organization?.aiKnowledgeBase ?? "",
+    persona: organization?.aiPersona ?? "",
+    temp: organization?.aiTemperature ?? 0.7,
+  });
+  if (aiSettingsKey !== syncedAiSettingsKey) {
+    setSyncedAiSettingsKey(aiSettingsKey);
+    setAiKnowledgeBase(organization?.aiKnowledgeBase || "");
+    setAiPersona(organization?.aiPersona || "");
+    setAiTemperature(organization?.aiTemperature ?? 0.7);
+  }
+
+  const handleSaveAiSettings = async () => {
+    if (!orgId) return;
+    setSavingAiSettings(true);
+    setAiSettingsError(null);
+    setAiSettingsSaved(false);
+    try {
+      const res = await fetch("/api/chatbot/ai-agent-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orgId,
+          aiKnowledgeBase: aiKnowledgeBase.trim(),
+          aiPersona: aiPersona.trim(),
+          aiTemperature,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to save AI agent settings.");
+      }
+      await refreshWorkspace(orgId);
+      setAiSettingsSaved(true);
+      setTimeout(() => setAiSettingsSaved(false), 2500);
+    } catch (err) {
+      setAiSettingsError(err instanceof Error ? err.message : "Failed to save AI agent settings.");
+    } finally {
+      setSavingAiSettings(false);
+    }
+  };
 
   const handleSaveBrand = async () => {
     if (!orgId || !brandName.trim()) {
@@ -625,6 +678,102 @@ export const SettingsTab: React.FC = () => {
               {savingBrand ? "Saving..." : "Save Profile"}
             </button>
             {brandSaved && (
+              <span className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold">
+                <CheckCircle2 className="w-4 h-4" />
+                Saved
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* AI Agent Settings Card */}
+      <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+        <div className="p-6 border-b border-stone-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-100 text-emerald-600">
+              <Bot className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-stone-900 text-sm">AI Agent Settings</h3>
+              <p className="text-stone-400 text-[11px] mt-0.5">
+                Give your Pure AI Mode autoresponder business knowledge, a custom persona, and a creativity level.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+              Knowledge Base
+            </label>
+            <textarea
+              value={aiKnowledgeBase}
+              onChange={(e) => setAiKnowledgeBase(e.target.value)}
+              placeholder="e.g. We sell handmade leather wallets starting at ₹1,200. Shipping takes 3-5 days across India. Returns accepted within 7 days. Store hours: 10am-7pm Mon-Sat."
+              rows={5}
+              maxLength={8000}
+              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all resize-none"
+            />
+            <p className="text-[10px] text-stone-400">
+              Facts, pricing, policies and FAQs the AI can use to answer questions accurately instead of guessing.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+              Persona & Tone
+            </label>
+            <textarea
+              value={aiPersona}
+              onChange={(e) => setAiPersona(e.target.value)}
+              placeholder="e.g. Speak as 'Riya', a warm and upbeat support specialist. Use simple English, avoid jargon, and always greet returning customers by name."
+              rows={3}
+              maxLength={8000}
+              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all resize-none"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+                Creativity (Temperature)
+              </label>
+              <span className="text-xs font-bold text-stone-900">{aiTemperature.toFixed(1)}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={1.2}
+              step={0.1}
+              value={aiTemperature}
+              onChange={(e) => setAiTemperature(parseFloat(e.target.value))}
+              className="w-full accent-stone-900"
+            />
+            <div className="flex items-center justify-between text-[10px] text-stone-400">
+              <span>Focused & predictable</span>
+              <span>Creative & varied</span>
+            </div>
+          </div>
+
+          {aiSettingsError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-medium px-4 py-2.5 rounded-xl flex items-center gap-2">
+              <XCircle className="w-4 h-4 shrink-0" />
+              {aiSettingsError}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={handleSaveAiSettings}
+              disabled={savingAiSettings}
+              className="flex items-center gap-2 px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50"
+            >
+              {savingAiSettings ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              {savingAiSettings ? "Saving..." : "Save AI Settings"}
+            </button>
+            {aiSettingsSaved && (
               <span className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold">
                 <CheckCircle2 className="w-4 h-4" />
                 Saved

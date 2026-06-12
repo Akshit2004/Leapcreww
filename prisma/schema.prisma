@@ -58,6 +58,15 @@ model Organization {
   // Brand-Aware AI content generation profile ({ name, industry, toneOfVoice })
   brandProfile             Json?
 
+  // Free-text business knowledge/FAQ/policies injected into the autoresponder AI system prompt
+  aiKnowledgeBase          String?    @db.Text
+
+  // Optional custom persona/tone instructions overriding the default sales-assistant persona
+  aiPersona                String?    @db.Text
+
+  // Groq sampling temperature for the free-form AI autoresponder agent
+  aiTemperature            Float?     @default(0.7)
+
   // White-label / agency reseller link (T-09)
   partnerId                String?
   partner                  Partner?   @relation(fields: [partnerId], references: [id], onDelete: SetNull)
@@ -125,6 +134,7 @@ model Contact {
   unreadCount    Int          @default(0)
   assignedAgent  String       @default("None")
   currentNodeId  String?      // Tracks position in chatbot flow tree
+  conversationSummary String? @db.Text // Rolling LLM-generated summary of older conversation history (long-chat context window management)
   attributes     Json?        // Custom attributes (key/value) for segmentation (T-04)
   lastActiveAt   DateTime?    // Last inbound activity, drives "active within N days" segments (T-04)
   organizationId String

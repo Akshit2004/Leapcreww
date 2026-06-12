@@ -14,6 +14,10 @@ export interface Organization {
   marketplaceBotEnabled?: boolean;
   activeUseCase?: "NONE" | "MARKETPLACE" | "APPOINTMENT";
   appointmentPreset?: "HEALTHCARE" | "HOSPITALITY" | "EDUCATION" | "CORPORATE";
+  chatbotBuilderEnabled?: boolean;
+  aiKnowledgeBase?: string | null;
+  aiPersona?: string | null;
+  aiTemperature?: number | null;
   [key: string]: unknown;
 }
 

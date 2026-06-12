@@ -51,6 +51,9 @@ export async function GET(
         appointmentPreset: true,
         chatbotBuilderEnabled: true,
         brandProfile: true,
+        aiKnowledgeBase: true,
+        aiPersona: true,
+        aiTemperature: true,
       }
     });
 
