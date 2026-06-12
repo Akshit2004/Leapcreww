@@ -61,7 +61,7 @@ export default function TermsPage() {
     rate: {
       title: "Rate Limiting & Queue Orchestration",
       subtitle: "HIGH-THROUGHPUT STABILITY RELAY",
-      desc: "To prevent Meta API rate failures and network clogging, WappFlow employs persistent queue pools. Broadcasts are dispatched inside dynamic rate-limiting partitions to preserve system health.",
+      desc: "To prevent Meta API rate failures and network clogging, LeapCrew AI employs persistent queue pools. Broadcasts are dispatched inside dynamic rate-limiting partitions to preserve system health.",
       badge: "STABILITY GUARANTEE",
       steps: [
         "Persistent concurrency control throttled at 80 ms/msg",
@@ -86,10 +86,10 @@ export default function TermsPage() {
       content: (
         <div className="space-y-4">
           <p>
-            WappFlow serves as an architectural intermediary SaaS application that facilitates seamless integrations with the **WhatsApp Business Cloud API (Meta)**. By registering a tenant workspace, you acknowledge and agree that our software’s operation is strictly bound by Meta’s official Service Level Agreements (SLAs).
+            LeapCrew AI serves as an architectural intermediary SaaS application that facilitates seamless integrations with the <strong>WhatsApp Business Cloud API (Meta)</strong>. By registering a tenant workspace, you acknowledge and agree that our software&apos;s operation is strictly bound by Meta&apos;s official Service Level Agreements (SLAs).
           </p>
           <p>
-            We represent a stateless and logical multi-tenant CRM layer. Any outages, API modifications, template blocking policies, or number suspensions executed by Meta Business Platform fall entirely outside WappFlow’s structural liabilities. You are obligated to maintain active, compliant Developer accounts and WhatsApp Business accounts directly inside Meta&apos;s dashboard.
+            We represent a stateless and logical multi-tenant CRM layer. Any outages, API modifications, template blocking policies, or number suspensions executed by Meta Business Platform fall entirely outside LeapCrew AI&apos;s structural liabilities. You are obligated to maintain active, compliant Developer accounts and WhatsApp Business accounts directly inside Meta&apos;s dashboard.
           </p>
         </div>
       )
@@ -101,13 +101,13 @@ export default function TermsPage() {
       content: (
         <div className="space-y-4">
           <p>
-            WappFlow enforces a strict **Zero Tolerance Policy for Unsolicited Broadcasts (Spam)**. You must abide by Meta’s official WhatsApp Business Terms of Service and Commerce Policies on all outbound campaigns.
+            LeapCrew AI enforces a strict <strong>Zero Tolerance Policy for Unsolicited Broadcasts (Spam)</strong>. You must abide by Meta&apos;s official WhatsApp Business Terms of Service and Commerce Policies on all outbound campaigns.
           </p>
           <p>
             You represent that all contacts imported via CSV or synchronized through external webhooks (Shopify/WooCommerce) have explicitly opted in to receive communications on their verified WhatsApp numbers. Any client account identified as receiving high block/spam report ratios inside the Meta Business Manager will be subject to instant workspace suspension.
           </p>
           <div className="bg-[#FAF7F2] border border-[#1D211F]/10 rounded-lg p-5 space-y-3 mt-6">
-            <h5 className="font-mono text-[9px] uppercase tracking-wider text-[#D05E3C] font-bold">Meta Quality Tiers & Limits:</h5>
+            <h5 className="font-mono text-[9px] uppercase tracking-wider text-[#D05E3C] font-bold">Meta Quality Tiers &amp; Limits:</h5>
             <ul className="text-xs space-y-2 text-[#1D211F]/80">
               <li className="flex items-start gap-2.5">
                 <Check className="w-3.5 h-3.5 text-[#2E4A3F] shrink-0 mt-0.5" />
@@ -133,13 +133,13 @@ export default function TermsPage() {
       content: (
         <div className="space-y-4">
           <p>
-            WappFlow utilizes an in-app **SaaS credit wallet system** for template messaging charges and WhatsApp utility session costs.
+            LeapCrew AI utilizes an in-app <strong>SaaS credit wallet system</strong> for template messaging charges and WhatsApp utility session costs.
           </p>
           <p>
-            All top-up transactions are executed securely through our integrated payment processor, **Razorpay**. By submitting billing details, you authorize WappFlow to credit your local database wallet ledger with the exact Indian Rupee (INR) amount verified by the processor. 
+            All top-up transactions are executed securely through our integrated payment processor, <strong>Razorpay</strong>. By submitting billing details, you authorize LeapCrew AI to credit your local database wallet ledger with the exact Indian Rupee (INR) amount verified by the processor.
           </p>
           <ul className="list-disc pl-5 text-xs space-y-2 text-[#1D211F]/80">
-            <li><strong>Non-Refundable Balance</strong>: Wallet top-up credits are non-refundable and hold no monetary cash value outside WappFlow campaign operations.</li>
+            <li><strong>Non-Refundable Balance</strong>: Wallet top-up credits are non-refundable and hold no monetary cash value outside LeapCrew AI campaign operations.</li>
             <li><strong>Session Cost Index</strong>: WhatsApp charges are based on Meta&apos;s official country index pricing rules and are deducted dynamically from your wallet ledger upon each webhook dispatch check.</li>
             <li><strong>Automatic Queue Halting</strong>: If your active wallet balance drops below ₹0, the outbound API dispatch pool halts instantly to prevent credit liability build-up.</li>
           </ul>
@@ -153,10 +153,10 @@ export default function TermsPage() {
       content: (
         <div className="space-y-4">
           <p>
-            Consistent with the GDPR and California Consumer Privacy Act (CCPA), WappFlow respects your absolute rights over your proprietary database assets.
+            Consistent with the GDPR, the India IT Act 2000, and the Digital Personal Data Protection Act 2023 (DPDP Act), LeapCrew AI respects your absolute rights over your proprietary database assets.
           </p>
           <p>
-            You can export all contacts, campaign transmission metrics, template databases, and system logs in structured JSON/CSV formats at any time. If you choose to terminate your workspace instance, you can request a **Permanent System Scrubbing**. Upon confirmation, your entire logical PostgreSQL tenant schema, Meta access credentials, and transaction logs are deleted completely in 48 hours.
+            You can export all contacts, campaign transmission metrics, template databases, and system logs in structured JSON/CSV formats at any time. If you choose to terminate your workspace instance, you can request a <strong>Permanent System Scrubbing</strong>. Upon confirmation, your entire logical PostgreSQL tenant schema, Meta access credentials, and transaction logs are deleted completely in 48 hours.
           </p>
         </div>
       )
@@ -168,7 +168,7 @@ export default function TermsPage() {
       content: (
         <div className="space-y-4">
           <p>
-            To protect infrastructure integrity and prevent database thrashing, WappFlow establishes strict concurrency boundaries across all workspace instances.
+            To protect infrastructure integrity and prevent database thrashing, LeapCrew AI establishes strict concurrency boundaries across all workspace instances.
           </p>
           <table className="min-w-full text-xs text-left border-collapse border border-[#1D211F]/8 mt-4">
             <thead>
@@ -202,28 +202,28 @@ export default function TermsPage() {
     {
       id: "sec-6",
       num: "06",
-      title: "System integrity & Administrative Integrity Compliance",
+      title: "System Integrity & Administrative Compliance",
       content: (
         <div className="space-y-4">
           <p>
-            WappFlow is architected with complete end-to-end transparency. We maintain round-the-clock infrastructure checks, logical database schema separations, and dynamic security audits to secure your customer CRM data.
+            LeapCrew AI is architected with complete end-to-end transparency. We maintain round-the-clock infrastructure checks, logical database schema separations, and dynamic security audits to secure your customer CRM data.
           </p>
           <p>
-            For inquiries regarding terms of operations, SOC2 compliance audits, or Meta Business Cloud API SLAs, please contact our core systems orchestrator:
+            For inquiries regarding terms of operations, SOC2 compliance audits, or Meta Business Cloud API SLAs, please contact our compliance team:
           </p>
           <div className="bg-[#1D211F] text-[#FAF7F2] rounded-lg p-6 space-y-4 mt-6">
             <div className="flex items-center gap-3">
               <Scale className="w-5 h-5 text-[#D05E3C]" />
-              <span className="font-serif text-sm font-semibold tracking-wide">WappFlow Operations & Compliance Operations</span>
+              <span className="font-serif text-sm font-semibold tracking-wide">LeapCrew AI — Operations &amp; Compliance</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono text-[#FAF7F2]/80">
               <div>
                 <span className="text-[#FAF7F2]/45 uppercase text-[9px] tracking-wider block">Legal Inquiries</span>
-                <span className="font-semibold text-white">smritix.ai.1@gmail.com</span>
+                <span className="font-semibold text-white">hello@leapcrew.ai</span>
               </div>
               <div>
                 <span className="text-[#FAF7F2]/45 uppercase text-[9px] tracking-wider block">Security Escalations</span>
-                <span className="font-semibold text-white">smritix.ai.1@gmail.com</span>
+                <span className="font-semibold text-white">hello@leapcrew.ai</span>
               </div>
             </div>
           </div>
@@ -234,7 +234,7 @@ export default function TermsPage() {
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] text-[#1D211F] flex flex-col font-sans overflow-x-hidden selection:bg-[#2E4A3F] selection:text-[#FAF7F2] relative">
-      
+
       {/* 1. Sticky Navigation Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#FAF7F2]/90 backdrop-blur-md border-b border-[#1D211F]/8 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 md:px-12 h-20 flex items-center justify-between">
@@ -242,10 +242,10 @@ export default function TermsPage() {
             <div className="w-9 h-9 rounded-md bg-[#1D211F] flex items-center justify-center transition-transform group-hover:scale-102">
               <Bot className="w-5 h-5 text-[#FAF7F2]" />
             </div>
-            <span className="font-sans font-extrabold text-xl tracking-tight text-[#1D211F]">WappFlow</span>
+            <span className="font-sans font-extrabold text-xl tracking-tight text-[#1D211F]">LeapCrew AI</span>
           </Link>
 
-          <Link 
+          <Link
             href="/"
             className="border border-[#1D211F]/15 hover:border-[#1D211F]/60 text-[#1D211F]/70 hover:text-[#1D211F] text-xs font-bold tracking-wider uppercase px-4 py-2.5 rounded-md flex items-center gap-2 transition-all duration-300 active:scale-98"
           >
@@ -268,7 +268,7 @@ export default function TermsPage() {
           </h1>
 
           <p className="text-[#1D211F]/70 text-sm sm:text-base leading-relaxed font-medium max-w-2xl">
-            Read WappFlow’s terms of service and compliance specifications. Learn about Meta Cloud APIs, rate limits, credit ledger allocation protocols, and logical tenant boundaries.
+            Read LeapCrew AI&apos;s terms of service and compliance specifications. Learn about Meta Cloud APIs, rate limits, credit ledger allocation protocols, and logical tenant boundaries.
           </p>
 
           <div className="pt-6 flex items-center gap-6 font-mono text-[9px] tracking-widest text-[#1D211F]/40 uppercase select-none">
@@ -292,7 +292,7 @@ export default function TermsPage() {
 
         {/* The Simulator UI */}
         <div className="bg-[#1D211F] text-[#FAF7F2] rounded-xl overflow-hidden shadow-2xl border border-white/10 grid grid-cols-1 lg:grid-cols-12 min-h-[500px]">
-          
+
           {/* Simulator Sidebar (Switches) */}
           <div className="lg:col-span-4 bg-[#171A19] border-r border-[#FAF7F2]/8 p-6 flex flex-col justify-between select-none">
             <div className="space-y-4">
@@ -342,7 +342,7 @@ export default function TermsPage() {
 
           {/* Simulator Main Workspace */}
           <div className="lg:col-span-8 p-6 md:p-8 flex flex-col justify-between bg-[#1D211F] space-y-6">
-            
+
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="bg-[#FAF7F2]/10 border border-[#FAF7F2]/10 text-white font-mono text-[8px] tracking-widest uppercase px-2 py-0.5 rounded font-bold">
@@ -365,7 +365,7 @@ export default function TermsPage() {
               {/* Dynamic Diagram */}
               <div className="py-4 border-y border-[#FAF7F2]/8 mt-2">
                 <span className="font-mono text-[9px] tracking-widest text-[#FAF7F2]/30 uppercase block mb-3">RULE FLOW:</span>
-                
+
                 {activeNode === "compliance" && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center text-xs font-mono">
                     <div className="bg-[#171A19] border border-[#FAF7F2]/10 p-3 rounded text-center space-y-1 select-none">
@@ -380,7 +380,7 @@ export default function TermsPage() {
                       <div className="text-lg">————&gt;</div>
                     </div>
                     <div className="bg-[#2E4A3F] border border-white/10 p-3 rounded text-center space-y-1 relative select-none">
-                      <span className="text-white/50 text-[8px] uppercase tracking-wider block">WappFlow Gatekeeper</span>
+                      <span className="text-white/50 text-[8px] uppercase tracking-wider block">LeapCrew AI Gatekeeper</span>
                       <span className="font-bold text-white block">Template Matcher</span>
                     </div>
                   </div>
@@ -465,7 +465,7 @@ export default function TermsPage() {
       {/* 4. Document Index Grid */}
       <section className="py-16 md:py-24 px-6 md:px-12 max-w-7xl mx-auto w-full relative z-10 flex-1">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-          
+
           {/* Left Navigation Quick Link Index */}
           <div className="lg:col-span-4 lg:sticky lg:top-28 space-y-6 lg:border-r border-[#1D211F]/8 lg:pr-8 select-none">
             <div className="space-y-2">
@@ -502,7 +502,7 @@ export default function TermsPage() {
               <div className="text-[9px] font-mono text-[#1D211F]/40 uppercase tracking-widest leading-relaxed">
                 Need a physical print copy for legal compliance audits?
               </div>
-              <button 
+              <button
                 onClick={() => window.print()}
                 className="w-full text-center py-2.5 rounded border border-[#1D211F]/20 hover:border-[#1D211F]/60 text-xs font-bold uppercase tracking-wide transition-all active:scale-98"
               >
@@ -514,8 +514,8 @@ export default function TermsPage() {
           {/* Right Detailed Copy Column */}
           <div className="lg:col-span-8 space-y-16">
             {sections.map((sec) => (
-              <div 
-                key={sec.id} 
+              <div
+                key={sec.id}
                 id={sec.id}
                 className="group border-t border-[#1D211F]/10 pt-10 scroll-mt-28 space-y-6 text-left transition-all duration-300"
               >
@@ -545,16 +545,16 @@ export default function TermsPage() {
       {/* 5. Editorial Footer */}
       <footer className="bg-[#171A19] text-[#FAF7F2]/80 border-t border-[#FAF7F2]/10 py-16 px-6 md:px-12 relative z-10 shrink-0">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-8 text-xs select-none">
-          
+
           <div className="space-y-3 text-left">
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 rounded bg-[#FAF7F2]/10 flex items-center justify-center">
                 <Bot className="w-4 h-4 text-[#FAF7F2]" />
               </div>
-              <span className="font-sans font-extrabold tracking-tight text-white text-base">WappFlow</span>
+              <span className="font-sans font-extrabold tracking-tight text-white text-base">LeapCrew AI</span>
             </div>
             <p className="text-[#FAF7F2]/40 max-w-sm font-medium">
-              Architectural customer communication systems. Secure localized database deployments with multi-tenant CRM isolation.
+              A product of smritix AI LLP, India. Architectural customer communication systems with secure multi-tenant CRM isolation.
             </p>
           </div>
 
@@ -575,10 +575,13 @@ export default function TermsPage() {
         </div>
 
         <div className="max-w-7xl mx-auto mt-12 pt-6 border-t border-[#FAF7F2]/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px] text-[#FAF7F2]/30 font-mono">
-          <p>© {new Date().getFullYear()} WappFlow Inc. All rights reserved. Distributed under strict Meta Cloud API SLAs.</p>
-          <div className="flex gap-6">
+          <p>© 2026 smritix AI LLP. LeapCrew AI is a product of smritix AI LLP, India.</p>
+          <div className="flex flex-wrap gap-6">
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-white transition-colors">Terms of Operations</Link>
+            <Link href="/legal/cookies" className="hover:text-white transition-colors">Cookie Policy</Link>
+            <Link href="/legal/dpa" className="hover:text-white transition-colors">DPA</Link>
+            <Link href="/legal/refund" className="hover:text-white transition-colors">Refund Policy</Link>
           </div>
         </div>
       </footer>

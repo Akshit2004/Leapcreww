@@ -66,9 +66,33 @@
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* Outline display type (kinetic bands / ghost CTA text) */
+.text-stroke-ink { -webkit-text-stroke: 1.5px rgba(29, 33, 31, 0.22); color: transparent; }
+.text-stroke-cream { -webkit-text-stroke: 1.5px rgba(250, 247, 242, 0.14); color: transparent; }
+
+/* Mouse-tracked spotlight hover (Features cards) */
+.spotlight-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  background: radial-gradient(440px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(208, 94, 60, 0.09), transparent 65%);
+}
+.spotlight-card:hover::after { opacity: 1; }
+
+/* Rotating conic border beam (popular pricing card) */
+@keyframes borderSpin { to { transform: rotate(360deg); } }
+.animate-border-spin { animation: borderSpin 6s linear infinite; }
+
+/* Marquee pause on hover (TrustedBy logo rail) */
+.marquee-container:hover .marquee-track { animation-play-state: paused; }
+
 /* Reduce motion */
 @media (prefers-reduced-motion: reduce) {
-  .animate-marquee, .animate-drift, .pulse-ring { animation: none !important; }
+  .animate-marquee, .animate-drift, .pulse-ring, .animate-border-spin, .marquee-track { animation: none !important; }
 }
 
 :root {

@@ -22,7 +22,11 @@ export default function Pricing() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto items-stretch">
         {pricing.map((plan, idx) => (
-          <motion.div key={idx} initial={{ opacity: 0, y: 60, scale: 0.94 }} whileInView={{ opacity: 1, y: 0, scale: plan.popular ? 1.04 : 1 }} whileHover={{ y: -10, scale: plan.popular ? 1.06 : 1.02 }} viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.7, delay: idx * 0.12, ease: [0.22, 1, 0.36, 1] }} className={`border p-8 md:p-10 flex flex-col justify-between rounded-lg ${plan.popular ? "bg-[#1D211F] text-[#FAF7F2] border-[#1D211F] shadow-xl" : "bg-white border-[#1D211F]/10 hover:border-[#1D211F]/40 text-[#1D211F] hover:shadow-2xl"}`}>
+          <motion.div key={idx} initial={{ opacity: 0, y: 60, scale: 0.94 }} whileInView={{ opacity: 1, y: 0, scale: plan.popular ? 1.04 : 1 }} whileHover={{ y: -10, scale: plan.popular ? 1.06 : 1.02 }} viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.7, delay: idx * 0.12, ease: [0.22, 1, 0.36, 1] }} className={`relative rounded-lg ${plan.popular ? "p-[2px] overflow-hidden shadow-xl" : ""}`}>
+            {plan.popular && (
+              <div aria-hidden className="absolute -inset-[150%] animate-border-spin" style={{ background: "conic-gradient(from 0deg, transparent 0%, transparent 68%, #D05E3C 80%, #FBBF24 88%, transparent 96%)" }} />
+            )}
+            <div className={`relative border p-8 md:p-10 flex flex-col justify-between rounded-lg h-full ${plan.popular ? "bg-[#1D211F] text-[#FAF7F2] border-transparent rounded-[6px]" : "bg-white border-[#1D211F]/10 hover:border-[#1D211F]/40 text-[#1D211F] hover:shadow-2xl transition-shadow"}`}>
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h4 className={`font-mono text-[10px] tracking-widest uppercase font-bold ${plan.popular ? "text-[#D05E3C]" : "text-[#1D211F]/50"}`}>{plan.name}</h4>
@@ -50,6 +54,7 @@ export default function Pricing() {
               <Link href="/signup" className={`w-full text-center py-4 rounded-md text-xs font-bold tracking-wider uppercase block transition-all duration-300 active:scale-[0.98] ${plan.popular ? "bg-[#D05E3C] hover:bg-[#b04826] text-white shadow-md" : "bg-[#1D211F] hover:bg-[#2E4A3F] text-[#FAF7F2] shadow-sm"}`}>
                 {plan.cta}
               </Link>
+            </div>
             </div>
           </motion.div>
         ))}

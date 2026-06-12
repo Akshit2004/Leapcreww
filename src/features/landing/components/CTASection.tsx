@@ -1,15 +1,24 @@
 "use client";
-import { motion } from "framer-motion";
+import { useRef } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 export default function CTASection() {
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const ghostX = useTransform(scrollYProgress, [0, 1], ["-6%", "6%"]);
+
   return (
-    <section className="py-24 md:py-32 px-6 md:px-12 max-w-7xl mx-auto w-full relative z-10">
+    <section ref={ref} className="py-24 md:py-32 px-6 md:px-12 max-w-7xl mx-auto w-full relative z-10">
       <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.8 }} className="relative bg-[#1D211F] text-[#FAF7F2] rounded-2xl px-8 md:px-16 py-14 md:py-20 overflow-hidden">
         <div aria-hidden className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "linear-gradient(to right,#FAF7F2 1px,transparent 1px),linear-gradient(to bottom,#FAF7F2 1px,transparent 1px)", backgroundSize: "48px 48px" }} />
         <div aria-hidden className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-[#D05E3C]/20 blur-3xl animate-drift" />
         <div aria-hidden className="absolute -bottom-32 -left-20 w-80 h-80 rounded-full bg-[#2E4A3F]/30 blur-3xl animate-drift" style={{ animationDelay: "-6s" }} />
+
+        <motion.span aria-hidden style={{ x: ghostX }} className="absolute -bottom-6 md:-bottom-10 left-0 right-0 text-center font-serif font-light text-[26vw] md:text-[16rem] leading-none text-stroke-cream select-none pointer-events-none whitespace-nowrap">
+          LAUNCH
+        </motion.span>
 
         <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
           <div className="lg:col-span-7 space-y-5">
