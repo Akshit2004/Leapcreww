@@ -17,6 +17,7 @@ import TrustedBy from "./components/TrustedBy";
 import Pricing from "./components/Pricing";
 import Testimonials from "./components/Testimonials";
 import FAQ from "./components/FAQ";
+import WaitlistSection from "./components/WaitlistSection";
 import CTASection from "./components/CTASection";
 import Footer from "./components/Footer";
 
@@ -39,6 +40,7 @@ export default function LandingPage() {
       <DeveloperPlatform />
       <Pricing />
       <Testimonials />
+      <WaitlistSection />
       <FAQ />
       <CTASection />
       <Footer />

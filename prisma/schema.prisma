@@ -266,6 +266,18 @@ model SystemLog {
   createdAt      DateTime     @default(now())
 }
 
+// Pre-launch waitlist — public capture, intentionally not org-scoped.
+model WaitlistEntry {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  brandName     String?
+  monthlyOrders String?  // self-reported band: "<500" | "500-2000" | "2000-10000" | "10000+"
+  source        String   @default("landing") // "landing" | "calculator" | "vs_page"
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model Product {
   id             String       @id @default(uuid())
   sku            String?      @unique
