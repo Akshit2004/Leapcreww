@@ -9,7 +9,7 @@ export function createKey(data: Prisma.ApiKeyUncheckedCreateInput) {
 export function listKeys(organizationId: string) {
   return prisma.apiKey.findMany({
     where: { organizationId },
-    select: { id: true, name: true, prefix: true, scopes: true, lastUsedAt: true, revokedAt: true, createdAt: true },
+    select: { id: true, name: true, prefix: true, scopes: true, isSandbox: true, lastUsedAt: true, revokedAt: true, createdAt: true },
     orderBy: { createdAt: "desc" },
   });
 }

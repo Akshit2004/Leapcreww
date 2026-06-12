@@ -148,7 +148,13 @@ export async function GET(
         id: m.id,
         sender: m.sender as "user" | "agent" | "system",
         text: m.text,
-        timestamp: m.timestamp,
+        timestamp: m.createdAt.toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+          timeZone: "Asia/Kolkata",
+        }),
+        createdAt: m.createdAt.toISOString(),
         status: m.status as "sent" | "delivered" | "read" | undefined,
         buttons: m.buttons as string[],
       });
@@ -160,6 +166,16 @@ export async function GET(
       orderBy: { createdAt: "desc" },
     });
 
+    const formattedLogs = systemLogs.map((log) => ({
+      ...log,
+      timestamp: log.createdAt.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Kolkata",
+      }),
+    }));
+
     // 4. Return unified JSON payloads
     return NextResponse.json({
       organization,
@@ -168,7 +184,7 @@ export async function GET(
       templates: allTemplates,
       chatbotNodes,
       integrations,
-      systemLogs,
+      systemLogs: formattedLogs,
       chatHistory,
       members,
       orders,

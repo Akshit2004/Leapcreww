@@ -1,12 +1,19 @@
 /**
- * broadcastService.ts — Broadcast business logic.
+ * broadcastService.ts — Broadcast business logic with queue engine.
  *
- * Consolidates the template-send loop that was previously duplicated between
- * the launch route and the scheduled-cron route. Both now delegate here.
+ * Queue design: launchCampaign creates the record and returns immediately.
+ * The cron (processAllCampaigns) advances each "Sending" campaign 50 contacts
+ * at a time (CHUNK_SIZE). This eliminates serverless timeout death on large
+ * lists and makes campaigns resumable after a crash.
+ *
+ * Optimistic locking: advanceCampaignChunk uses a WHERE currentOffset =
+ * expectedOffset so two concurrent cron ticks cannot double-process the same
+ * chunk — the second one gets count=0 and exits early.
  */
 import type { Campaign, Contact } from "@prisma/client";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
 import { recordTouch } from "@/features/analytics/services/attribution";
+import { canAfford, recordUsage } from "@/features/billing/services/billingService";
 import * as repo from "../repositories/campaignRepo";
 import type {
   CampaignVariable,
@@ -15,8 +22,8 @@ import type {
   WhatsAppTemplatePayload,
 } from "../types";
 
-const hhmm = (d = new Date()) =>
-  `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+/** Max contacts to send per cron tick per campaign. 50 × 1s delay = 50s worst-case. */
+export const CHUNK_SIZE = 50;
 
 /** Build a Meta template payload for one contact, resolving variables + media header. */
 export function buildTemplatePayload(
@@ -29,7 +36,7 @@ export function buildTemplatePayload(
   const parameters: WhatsAppTemplateParameter[] = variables.map((v) => {
     if (v.type === "contact_field") {
       if (v.value === "name") return { type: "text", text: contact.name };
-      if (v.value === "email") return { type: "text", text: contact.email };
+      if (v.value === "email") return { type: "text", text: contact.email ?? "" };
       if (v.value === "phone") return { type: "text", text: contact.phone };
     }
     return { type: "text", text: v.value || "" };
@@ -51,155 +58,196 @@ export function buildTemplatePayload(
   return { payload, parameters };
 }
 
-/**
- * Send a campaign (template or flow) to a list of contacts, updating delivered metrics,
- * system logs and CRM message bubbles as it goes. Returns delivered count.
- */
-export async function runBroadcast(campaign: Campaign, contacts: Contact[]): Promise<number> {
-  const { id: campaignId, name, templateName, mediaType, mediaUrl, organizationId, flowId } = campaign;
-  const delaySeconds = campaign.delay ?? 1;
+/** Send one contact and return whether it succeeded. */
+async function sendToContact(campaign: Campaign, contact: Contact, flow: any, screenId: string): Promise<boolean> {
+  const { id: campaignId, templateName, mediaType, mediaUrl, organizationId, flowId } = campaign;
+  const phone = formatPhoneNumber(contact.phone);
+  let result;
+  let preview = "";
 
-  await repo.updateCampaign(campaignId, { sent: contacts.length });
-
-  // If this is a Flow broadcast, fetch flow configuration
-  let flow: any = null;
-  let screenId = "WELCOME_SCREEN";
-  if (flowId) {
-    const { prisma } = await import("@/shared/lib/prisma");
-    flow = await prisma.flow.findUnique({ where: { id: flowId } });
-    if (!flow || !flow.metaFlowId) {
-      await repo.updateCampaign(campaignId, { status: "Failed" });
-      await repo.logCampaignEvent(
-        organizationId,
-        campaignId,
-        `Failed to run flow broadcast: Flow or Meta Flow ID not found for Flow ID ${flowId}.`,
-        hhmm()
-      );
-      return 0;
-    }
-    if (flow.status !== "published") {
-      await repo.updateCampaign(campaignId, { status: "Failed" });
-      await repo.logCampaignEvent(
-        organizationId,
-        campaignId,
-        `Failed to run flow broadcast: "${flow.name}" has unpublished changes. Publish it to Meta before broadcasting.`,
-        hhmm()
-      );
-      return 0;
-    }
-    const flowJson = flow.flowJson as any;
-    const rawScreenId = flowJson?.screens?.[0]?.id || "WELCOME_SCREEN";
-    // Sanitize to match what flowService uploads to Meta (alphabets + underscores only)
-    screenId = rawScreenId.replace(/[^a-zA-Z_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "WELCOME_SCREEN";
+  if (flowId && flow) {
+    const flowVars = (campaign.variables as any) || {};
+    result = await sendWhatsAppMessage(
+      {
+        to: phone,
+        flow: {
+          flowId: flow.metaFlowId,
+          flowToken: `flow_${flow.id}_campaign_${campaignId}_${contact.id}`,
+          flowCta: flowVars.ctaText || "Open Form",
+          screen: screenId,
+          title: flowVars.title || `Flow: ${flow.name}`,
+          footer: flowVars.footer || "Sent via Campaign",
+        },
+      },
+      organizationId
+    );
+    preview = `[Flow: ${flow.name}] | CTA: ${flowVars.ctaText || "Open Form"}`;
+  } else {
+    const variables = (campaign.variables as unknown as CampaignVariable[]) || [];
+    const { payload, parameters } = buildTemplatePayload(
+      templateName || "",
+      variables,
+      contact,
+      mediaType,
+      mediaUrl
+    );
+    result = await sendWhatsAppMessage(
+      {
+        to: phone,
+        template: payload as unknown as {
+          name: string;
+          language: { code: string };
+          components?: Record<string, unknown>[];
+        },
+      },
+      organizationId
+    );
+    preview =
+      parameters.length > 0
+        ? `[Template: ${templateName}] | Params: ${parameters.map((p) => p.text).join(", ")}`
+        : `[Template Message: ${templateName}]`;
   }
 
-  let delivered = 0;
-  for (const contact of contacts) {
-    const phone = formatPhoneNumber(contact.phone);
-    let result;
-    let preview = "";
-
-    if (flowId && flow) {
-      // Send interactive Flow message
-      const flowVars = (campaign.variables as any) || {};
-      result = await sendWhatsAppMessage(
-        {
-          to: phone,
-          flow: {
-            flowId: flow.metaFlowId,
-            flowToken: `flow_${flow.id}_campaign_${campaignId}_${contact.id}`,
-            flowCta: flowVars.ctaText || "Open Form",
-            screen: screenId,
-            title: flowVars.title || `Flow: ${flow.name}`,
-            footer: flowVars.footer || "Sent via Campaign",
-          }
-        },
-        organizationId
-      );
-      preview = `[Flow: ${flow.name}] | CTA: ${flowVars.ctaText || "Open Form"}`;
-    } else {
-      // Send template message (original path)
-      const variables = (campaign.variables as unknown as CampaignVariable[]) || [];
-      const { payload, parameters } = buildTemplatePayload(
-        templateName || "",
-        variables,
-        contact,
-        mediaType,
-        mediaUrl
-      );
-      result = await sendWhatsAppMessage(
-        {
-          to: phone,
-          template: payload as unknown as {
-            name: string;
-            language: { code: string };
-            components?: Record<string, unknown>[];
-          },
-        },
-        organizationId
-      );
-      preview =
-        parameters.length > 0
-          ? `[Template: ${templateName}] | Params: ${parameters.map((p) => p.text).join(", ")}`
-          : `[Template Message: ${templateName}]`;
-    }
-
-    const ts = hhmm();
-    if (!result.ok) {
-      await repo.logCampaignEvent(
-        organizationId,
-        campaignId,
-        `Broadcast delivery failed to ${contact.name} (${phone}): ${result.error}`,
-        ts
-      );
-    } else {
-      delivered++;
-      await repo.logCampaignEvent(
-        organizationId,
-        campaignId,
-        `Broadcast successfully sent to ${contact.name} (${phone})`,
-        ts
-      );
-      await repo.recordOutboundMessage({
-        organizationId,
-        campaignId,
-        contactId: contact.id,
-        text: preview,
-        timestamp: ts,
-        waMessageId: result.data?.messages?.[0]?.id,
-      });
-      // D-04: record a campaign touch for last-touch revenue attribution.
-      await recordTouch({ organizationId, contactId: contact.id, channel: "campaign", campaignId });
-    }
-
-    await repo.updateCampaign(campaignId, { delivered });
-    if (delaySeconds > 0) await new Promise((r) => setTimeout(r, delaySeconds * 1000));
+  if (!result.ok) {
+    await repo.logCampaignEvent(
+      organizationId,
+      campaignId,
+      `Broadcast delivery failed to ${contact.name} (${phone}): ${result.error}`
+    );
+    return false;
   }
 
-  await repo.updateCampaign(campaignId, { status: "Completed" });
   await repo.logCampaignEvent(
     organizationId,
     campaignId,
-    `Broadcast campaign '${name}' processing completely finalized.`,
-    hhmm()
+    `Broadcast successfully sent to ${contact.name} (${phone})`
   );
-  return delivered;
+  await repo.recordOutboundMessage({
+    organizationId,
+    campaignId,
+    contactId: contact.id,
+    text: preview,
+    waMessageId: result.data?.messages?.[0]?.id,
+  });
+  await recordUsage({ type: "message", category: "marketing", organizationId, campaignId }).catch(() => {});
+  await recordTouch({ organizationId, contactId: contact.id, channel: "campaign", campaignId });
+  return true;
 }
 
 /**
- * Create a campaign record. If scheduled, returns immediately for the cron to
- * pick up. Otherwise fires the broadcast in the background and returns the record.
+ * Resolve flow metadata once per chunk so we don't re-fetch on every contact.
+ * Returns { flow, screenId } or null if the campaign is a template broadcast.
+ */
+async function resolveFlow(campaign: Campaign): Promise<{ flow: any; screenId: string } | null> {
+  if (!campaign.flowId) return null;
+  const { prisma } = await import("@/shared/lib/prisma");
+  const flow = await prisma.flow.findUnique({ where: { id: campaign.flowId } });
+  if (!flow?.metaFlowId || flow.status !== "published") {
+    await repo.updateCampaign(campaign.id, { status: "Failed" });
+    await repo.logCampaignEvent(
+      campaign.organizationId,
+      campaign.id,
+      `Campaign '${campaign.name}' aborted: Flow ${campaign.flowId} not found or not published.`
+    );
+    return null;
+  }
+  const rawScreenId = (flow.flowJson as any)?.screens?.[0]?.id || "WELCOME_SCREEN";
+  const screenId =
+    rawScreenId.replace(/[^a-zA-Z_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") ||
+    "WELCOME_SCREEN";
+  return { flow, screenId };
+}
+
+/**
+ * Process one CHUNK_SIZE slice of a campaign's contact list.
+ *
+ * The optimistic lock: advanceCampaignChunk writes only when
+ * currentOffset still equals the value we read — a concurrent cron tick
+ * that already advanced the offset will get count=0 and this function exits.
+ */
+export async function processCampaignChunk(campaign: Campaign): Promise<void> {
+  const { id: campaignId, organizationId, name } = campaign;
+  const startOffset = campaign.currentOffset;
+
+  // Wallet pre-flight once per chunk
+  if (!(await canAfford(organizationId, "marketing"))) {
+    await repo.updateCampaign(campaignId, { status: "Failed" });
+    await repo.logCampaignEvent(
+      organizationId,
+      campaignId,
+      `Campaign '${name}' paused: insufficient wallet balance.`
+    );
+    return;
+  }
+
+  // Load the next slice of contacts with a stable order
+  const contacts = await repo.findTargetContactsPaged(
+    organizationId,
+    campaign.targetTag,
+    campaign.excludeTag ?? undefined,
+    campaign.segmentId,
+    startOffset,
+    CHUNK_SIZE
+  );
+
+  if (!contacts.length) {
+    // All contacts processed — close the campaign
+    await repo.updateCampaign(campaignId, { status: "Completed" });
+    await repo.logCampaignEvent(
+      organizationId,
+      campaignId,
+      `Broadcast campaign '${name}' completed.`
+    );
+    return;
+  }
+
+  const flowCtx = await resolveFlow(campaign);
+  if (campaign.flowId && !flowCtx) return; // resolveFlow already marked it Failed
+
+  const delaySeconds = campaign.delay ?? 1;
+  let delivered = 0;
+
+  for (const contact of contacts) {
+    const ok = await sendToContact(
+      campaign,
+      contact,
+      flowCtx?.flow ?? null,
+      flowCtx?.screenId ?? "WELCOME_SCREEN"
+    );
+    if (ok) delivered++;
+    if (delaySeconds > 0) await new Promise((r) => setTimeout(r, delaySeconds * 1000));
+  }
+
+  const newOffset = startOffset + contacts.length;
+  const isComplete = contacts.length < CHUNK_SIZE; // last chunk is smaller than full size
+
+  // Optimistic commit — safe to ignore if another cron tick already advanced
+  await repo.advanceCampaignChunk(campaignId, startOffset, newOffset, delivered, isComplete);
+
+  if (isComplete) {
+    await repo.logCampaignEvent(
+      organizationId,
+      campaignId,
+      `Broadcast campaign '${name}' completed (${newOffset} contacts processed).`
+    );
+  }
+}
+
+/**
+ * Create a campaign record and return immediately.
+ *
+ * The actual sending is handled by the cron (processAllCampaigns) which
+ * advances "Sending" campaigns CHUNK_SIZE contacts per tick.
  */
 export async function launchCampaign(input: LaunchCampaignInput): Promise<Campaign> {
-  const contacts = await repo.findTargetContacts(
+  const totalContacts = await repo.countTargetContacts(
     input.organizationId,
     input.targetTag,
-    input.excludeTag,
     input.segmentId
   );
   const isScheduled = !!input.scheduledAt;
 
-  const campaign = await repo.createCampaign({
+  return repo.createCampaign({
     name: input.name,
     targetTag: input.targetTag,
     excludeTag: input.excludeTag,
@@ -210,60 +258,61 @@ export async function launchCampaign(input: LaunchCampaignInput): Promise<Campai
     variables: (input.variables as unknown as object) || [],
     delay: input.delay || 1,
     segmentId: input.segmentId,
-    sent: contacts.length,
+    sent: totalContacts,
     delivered: 0,
     read: 0,
     clicked: 0,
+    currentOffset: 0,
     status: isScheduled ? "Scheduled" : "Sending",
     date: new Date().toISOString().split("T")[0],
     scheduledAt: isScheduled ? new Date(input.scheduledAt as string) : null,
     organizationId: input.organizationId,
   });
-
-  if (!isScheduled) {
-    // Fire-and-forget background worker.
-    void runBroadcast(campaign, contacts).catch(async (err) => {
-      console.error("[Broadcast Background Worker Error]:", err);
-      await repo.updateCampaign(campaign.id, { status: "Failed" }).catch(() => {});
-    });
-  }
-
-  return campaign;
 }
 
-/** Cron entrypoint: run all scheduled campaigns whose time has arrived. */
-export async function processScheduledCampaigns() {
-  const due = await repo.findScheduledDue(new Date());
+/**
+ * Cron entrypoint: start due scheduled campaigns, then advance all in-progress
+ * campaigns by one chunk each.  Runs every minute.
+ */
+export async function processAllCampaigns() {
   const results: Array<Record<string, unknown>> = [];
 
+  // 1. Promote due scheduled campaigns to "Sending"
+  const due = await repo.findScheduledDue(new Date());
   for (const campaign of due) {
+    await repo.updateCampaign(campaign.id, {
+      status: "Sending",
+      date: new Date().toISOString().split("T")[0],
+    });
+    await repo.logCampaignEvent(
+      campaign.organizationId,
+      campaign.id,
+      `Scheduled campaign '${campaign.name}' started.`
+    );
+  }
+
+  // 2. Advance every campaign currently sending (includes newly promoted ones)
+  const sending = await repo.findSendingCampaigns();
+  for (const campaign of sending) {
     try {
-      await repo.updateCampaign(campaign.id, {
-        status: "Sending",
-        date: new Date().toISOString().split("T")[0],
-      });
-      await repo.logCampaignEvent(
-        campaign.organizationId,
-        campaign.id,
-        `Scheduled broadcast campaign '${campaign.name}' processing has commenced. (${campaign.id})`,
-        hhmm()
-      );
-      const contacts = await repo.findTargetContacts(
-        campaign.organizationId,
-        campaign.targetTag,
-        campaign.excludeTag ?? undefined,
-        campaign.segmentId
-      );
-      const delivered = await runBroadcast(campaign, contacts);
-      results.push({ campaignId: campaign.id, name: campaign.name, recipients: contacts.length, delivered, status: "Completed" });
+      await processCampaignChunk(campaign);
+      results.push({ campaignId: campaign.id, name: campaign.name, offset: campaign.currentOffset });
     } catch (err) {
-      console.error(`Error processing campaign ${campaign.id}:`, err);
+      console.error(`[BroadcastQueue] chunk failed for campaign ${campaign.id}:`, err);
       await repo.updateCampaign(campaign.id, { status: "Failed" }).catch(() => {});
-      results.push({ campaignId: campaign.id, name: campaign.name, error: err instanceof Error ? err.message : String(err), status: "Failed" });
+      results.push({
+        campaignId: campaign.id,
+        error: err instanceof Error ? err.message : String(err),
+        status: "Failed",
+      });
     }
   }
+
   return results;
 }
+
+/** @deprecated Use processAllCampaigns — kept for backwards-compat with old cron callers. */
+export const processScheduledCampaigns = processAllCampaigns;
 
 /** Delete a campaign after verifying the requesting user owns its org. */
 export async function deleteCampaignFor(campaignId: string, userEmail: string): Promise<void> {

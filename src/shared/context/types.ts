@@ -25,7 +25,7 @@ export interface Contact {
   id: string;
   name: string;
   phone: string;
-  email: string;
+  email?: string | null;
   source: string;
   tags: string[];
   status: "Active" | "Inactive";
@@ -42,6 +42,7 @@ export interface Message {
   sender: "user" | "agent" | "system";
   text: string;
   timestamp: string;
+  createdAt?: string;
   status?: "sent" | "delivered" | "read";
   buttons?: string[];
 }

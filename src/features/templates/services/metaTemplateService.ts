@@ -10,9 +10,6 @@ import { formatTemplateName, type CreateTemplateInput } from "../types";
 
 const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
 
-const hhmm = (d = new Date()) =>
-  `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-
 /**
  * Meta requires a media HEADER to carry an example asset handle at template
  * creation time. Obtain it via the Resumable Upload API and return the `h` handle.
@@ -188,7 +185,6 @@ export async function createTemplate(input: CreateTemplateInput) {
     : await repo.createTemplate(persistData);
 
   await repo.createLog({
-    timestamp: hhmm(),
     type: "crm",
     message: `Template submitted for approval: "${formattedName}" (${category}) - Status: ${metaStatus}`,
     organizationId,

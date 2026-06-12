@@ -69,11 +69,14 @@ export async function POST(req: NextRequest) {
 
       const paymentId = payload.payload?.payment?.entity?.id;
 
+      const wasCodConversion = order.codStatus === "confirmed";
+
       await prisma.order.update({
         where: { id: order.id },
         data: {
           paymentStatus: "paid",
           status: "confirmed",
+          codStatus: wasCodConversion ? null : order.codStatus,
           ...(paymentId ? { razorpayPaymentId: paymentId } : {}),
         },
       });
@@ -83,16 +86,41 @@ export async function POST(req: NextRequest) {
       await markCartRecovered(order.organizationId, order.contactId);
 
       const cleanPhone = order.contact.phone.replace(/[^0-9]/g, "");
-      const text = `✅ *Payment Received!* 🎉
 
-Thank you for your order *${order.orderId}*!
+      if (wasCodConversion) {
+        // Customer took the prepaid conversion offer — send a celebratory message.
+        await prisma.contact.update({
+          where: { id: order.contactId },
+          data: {
+            tags: {
+              set: Array.from(
+                new Set([
+                  ...order.contact.tags.filter((t) => t !== "cod-confirmed"),
+                  "cod-converted-prepaid",
+                ])
+              ),
+            },
+          },
+        });
 
-📦 *Status:* Confirmed
-💳 *Payment:* Paid — ₹${(order.total / 100).toFixed(2)}
+        await prisma.systemLog.create({
+          data: {
+            type: "integration",
+            message: `COD order #${order.orderId} converted to prepaid by ${order.contact.name}. Saved ₹50.`,
+            organizationId: order.organizationId,
+          },
+        });
 
-We'll notify you when it ships. Reply *ORDERS* to check status anytime.`;
-
-      await sendWhatsAppMessage({ to: cleanPhone, text }, order.organizationId);
+        await sendWhatsAppMessage({
+          to: cleanPhone,
+          text:
+            `🎊 *You saved ₹50!*\n\nPayment received for order #${order.orderId}. ` +
+            `Great choice paying online — we'll get it packed and shipped right away. 🚀`,
+        }, order.organizationId);
+      } else {
+        const text = `✅ *Payment Received!* 🎉\n\nThank you for your order *${order.orderId}*!\n\n📦 *Status:* Confirmed\n💳 *Payment:* Paid — ₹${(order.total / 100).toFixed(2)}\n\nWe'll notify you when it ships. Reply *ORDERS* to check status anytime.`;
+        await sendWhatsAppMessage({ to: cleanPhone, text }, order.organizationId);
+      }
     }
 
     if (event === "payment.failed" || event === "payment_link.cancelled") {

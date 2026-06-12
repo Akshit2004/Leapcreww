@@ -1,184 +1,190 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
+import {
+  verifyShopifyInstallHmac,
+  parseSignedState,
+  encryptToken,
+} from "@/features/integrations/lib/shopifyAuth";
+
+const SHOPIFY_API_VERSION = "2024-10";
+
+// Webhook topics to subscribe during install.
+// GDPR topics (customers/data_request, customers/redact, shop/redact) are
+// mandatory for App Store listing — they MUST be registered and handled.
+const WEBHOOK_TOPICS = [
+  "orders/create",
+  "orders/fulfilled",
+  "checkouts/create",
+  "inventory_levels/update",
+  "app/uninstalled",
+  "customers/data_request",
+  "customers/redact",
+  "shop/redact",
+];
+
+async function registerWebhooks(
+  shop: string,
+  accessToken: string,
+  receiverUrl: string
+): Promise<{ registered: string[]; failed: string[] }> {
+  const registered: string[] = [];
+  const failed: string[] = [];
+
+  for (const topic of WEBHOOK_TOPICS) {
+    try {
+      const r = await fetch(
+        `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/webhooks.json`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": accessToken,
+          },
+          body: JSON.stringify({ webhook: { topic, address: receiverUrl, format: "json" } }),
+        }
+      );
+      // 422 = already registered — treat as success
+      if (r.ok || r.status === 422) {
+        registered.push(topic);
+      } else {
+        failed.push(topic);
+      }
+    } catch {
+      failed.push(topic);
+    }
+  }
+
+  return { registered, failed };
+}
 
 export async function GET(request: NextRequest) {
-  let shop: string | null = null;
-  let orgId: string | null = null;
+  const { searchParams } = new URL(request.url);
+  const code  = searchParams.get("code")?.trim() ?? "";
+  const shop  = searchParams.get("shop")?.trim() ?? "";
+  const state = searchParams.get("state")?.trim() ?? "";
 
+  const clientId     = process.env.SHOPIFY_CLIENT_ID;
+  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
+
+  const host     = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
+  const protocol = request.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+  const origin   = `${protocol}://${host}`;
+
+  const fail = (msg: string, orgId?: string) => {
+    const dest = orgId
+      ? `${origin}/org/${orgId}?tab=integrations&error=${encodeURIComponent(msg)}`
+      : `${origin}/login?error=${encodeURIComponent(msg)}`;
+    return NextResponse.redirect(dest);
+  };
+
+  if (!clientId || !clientSecret) {
+    return NextResponse.json({ error: "Shopify credentials not configured." }, { status: 500 });
+  }
+
+  if (!code || !shop || !state) {
+    return fail("Missing OAuth callback parameters.");
+  }
+
+  // 1. Verify HMAC on the callback — Shopify signs these too.
+  if (!verifyShopifyInstallHmac(searchParams, clientSecret)) {
+    return fail("Invalid HMAC on callback. Possible CSRF or replay attack.");
+  }
+
+  // 2. Verify signed state — confirms this callback belongs to our install
+  //    request and hasn't expired (10-minute window).
+  const parsed = parseSignedState(state, clientSecret);
+  if (!parsed) {
+    return fail("Invalid or expired state parameter. Please retry the installation.");
+  }
+  const { orgId } = parsed;
+
+  // 3. Confirm the org exists
+  const org = await prisma.organization.findUnique({ where: { id: orgId } });
+  if (!org) return fail("Workspace not found.", orgId);
+
+  // 4. Exchange code for access token
+  let accessToken: string;
   try {
-    const { searchParams } = new URL(request.url);
-    const code = searchParams.get("code")?.trim() || null;
-    shop = searchParams.get("shop")?.trim() || null;
-    orgId = searchParams.get("state")?.trim() || null; // We passed orgId as the state
-
-    if (!code || !shop || !orgId) {
-      return NextResponse.json({ error: "Missing required callback parameters (code, shop, or state)." }, { status: 400 });
-    }
-
-    const clientId = process.env.SHOPIFY_CLIENT_ID;
-    const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret) {
-      return NextResponse.json(
-        { error: "Shopify OAuth Client credentials are missing on the server. Please check your .env file." },
-        { status: 500 }
-      );
-    }
-
-    // 1. Exchange the temporary code for a permanent Access Token
-    const exchangeUrl = `https://${shop}/admin/oauth/access_token`;
-    const exchangeResponse = await fetch(exchangeUrl, {
+    const r = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-      }),
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
     });
-
-    if (!exchangeResponse.ok) {
-      const errorData = await exchangeResponse.json();
-      console.error("❌ Shopify Access Token exchange failed:", errorData);
-      return NextResponse.json(
-        { error: "Failed to exchange authorization code for access token.", details: errorData },
-        { status: 400 }
-      );
+    if (!r.ok) {
+      const err = await r.json();
+      console.error("Shopify token exchange failed:", err);
+      return fail("Token exchange failed. The authorization code may have expired.", orgId);
     }
+    const data = await r.json();
+    accessToken = data.access_token;
+    if (!accessToken) return fail("No access token in Shopify response.", orgId);
+  } catch (e) {
+    console.error("Shopify token exchange error:", e);
+    return fail("Network error during token exchange.", orgId);
+  }
 
-    const tokenData = await exchangeResponse.json();
-    const accessToken = tokenData.access_token;
-
-    if (!accessToken) {
-      return NextResponse.json({ error: "Access token not found in Shopify response." }, { status: 400 });
-    }
-
-    // 2. Fetch Shop Details to get the official Shop Name
-    let shopName = shop.split(".")[0];
-    try {
-      const shopRes = await fetch(`https://${shop}/admin/api/2024-04/shop.json`, {
-        headers: {
-          "X-Shopify-Access-Token": accessToken,
-        },
-      });
-      if (shopRes.ok) {
-        const shopDetails = await shopRes.json();
-        shopName = shopDetails.shop.name || shopName;
-      }
-    } catch (e) {
-      console.error("⚠️ Failed to fetch shop details:", e);
-    }
-
-    // 3. Serialize Credentials and Upsert in Database
-    const serializedApiKey = JSON.stringify({
-      shopDomain: shop,
-      accessToken: accessToken,
+  // 5. Fetch shop name
+  let shopName = shop.split(".")[0];
+  try {
+    const r = await fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/shop.json`, {
+      headers: { "X-Shopify-Access-Token": accessToken },
     });
+    if (r.ok) {
+      const d = await r.json();
+      shopName = d.shop?.name || shopName;
+    }
+  } catch { /* non-fatal */ }
 
-    const integrationData = {
+  // 6. Encrypt token at rest, persist integration
+  const encryptedToken = encryptToken(accessToken);
+  const serializedApiKey = JSON.stringify({ shopDomain: shop, accessToken: encryptedToken });
+
+  await prisma.integration.upsert({
+    where: { id_organizationId: { id: "shopify", organizationId: orgId } },
+    update: {
       name: "Shopify",
       description: "Sync products, track orders, recover carts, and automate post-purchase flows.",
       status: "connected",
       icon: "ShoppingBag",
       apiKey: serializedApiKey,
-      webhookUrl: `https://${shop}`, // Using this to save store root domain
-    };
+      webhookUrl: `https://${shop}`,
+    },
+    create: {
+      id: "shopify",
+      organizationId: orgId,
+      name: "Shopify",
+      description: "Sync products, track orders, recover carts, and automate post-purchase flows.",
+      status: "connected",
+      icon: "ShoppingBag",
+      apiKey: serializedApiKey,
+      webhookUrl: `https://${shop}`,
+    },
+  });
 
-    await prisma.integration.upsert({
-      where: {
-        id_organizationId: {
-          id: "shopify",
-          organizationId: orgId,
-        },
-      },
-      update: integrationData,
-      create: {
-        id: "shopify",
-        organizationId: orgId,
-        ...integrationData,
-      },
-    });
+  // 7. Register webhooks (skip on localhost — Shopify can't reach it)
+  const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
+  let registered: string[] = [];
+  let failed: string[] = [];
 
-    // 4. Programmatic Webhooks Setup
-    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
-    const protocol = request.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
-    const origin = `${protocol}://${host}`;
-    const webhookReceiverUrl = `${origin}/api/webhooks/shopify`;
-
-    const webhooksRegistered: string[] = [];
-    let webhookWarning = "";
-
-    const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
-
-    if (isLocal) {
-      webhookWarning = "Localhost environment detected. Skipping automatic Shopify webhook registration. Please set up a tunnel (e.g. ngrok) to receive real-time webhook updates.";
-    } else {
-      // Register webhooks programmatically for non-localhost hosts
-      const topics = ["orders/create", "orders/fulfilled", "checkouts/create"];
-      for (const topic of topics) {
-        try {
-          const webhookRes = await fetch(`https://${shop}/admin/api/2024-04/webhooks.json`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Shopify-Access-Token": accessToken,
-            },
-            body: JSON.stringify({
-              webhook: {
-                topic,
-                address: webhookReceiverUrl,
-                format: "json",
-              },
-            }),
-          });
-          if (webhookRes.ok) {
-            webhooksRegistered.push(topic);
-          } else {
-            const errData = await webhookRes.json();
-            console.warn(`⚠️ Failed to register webhook topic ${topic}:`, errData);
-          }
-        } catch (e) {
-          console.error(`❌ Webhook subscription failed for ${topic}:`, e);
-        }
-      }
-    }
-
-    // 5. Create System Log
-    const d = new Date();
-    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-    await prisma.systemLog.create({
-      data: {
-        timestamp: timeStr,
-        type: "integration",
-        message: `Shopify Connected: Store "${shopName}" (${shop}) successfully authenticated via 1-Click OAuth.${
-          webhooksRegistered.length > 0
-            ? ` Subscribed to topics: ${webhooksRegistered.join(", ")}.`
-            : ""
-        }`,
-        organizationId: orgId,
-      },
-    });
-
-    // 6. Redirect user back to the Integrations tab dashboard
-    const successRedirectUrl = `${origin}/org/${orgId}?success=true&registered=${webhooksRegistered.length}&warning=${encodeURIComponent(
-      webhookWarning
-    )}`;
-
-    return NextResponse.redirect(successRedirectUrl);
-  } catch (err: unknown) {
-    console.error("❌ Shopify OAuth callback failed:", err);
-    
-    // Redirect to error page if we have origin and orgId, otherwise return error payload
-    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
-    const protocol = host.includes("localhost") ? "http" : "https";
-    if (orgId && host) {
-      return NextResponse.redirect(
-        `${protocol}://${host}/org/${orgId}?error=${encodeURIComponent(
-          err instanceof Error ? err.message : String(err)
-        )}`
-      );
-    }
-
-    return NextResponse.json({ error: "Internal callback handler failure.", details: err instanceof Error ? err.message : String(err) }, { status: 500 });
+  if (!isLocal) {
+    const receiverUrl = `${origin}/api/webhooks/shopify`;
+    ({ registered, failed } = await registerWebhooks(shop, accessToken, receiverUrl));
   }
+
+  // 8. Log
+  await prisma.systemLog.create({
+    data: {
+      type: "integration",
+      message:
+        `Shopify connected: "${shopName}" (${shop}).` +
+        (registered.length ? ` Webhooks registered: ${registered.join(", ")}.` : "") +
+        (failed.length ? ` Failed: ${failed.join(", ")}.` : "") +
+        (isLocal ? " Localhost — webhooks skipped." : ""),
+      organizationId: orgId,
+    },
+  });
+
+  return NextResponse.redirect(
+    `${origin}/org/${orgId}?tab=integrations&shopify=connected&shop=${encodeURIComponent(shopName)}`
+  );
 }

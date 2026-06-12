@@ -74,11 +74,8 @@ export async function POST(
     ]);
 
     // 3. Log layout save action
-    const d = new Date();
-    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "crm",
         message: `Chatbot Builder visual nodes layout updated: ${nodes.length} nodes saved successfully.`,
         organizationId: orgId

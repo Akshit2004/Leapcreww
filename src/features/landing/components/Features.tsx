@@ -6,6 +6,8 @@ const features = [
   { index: "02", title: "Smart Campaign Broadcasts", subtitle: "CRM Dispatch System", desc: "Launch pre-approved Meta templates to targeted tag lists. Monitor live deliverability metrics (Sent, Delivered, Read, and Click-Through rates) synchronized directly with your secure PostgreSQL database.", bullets: ["Scheduled & recurring", "Variable interpolation", "Funnel analytics"] },
   { index: "03", title: "Visual Chatbot Builder", subtitle: "Automation Engine", desc: "Architect complex conversational paths with absolute structural clarity. Design branch routing triggers, optional node choices, and third-party webhook integrations in a custom workspace engineered for high-throughput messaging.", bullets: ["Drag-and-drop canvas", "Pure AI autoresponder", "Per-node analytics"] },
   { index: "04", title: "Webhook Integrations", subtitle: "External Orchestration", desc: "Synchronize customer actions across your technology stack natively. Bind Shopify abandoned carts, WooCommerce payment receipts, and automated Google Sheets logs directly to your secure WhatsApp channel without third-party delay.", bullets: ["Shopify & WooCommerce", "Signed outbound hooks", "Connector registry"] },
+  { index: "05", title: "One-Click AI Automations", subtitle: "Recipe Engine", desc: "Install complete working automations — abandoned cart recovery, win-back sequences, review collection — with a single click. Or describe your use case in plain language and the AI composer generates and installs a custom drip sequence on the spot.", bullets: ["Six instant recipes", "AI recipe composer", "Drip sequences"] },
+  { index: "06", title: "Commerce, Bookings & ROI", subtitle: "Revenue Layer", desc: "Sell inside the conversation. WhatsApp catalog orders, Razorpay-paid appointment bookings, and Shopify checkouts all land in one attribution ledger that ties every rupee of revenue back to the exact campaign that sourced it.", bullets: ["Paid bookings", "Catalog checkout", "Attribution ledger"] },
 ];
 
 export default function Features() {
@@ -25,7 +27,13 @@ export default function Features() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 lg:gap-x-16 gap-y-12 lg:gap-y-20 border-t border-[#1D211F]/10 pt-12 lg:pt-16">
         {features.map((feat, idx) => (
-          <motion.article key={idx} initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.75, delay: (idx % 2) * 0.12, ease: [0.22, 1, 0.36, 1] }} whileHover={{ y: -6 }} className="group space-y-4 border-t border-[#1D211F]/8 pt-8 first:border-none lg:first:border-t lg:border-t cursor-default">
+          <motion.article key={idx} initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.75, delay: (idx % 2) * 0.12, ease: [0.22, 1, 0.36, 1] }} whileHover={{ y: -6 }}
+            onMouseMove={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              e.currentTarget.style.setProperty("--spot-x", `${e.clientX - r.left}px`);
+              e.currentTarget.style.setProperty("--spot-y", `${e.clientY - r.top}px`);
+            }}
+            className="group relative spotlight-card rounded-lg space-y-4 border-t border-[#1D211F]/8 pt-8 first:border-none lg:first:border-t lg:border-t cursor-default">
             <div className="flex items-baseline justify-between">
               <span className="font-mono text-xs tracking-widest text-[#D05E3C] uppercase font-bold">
                 <span className="inline-block group-hover:translate-x-1 transition-transform duration-300">{feat.subtitle}</span>

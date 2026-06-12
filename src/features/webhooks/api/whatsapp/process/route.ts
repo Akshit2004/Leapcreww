@@ -2,7 +2,37 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { handleAutoResponder } from "@/shared/lib/autoresponder";
 
+function isWithinWorkingHours(wh: import("@/features/inbox/api/working-hours/route").WorkingHoursConfig): boolean {
+  const now = new Date();
+  // Use Intl to get hours/minutes in the configured timezone
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: wh.timezone,
+    weekday: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const dayName = parts.find(p => p.type === "weekday")?.value?.toLowerCase() as keyof typeof wh.schedule;
+  const hour = parseInt(parts.find(p => p.type === "hour")?.value ?? "0", 10);
+  const minute = parseInt(parts.find(p => p.type === "minute")?.value ?? "0", 10);
+  const daySchedule = wh.schedule[dayName];
+  if (!daySchedule?.open) return false;
+  const [fromH, fromM] = daySchedule.from.split(":").map(Number);
+  const [toH, toM] = daySchedule.to.split(":").map(Number);
+  const currentMins = hour * 60 + minute;
+  return currentMins >= fromH * 60 + fromM && currentMins < toH * 60 + toM;
+}
+
 export async function POST(req: NextRequest) {
+  // Only usable in development — prevents accidental sandbox calls in production
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "Sandbox simulation endpoint is disabled in production." },
+      { status: 403 }
+    );
+  }
+
   try {
     const { from, text } = await req.json();
     if (!from || !text) {
@@ -48,7 +78,6 @@ export async function POST(req: NextRequest) {
         data: {
           name: profileName,
           phone: normalizedPhone,
-          email: `${from}@whatsapp.customer`,
           source: "WhatsApp Inbound",
           tags: ["WhatsApp", "Inbound"],
           status: "Active",
@@ -74,7 +103,6 @@ export async function POST(req: NextRequest) {
       data: {
         sender: "user",
         text,
-        timestamp: timeStr,
         contactId: contact.id,
         organizationId: activeOrgId,
       },
@@ -82,12 +110,29 @@ export async function POST(req: NextRequest) {
 
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "chat",
         message: `Received WhatsApp message from ${contact.name}: "${text.slice(0, 60)}"`,
         organizationId: activeOrgId,
       },
     });
+
+    // Working hours auto-away
+    const orgWithHours = await prisma.organization.findUnique({
+      where: { id: activeOrgId },
+      select: { workingHours: true, whatsappPhoneNumberId: true, whatsappConnected: true },
+    });
+    if (orgWithHours?.workingHours) {
+      const wh = orgWithHours.workingHours as unknown as import("@/features/inbox/api/working-hours/route").WorkingHoursConfig;
+      if (wh.enabled && !isWithinWorkingHours(wh)) {
+        // Send away message via WhatsApp API if connected
+        if (orgWithHours.whatsappConnected && orgWithHours.whatsappPhoneNumberId) {
+          const { sendWhatsAppMessage } = await import("@/shared/lib/whatsapp");
+          await sendWhatsAppMessage({ to: normalizedPhone, text: wh.awayMessage }, activeOrgId).catch(() => {});
+        }
+        // Log it and skip autoresponder
+        return NextResponse.json({ status: "ok", contactId: contact.id, outsideHours: true }, { status: 200 });
+      }
+    }
 
     if (contact.assignedAgent === "Bot") {
       await handleAutoResponder(contact.id, activeOrgId);

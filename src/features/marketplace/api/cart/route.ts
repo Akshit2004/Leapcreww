@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { createRazorpayOrder } from "@/shared/lib/razorpay";
 import { resolveAttribution } from "@/features/analytics/services/attribution";
+import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
 
 function generateOrderId(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -63,6 +64,20 @@ export async function POST(req: NextRequest) {
         },
       },
       include: { items: true },
+    });
+
+    // Sequence trigger: enroll into order_placed sequences.
+    await enrollOnTrigger(orgId, "order_placed", contact.id);
+
+    // Outbound webhook (T-08): notify subscribers of the new order.
+    const { emitEvent } = await import("@/features/webhooks/services/webhookDeliveryService");
+    await emitEvent(orgId, "order.placed", {
+      orderId: order.orderId,
+      total,
+      currency: "INR",
+      source: "marketplace",
+      contact: { id: contact.id, name: contact.name, phone: contact.phone },
+      items: order.items.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price })),
     });
 
     await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });

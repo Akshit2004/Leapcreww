@@ -31,7 +31,6 @@ export async function sendAgentMessage(input: SendMessageInput, agentName: strin
   const dbMsg = await repo.createMessage({
     sender: "agent",
     text: input.text,
-    timestamp: ts,
     contactId: input.contactId,
     organizationId: input.orgId,
   });
@@ -44,7 +43,6 @@ export async function sendAgentMessage(input: SendMessageInput, agentName: strin
       lastMessageTime: ts,
     });
     await repo.createLog({
-      timestamp: ts,
       type: "crm",
       message: `Agent ${agentName} took over conversation from AI Bot for contact ${contact.name}`,
       organizationId: input.orgId,
@@ -63,7 +61,6 @@ export async function sendAgentMessage(input: SendMessageInput, agentName: strin
 
   if (!result.ok) {
     await repo.createLog({
-      timestamp: ts,
       type: "chat",
       message: `Agent sent sandbox message: "${input.text.slice(0, 45)}" (Meta: ${result.error})`,
       organizationId: input.orgId,
@@ -72,7 +69,6 @@ export async function sendAgentMessage(input: SendMessageInput, agentName: strin
   }
 
   await repo.createLog({
-    timestamp: ts,
     type: "chat",
     message: `Agent sent WhatsApp message: "${input.text.slice(0, 50)}"`,
     organizationId: input.orgId,
@@ -91,12 +87,26 @@ export async function updateContactFields(
   callerOrgIds: string[],
   body: Record<string, unknown>
 ) {
-  await requireOwnedContact(contactId, callerOrgIds);
+  const existing = await requireOwnedContact(contactId, callerOrgIds);
   const updates: Record<string, unknown> = {};
   for (const key of CONTACT_EDITABLE_FIELDS) {
     if (body[key] !== undefined) updates[key] = body[key];
   }
-  return repo.updateContact(contactId, updates);
+  const updated = await repo.updateContact(contactId, updates);
+
+  // Fire tag_added for each newly added tag so sequences (e.g. win_back) enroll correctly.
+  if (Array.isArray(body.tags)) {
+    const prevTags = new Set<string>(existing.tags ?? []);
+    const addedTags = (body.tags as string[]).filter((t) => !prevTags.has(t));
+    if (addedTags.length > 0) {
+      const { enrollOnTrigger } = await import("@/features/sequences/services/sequenceService");
+      for (const tag of addedTags) {
+        await enrollOnTrigger(existing.organizationId, "tag_added", contactId, { tag });
+      }
+    }
+  }
+
+  return updated;
 }
 
 /** Bulk import contacts for an org after verifying membership. Returns inserted count. */

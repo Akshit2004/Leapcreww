@@ -1,0 +1,165 @@
+{
+  "name": "WappFlow — WhatsApp Automation",
+  "description": "Connect WappFlow to any Make.com scenario. Pre-wired: watch for new inbound messages, send a WhatsApp message, and upsert a CRM contact.",
+  "version": 2,
+  "metadata": {
+    "instant": false,
+    "designer": { "x": 0, "y": 0, "zoom": 1 }
+  },
+  "modules": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "__MAKE_WEBHOOK_HOOK_ID__",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": { "parameters": { "hook": { "data": { "editable": true }, "label": "WappFlow inbound trigger" } } },
+        "expect": [
+          { "name": "type",      "type": "text",   "label": "Event type" },
+          { "name": "data",      "type": "any",    "label": "Event payload" },
+          { "name": "createdAt", "type": "date",   "label": "Occurred at" }
+        ],
+        "interface": [
+          { "name": "type",      "type": "text",   "label": "Event type" },
+          { "name": "data",      "type": "any",    "label": "Event payload" },
+          { "name": "createdAt", "type": "date",   "label": "Occurred at" }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": { "handleErrors": true, "useNewZLibDeCompress": true },
+      "mapper": {
+        "url": "https://app.wappflow.com/api/v1/messages",
+        "serializeUrl": false,
+        "method": "post",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Bearer {{connection.apiKey}}"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "contentType": "application/json",
+        "body": "{\n  \"to\": \"{{1.data.phone}}\",\n  \"text\": \"Hi {{1.data.name}}, thanks for reaching out!\"\n}",
+        "parseResponse": true,
+        "authUser": "",
+        "authPass": "",
+        "timeout": 30,
+        "shareCookies": false,
+        "ca": "",
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false,
+        "contentLength": false
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "restore": {
+          "expect": {
+            "method": { "mode": "chose", "label": "POST" },
+            "bodyType": { "label": "Raw" },
+            "contentType": { "label": "JSON (application/json)" }
+          }
+        },
+        "expect": [
+          { "name": "url",     "type": "url",  "label": "URL", "required": true },
+          { "name": "method",  "type": "select","label": "Method" },
+          { "name": "headers", "type": "array", "label": "Headers" },
+          { "name": "body",    "type": "buffer","label": "Request body" }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": { "handleErrors": true, "useNewZLibDeCompress": true },
+      "mapper": {
+        "url": "https://app.wappflow.com/api/v1/contacts",
+        "serializeUrl": false,
+        "method": "post",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Bearer {{connection.apiKey}}"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "contentType": "application/json",
+        "body": "{\n  \"phone\": \"{{1.data.phone}}\",\n  \"name\": \"{{1.data.name}}\",\n  \"tags\": [\"make-automation\"]\n}",
+        "parseResponse": true,
+        "timeout": 30,
+        "shareCookies": false,
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "gzip": true
+      },
+      "metadata": {
+        "designer": { "x": 600, "y": 0 },
+        "restore": {
+          "expect": {
+            "method": { "mode": "chose", "label": "POST" },
+            "bodyType": { "label": "Raw" },
+            "contentType": { "label": "JSON (application/json)" }
+          }
+        }
+      }
+    }
+  ],
+  "connections": [
+    { "source": 1, "target": 2 },
+    { "source": 2, "target": 3 }
+  ],
+  "metadata_connections": [],
+  "designer": {
+    "orphans": []
+  },
+  "notes": [
+    {
+      "module": 1,
+      "label": "SETUP: Create a Make.com webhook, paste its URL into WappFlow Settings → Webhooks → Add Endpoint (event: message.received). The webhook secret is optional but recommended — set X-WappFlow-Signature validation in your Make scenario if used."
+    },
+    {
+      "module": 2,
+      "label": "SETUP: Replace {{connection.apiKey}} with your WappFlow API key from Settings → Developer → API Keys. Customize the message body with your own text or Map fields from the trigger payload."
+    },
+    {
+      "module": 3,
+      "label": "SETUP: This module upserts the sender as a CRM contact. Tags are merged (not replaced). Add more tags or custom attributes in the body as needed."
+    }
+  ],
+  "wappflow_api_reference": {
+    "base_url": "https://app.wappflow.com/api/v1",
+    "auth": "Bearer token — set in Authorization header",
+    "key_format": "wf_live_<hex>  (sandbox: wf_test_<hex>)",
+    "endpoints": {
+      "verify_key":      "GET  /me",
+      "send_message":    "POST /messages   — body: { to, text? | template? }",
+      "list_contacts":   "GET  /contacts   — qs: search, tag, limit, cursor",
+      "upsert_contact":  "POST /contacts   — body: { phone, name?, email?, tags?, attributes? }",
+      "list_templates":  "GET  /templates",
+      "poll_events":     "GET  /events     — qs: type, limit, after"
+    },
+    "event_types": ["message.received", "message.status", "order.placed", "contact.created"]
+  }
+}

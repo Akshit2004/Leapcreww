@@ -11,22 +11,81 @@ export async function findTargetContacts(
   excludeTag?: string,
   segmentId?: string | null
 ) {
+  return findTargetContactsPaged(organizationId, targetTag, excludeTag, segmentId);
+}
+
+/** Paginated version used by the queue engine. skip/take undefined = load all. */
+export async function findTargetContactsPaged(
+  organizationId: string,
+  targetTag: string,
+  excludeTag?: string,
+  segmentId?: string | null,
+  skip?: number,
+  take?: number
+) {
   if (segmentId) {
-    const segment = await prisma.segment.findUnique({
-      where: { id: segmentId },
-    });
+    const segment = await prisma.segment.findUnique({ where: { id: segmentId } });
     if (segment) {
       const { buildSegmentWhere } = await import("@/features/segments/services/segmentRules");
       const where = buildSegmentWhere(organizationId, segment.rules as any);
-      return prisma.contact.findMany({ where });
+      return prisma.contact.findMany({ where, orderBy: { createdAt: "asc" }, skip, take });
     }
   }
 
   const where: Prisma.ContactWhereInput =
     targetTag === "all" ? { organizationId } : { organizationId, tags: { has: targetTag } };
-  return prisma.contact.findMany({ where }).then((contacts) =>
-    excludeTag ? contacts.filter((c) => !c.tags.includes(excludeTag)) : contacts
-  );
+
+  const contacts = await prisma.contact.findMany({
+    where,
+    orderBy: { createdAt: "asc" },
+    skip,
+    take,
+  });
+  return excludeTag ? contacts.filter((c) => !c.tags.includes(excludeTag)) : contacts;
+}
+
+export function countTargetContacts(
+  organizationId: string,
+  targetTag: string,
+  segmentId?: string | null
+) {
+  if (segmentId) {
+    // For segments, load+count is fine at launch — segments are bounded
+    return findTargetContactsPaged(organizationId, targetTag, undefined, segmentId).then(
+      (c) => c.length
+    );
+  }
+  const where: Prisma.ContactWhereInput =
+    targetTag === "all" ? { organizationId } : { organizationId, tags: { has: targetTag } };
+  return prisma.contact.count({ where });
+}
+
+/** Find all campaigns that are currently mid-send (queue engine). */
+export function findSendingCampaigns() {
+  return prisma.campaign.findMany({ where: { status: "Sending" } });
+}
+
+/**
+ * Atomically advance currentOffset by `by` contacts and increment `delivered`
+ * by the number that succeeded.  Uses `updateMany` with an equality check on
+ * currentOffset so two concurrent cron ticks cannot process the same chunk.
+ * Returns the count of rows updated (1 = claimed, 0 = already claimed).
+ */
+export function advanceCampaignChunk(
+  id: string,
+  expectedOffset: number,
+  newOffset: number,
+  deliveredDelta: number,
+  isComplete: boolean
+) {
+  return prisma.campaign.updateMany({
+    where: { id, currentOffset: expectedOffset, status: "Sending" },
+    data: {
+      currentOffset: newOffset,
+      ...(deliveredDelta > 0 ? { delivered: { increment: deliveredDelta } } : {}),
+      ...(isComplete ? { status: "Completed" } : {}),
+    },
+  });
 }
 
 export function createCampaign(data: Prisma.CampaignUncheckedCreateInput) {
@@ -54,11 +113,10 @@ export function findScheduledDue(now: Date) {
 export function logCampaignEvent(
   organizationId: string,
   campaignId: string,
-  message: string,
-  timestamp: string
+  message: string
 ) {
   return prisma.systemLog.create({
-    data: { timestamp, type: "campaign", message, organizationId, campaignId },
+    data: { type: "campaign", message, organizationId, campaignId },
   });
 }
 
@@ -67,14 +125,12 @@ export function recordOutboundMessage(params: {
   campaignId: string;
   contactId: string;
   text: string;
-  timestamp: string;
   waMessageId?: string;
 }) {
   return prisma.message.create({
     data: {
       sender: "agent",
       text: params.text,
-      timestamp: params.timestamp,
       contactId: params.contactId,
       organizationId: params.organizationId,
       waMessageId: params.waMessageId,

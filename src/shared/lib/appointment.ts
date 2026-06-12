@@ -555,7 +555,7 @@ function nowTimeStr(): string {
 
 async function logSystemEvent(orgId: string, message: string) {
   await prisma.systemLog.create({
-    data: { timestamp: nowTimeStr(), type: "chat", message, organizationId: orgId },
+    data: { type: "chat", message, organizationId: orgId },
   });
 }
 

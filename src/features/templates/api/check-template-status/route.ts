@@ -73,11 +73,8 @@ export async function GET(request: NextRequest) {
         data: { metaStatus: dbStatus },
       });
 
-      const d = new Date();
-      const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
       await prisma.systemLog.create({
         data: {
-          timestamp: timeStr,
           type: "crm",
           message: `Template approval status updated: "${template.name}" is now ${dbStatus.toUpperCase()}`,
           organizationId: template.organizationId

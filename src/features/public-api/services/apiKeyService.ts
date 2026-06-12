@@ -12,17 +12,19 @@ import type { ApiKeyContext, CreateApiKeyInput } from "../types";
 const hash = (key: string) => crypto.createHash("sha256").update(key).digest("hex");
 
 export async function issueKey(input: CreateApiKeyInput) {
-  const secret = `wf_live_${crypto.randomBytes(24).toString("hex")}`;
+  const prefix_str = input.isSandbox ? "wf_test_" : "wf_live_";
+  const secret = `${prefix_str}${crypto.randomBytes(24).toString("hex")}`;
   const prefix = secret.slice(0, 12);
   const record = await repo.createKey({
     name: input.name,
     hashedKey: hash(secret),
     prefix,
-    scopes: input.scopes ?? ["messages:send"],
+    scopes: input.scopes ?? ["messages:send", "contacts:read", "contacts:write", "templates:read"],
     organizationId: input.organizationId,
+    isSandbox: input.isSandbox ?? false,
   });
   // Return the plaintext exactly once.
-  return { id: record.id, name: record.name, prefix, key: secret };
+  return { id: record.id, name: record.name, prefix, key: secret, isSandbox: record.isSandbox };
 }
 
 export function listKeys(organizationId: string) {
@@ -46,7 +48,7 @@ export async function authenticateApiKey(req: Request): Promise<ApiKeyContext> {
   if (!record || record.revokedAt) throw new ApiError("Invalid or revoked API key", 401);
 
   void repo.touch(record.id);
-  return { organizationId: record.organizationId, scopes: record.scopes };
+  return { organizationId: record.organizationId, scopes: record.scopes, isSandbox: record.isSandbox ?? false };
 }
 
 export function requireScope(ctx: ApiKeyContext, scope: string) {

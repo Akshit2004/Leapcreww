@@ -15,6 +15,7 @@ import {
   Loader2,
   ShoppingBag,
   CreditCard,
+  Truck,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -51,7 +52,7 @@ const WEBHOOK_TOPICS = [
   { topic: "checkouts/create", label: "Abandoned cart started" },
 ];
 
-type IntegrationId = "shopify" | "razorpay";
+type IntegrationId = "shopify" | "razorpay" | "shiprocket";
 
 interface IntegrationMeta {
   id: IntegrationId;
@@ -84,6 +85,16 @@ const INTEGRATIONS: IntegrationMeta[] = [
     badge: "live",
     accentColor: "#3395FF",
   },
+  {
+    id: "shiprocket",
+    name: "Shiprocket",
+    tagline: "Shipping & NDR automation",
+    description:
+      "Connect Shiprocket to automatically send WhatsApp notifications when orders ship, arrive out for delivery, or fail. NDR recovery flows fire instantly — reducing RTO before the courier retries.",
+    icon: <Truck className="w-5 h-5" />,
+    badge: "live",
+    accentColor: "#F76A1A",
+  },
 ];
 
 
@@ -104,6 +115,9 @@ export function IntegrationsTab() {
   const [keyId, setKeyId] = useState("");
   const [keySecret, setKeySecret] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
+  const [srEmail, setSrEmail] = useState("");
+  const [srPassword, setSrPassword] = useState("");
+  const [srWebhookUrl, setSrWebhookUrl] = useState<string | null>(null);
 
   const [showToken, setShowToken] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -137,6 +151,11 @@ export function IntegrationsTab() {
         setKeyId(creds.keyId ?? "");
         setKeySecret(creds.keySecret ?? "");
         setWebhookSecret(creds.webhookSecret ?? "");
+      } catch {}
+    } else if (selected === "shiprocket" && integration?.apiKey) {
+      try {
+        const creds = JSON.parse(integration.apiKey);
+        setSrEmail(creds.email ?? "");
       } catch {}
     }
   }, [selected, integration]);
@@ -203,6 +222,12 @@ export function IntegrationsTab() {
         return;
       }
       body = { ...body, keyId, keySecret, webhookSecret };
+    } else if (selected === "shiprocket") {
+      if (!srEmail || !srPassword) {
+        setError("Shiprocket email and password are required.");
+        return;
+      }
+      body = { ...body, email: srEmail, password: srPassword };
     }
 
     setError("");
@@ -220,6 +245,7 @@ export function IntegrationsTab() {
         if (data.webhookWarning && !data.webhookWarning.toLowerCase().includes("localhost")) {
           setWarningBanner(data.webhookWarning);
         }
+        if (data.webhookUrl) setSrWebhookUrl(data.webhookUrl);
         await fetchIntegration();
       }
     } catch {
@@ -244,6 +270,10 @@ export function IntegrationsTab() {
         setKeyId("");
         setKeySecret("");
         setWebhookSecret("");
+      } else if (selected === "shiprocket") {
+        setSrEmail("");
+        setSrPassword("");
+        setSrWebhookUrl(null);
       }
       setSuccessBanner(null);
       setWarningBanner(null);
@@ -432,7 +462,7 @@ export function IntegrationsTab() {
             {/* ── Section: Credentials & Connection ── */}
             <section className="space-y-4">
               <h3 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
-                {selected === "shopify" ? "Store Connection" : "Razorpay Credentials"}
+                {selected === "shopify" ? "Store Connection" : selected === "razorpay" ? "Razorpay Credentials" : "Shiprocket Credentials"}
               </h3>
 
               <div className="space-y-3">
@@ -493,6 +523,57 @@ export function IntegrationsTab() {
                       </div>
                     )}
                   </>
+                )}
+
+                {/* Shiprocket Inputs */}
+                {selected === "shiprocket" && (
+                  <div className="space-y-3 animate-fade-in">
+                    <div>
+                      <label className="block text-[10px] font-bold text-stone-600 mb-1.5">Shiprocket Email</label>
+                      <input
+                        type="email"
+                        value={srEmail}
+                        onChange={(e) => { setSrEmail(e.target.value); setError(""); }}
+                        disabled={isConnected}
+                        className="w-full px-3 py-2.5 text-xs text-stone-900 bg-white border border-stone-200 outline-none focus:border-stone-400 transition-colors disabled:text-stone-400 disabled:bg-stone-50"
+                        placeholder="you@brand.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-stone-600 mb-1.5">Password</label>
+                      <div className="flex items-stretch border border-stone-200 bg-white focus-within:border-stone-400 transition-colors">
+                        <input
+                          type={showToken ? "text" : "password"}
+                          value={srPassword}
+                          onChange={(e) => { setSrPassword(e.target.value); setError(""); }}
+                          disabled={isConnected}
+                          className="flex-1 px-3 py-2.5 text-xs font-mono text-stone-900 bg-transparent outline-none disabled:text-stone-400 disabled:bg-stone-50"
+                          placeholder="••••••••"
+                        />
+                        <button type="button" onClick={() => setShowToken(!showToken)} className="px-3 border-l border-stone-200 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer">
+                          {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                    {(isConnected || srWebhookUrl) && (
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-stone-600">Webhook URL — paste this in Shiprocket dashboard</label>
+                        <div className="flex items-stretch border border-stone-200 bg-stone-50">
+                          <code className="flex-1 px-3 py-2 text-[10px] font-mono text-stone-700 break-all">
+                            {srWebhookUrl || `…/api/webhooks/shiprocket?orgId=${orgId}`}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => { navigator.clipboard.writeText(srWebhookUrl || ""); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                            className="px-3 border-l border-stone-200 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer shrink-0"
+                          >
+                            {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                        <p className="text-[9px] text-stone-400">In Shiprocket: Settings → Channels → Webhooks → Add webhook URL above.</p>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Razorpay Inputs */}
@@ -566,7 +647,7 @@ export function IntegrationsTab() {
                       ) : (
                         <Link2 className="w-3.5 h-3.5" />
                       )}
-                      {connecting ? "Connecting…" : (selected === "shopify" ? "Connect Store (Developer)" : "Link Razorpay")}
+                      {connecting ? "Connecting…" : selected === "shopify" ? "Connect Store (Developer)" : selected === "razorpay" ? "Link Razorpay" : "Connect Shiprocket"}
                     </button>
                   )
                 ) : (

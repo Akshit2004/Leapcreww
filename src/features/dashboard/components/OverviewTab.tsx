@@ -8,6 +8,7 @@ import { ChecklistWizard } from "./ChecklistWizard";
 import { DoneForYouCopilot } from "./DoneForYouCopilot";
 import { PromoVideo } from "./PromoVideo";
 import { MetaBillingModal } from "@/features/wallet/components/MetaBillingModal";
+import { RecipesSection } from "@/features/recipes/components/RecipesSection";
 
 interface OverviewTabProps {
   onNavigate?: (tab: string) => void;
@@ -153,6 +154,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
           ))}
         </div>
       </div>
+
+      {/* One-Click Automation Recipes */}
+      <RecipesSection />
 
       {/* Quick Actions + Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">

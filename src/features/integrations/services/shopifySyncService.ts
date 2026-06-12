@@ -112,11 +112,8 @@ export async function syncShopifyCatalog(orgId: string): Promise<{ synced: numbe
   }
 
   // D. Record the sync in the activity stream.
-  const d = new Date();
-  const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   await prisma.systemLog.create({
     data: {
-      timestamp: timeStr,
       type: "integration",
       message: `Catalog Sync Success: Imported and updated ${syncedCount} products from Shopify.`,
       organizationId: orgId,

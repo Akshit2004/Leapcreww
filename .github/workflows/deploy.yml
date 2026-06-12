@@ -1,16 +1,42 @@
-name: Deploy to Supabase
+name: Verify & Deploy
 on:
   push:
-    branches: [main]
+    branches: [main, master]
+  pull_request:
+
 jobs:
-  deploy:
+  # Constitution Article IV gates — every push and PR must pass these.
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npx prisma generate
-      - run: npx prisma db push
+          cache: npm
+      - run: npm ci
+      - run: npx prisma validate
+      - run: npx tsc --noEmit
+      # eslint is not gated yet: 123 pre-existing errors repo-wide. Add
+      # `npx eslint .` here once the backlog is cleared.
+      - run: SKIP_ENV_VALIDATION=1 npx next build
+
+  # Schema sync runs only after verification passes, and never for PRs.
+  # Uses migrate deploy (idempotent, history-tracked, rollback-safe).
+  # IMPORTANT: existing DBs that were previously managed with `db push` must
+  # run `npx prisma migrate resolve --applied 20260611000000_baseline` once
+  # before the first deploy to mark the baseline migration as already applied.
+  deploy:
+    needs: verify
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

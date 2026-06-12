@@ -76,7 +76,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { action, integrationId, shopDomain, accessToken, keyId, keySecret, webhookSecret } = body;
+    const { action, integrationId, shopDomain, accessToken, keyId, keySecret, webhookSecret, email, password } = body;
 
     const resolvedIntegrationId = integrationId || (shopDomain ? "shopify" : "razorpay");
 
@@ -105,11 +105,8 @@ export async function POST(
       });
 
       // Create disconnect log
-      const d = new Date();
-      const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
       await prisma.systemLog.create({
         data: {
-          timestamp: timeStr,
           type: "integration",
           message: `${resolvedIntegrationId} Integration successfully disconnected.`,
           organizationId: orgId,
@@ -117,6 +114,65 @@ export async function POST(
       });
 
       return NextResponse.json({ success: true });
+    }
+
+    if (resolvedIntegrationId === "shiprocket") {
+      if (!email || !password) {
+        return NextResponse.json(
+          { error: "Shiprocket email and password are required." },
+          { status: 400 }
+        );
+      }
+
+      // Validate credentials against the Shiprocket API — throws on failure.
+      const { authenticateShiprocket } = await import(
+        "@/features/integrations/connectors/shiprocket"
+      );
+      const token = await authenticateShiprocket(email as string, password as string);
+
+      await prisma.integration.upsert({
+        where: {
+          id_organizationId: { id: "shiprocket", organizationId: orgId },
+        },
+        update: {
+          name: "Shiprocket",
+          description:
+            "Auto-notify customers on ship, OFD, delivery, NDR, and RTO via WhatsApp.",
+          status: "connected",
+          icon: "Truck",
+          apiKey: JSON.stringify({ email, token }),
+        },
+        create: {
+          id: "shiprocket",
+          organizationId: orgId,
+          name: "Shiprocket",
+          description:
+            "Auto-notify customers on ship, OFD, delivery, NDR, and RTO via WhatsApp.",
+          status: "connected",
+          icon: "Truck",
+          apiKey: JSON.stringify({ email, token }),
+        },
+      });
+
+      await prisma.systemLog.create({
+        data: {
+          type: "integration",
+          message: `Shiprocket connected (${email as string}).`,
+          organizationId: orgId,
+        },
+      });
+
+      // Return the webhook URL the merchant must configure in the Shiprocket
+      // dashboard under Settings → API → Webhooks.
+      const host =
+        request.headers.get("x-forwarded-host") ||
+        request.headers.get("host") ||
+        "";
+      const proto =
+        request.headers.get("x-forwarded-proto") || "https";
+      const webhookUrl = `${proto}://${host}/api/webhooks/shiprocket?orgId=${orgId}`;
+
+      return NextResponse.json({ success: true, webhookUrl });
     }
 
     if (resolvedIntegrationId === "razorpay") {
@@ -147,11 +203,8 @@ export async function POST(
         },
       });
 
-      const d = new Date();
-      const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
       await prisma.systemLog.create({
         data: {
-          timestamp: timeStr,
           type: "integration",
           message: `Razorpay Connected via manual keys.`,
           organizationId: orgId,
@@ -270,11 +323,8 @@ export async function POST(
     }
 
     // Save System Log
-    const d = new Date();
-    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "integration",
         message: `Shopify Connected: Store "${shopName}" (${cleanShop}) connected manually via Developer Mode token.${
           webhooksRegistered.length > 0

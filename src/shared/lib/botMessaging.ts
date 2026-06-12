@@ -24,7 +24,6 @@ export async function logBotMessage(
     data: {
       sender: "agent",
       text,
-      timestamp: timeStr,
       contactId,
       organizationId: orgId,
       waMessageId: waMessageId || null,

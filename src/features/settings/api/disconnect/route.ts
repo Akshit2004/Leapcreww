@@ -26,11 +26,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Log the disconnection
-    const d = new Date();
-    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "crm",
         message: "WhatsApp Business Account disconnected from workspace.",
         organizationId: orgId,

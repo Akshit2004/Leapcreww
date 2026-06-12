@@ -425,7 +425,7 @@ export const AnalyticsTab: React.FC = () => {
     Object.values(chatHistory).forEach((messages) => {
       messages.forEach((msg) => {
         try {
-          const d = new Date(msg.timestamp);
+          const d = new Date(msg.createdAt ?? msg.timestamp);
           if (!isNaN(d.getTime())) {
             grid[d.getDay()][d.getHours()]++;
           }

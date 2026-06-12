@@ -50,11 +50,8 @@ export async function POST(
     ]);
 
     // Create a new baseline system log logging this reset
-    const d = new Date();
-    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     await prisma.systemLog.create({
       data: {
-        timestamp: timeStr,
         type: "crm",
         message: "Sandbox sandbox environment successfully flushed and re-initialized.",
         organizationId: orgId

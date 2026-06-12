@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Quote } from "lucide-react";
 
 const testimonials = [
-  { quote: "We migrated three different broadcast tools onto WappFlow in a weekend. The visual chatbot canvas became our single source of conversation truth.", author: "Priya Raghavan", role: "Head of Lifecycle, Folke & Co.", accent: "#D05E3C" },
+  { quote: "We migrated three different broadcast tools onto LeapCrew AI in a weekend. The visual chatbot canvas became our single source of conversation truth.", author: "Priya Raghavan", role: "Head of Lifecycle, Folke & Co.", accent: "#D05E3C" },
   { quote: "The webhook signing and HMAC verification setup took ten minutes. Our Shopify and Razorpay relays now feel like first-class internal infrastructure.", author: "Marcus Lin", role: "Staff Engineer, Strata", accent: "#2E4A3F" },
   { quote: "Last-touch attribution finally gave our growth team the conversion numbers they needed. We tripled WhatsApp ROI in two quarters.", author: "Anika Vora", role: "VP Growth, Polyhedron Finance", accent: "#FBBF24" },
   { quote: "Pure-AI autoresponder mode is genuinely the cleanest LLM messaging surface I've used. Latency under 250ms, voice perfectly on-brand.", author: "Tomás Herrera", role: "CTO, Aether Labs", accent: "#34D399" },

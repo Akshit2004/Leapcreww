@@ -6,11 +6,17 @@ import { handleAutoResponder } from "@/shared/lib/autoresponder";
 import { handleMarketplaceMessage } from "@/shared/lib/marketplace";
 import { handleAppointmentMessage } from "@/shared/lib/appointment";
 import { resolveAttribution } from "@/features/analytics/services/attribution";
+import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
+import { emitEvent } from "../../services/webhookDeliveryService";
 import { handleNfmReply } from "../../services/webhookService";
 import {
   resumeCampaignsAwaitingTemplate,
   failCampaignsAwaitingTemplate,
 } from "@/features/campaigns/services/strategistActivation";
+import { handleCodReply } from "@/features/cod/services/codService";
+import { handleNdrReply } from "@/features/ndr/services/ndrService";
+import { handleSizeFinderReply, handleShadeFinderReply } from "@/features/size-shade-finder/services/sizeShadeService";
+import { handleReplenishmentReply } from "@/features/replenishment/services/replenishmentService";
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
@@ -70,6 +76,20 @@ export async function POST(req: NextRequest) {
                   data: { status: status.status },
                 });
 
+                // Outbound webhook: notify subscribers of the status change.
+                const statusMsg = await prisma.message.findFirst({
+                  where: { waMessageId: status.id },
+                  select: { organizationId: true, campaignId: true, contact: { select: { phone: true } } },
+                });
+                if (statusMsg) {
+                  await emitEvent(statusMsg.organizationId, "message.status", {
+                    waMessageId: status.id,
+                    status: status.status,
+                    to: statusMsg.contact?.phone ?? null,
+                    campaignId: statusMsg.campaignId ?? null,
+                  });
+                }
+
                 // If message failed to deliver, log the details
                 if (status.status === "failed") {
                   const errorDetail = status.errors?.[0];
@@ -88,11 +108,8 @@ export async function POST(req: NextRequest) {
                   });
 
                   if (msg) {
-                    const d = new Date();
-                    const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
                     await prisma.systemLog.create({
                       data: {
-                        timestamp: timeStr,
                         type: "campaign",
                         message: `Delivery failed to ${msg.contact.name} (${msg.contact.phone}): ${reason} (Code ${code})`,
                         organizationId: msg.organizationId,
@@ -231,11 +248,8 @@ async function handleTemplateStatusUpdate(
     data: { metaStatus: newStatus },
   });
 
-  const d = new Date();
-  const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   await prisma.systemLog.create({
     data: {
-      timestamp: timeStr,
       type: "crm",
       message: `Template "${templateName}" is now ${newStatus.toUpperCase()}${value.reason ? ` — ${value.reason}` : ""}.`,
       organizationId: org.id,
@@ -259,6 +273,20 @@ async function processInboundMessage(
   referralData?: { source_id: string; source_url: string; headline: string; body: string },
   interactiveData?: { type?: string; nfm_reply?: { response_json: string; body: string; name: string } }
 ) {
+  // Dedup: Meta retries the same webhook on timeout. Skip if already processed.
+  if (waMessageId) {
+    const dup = await prisma.message.findFirst({
+      where: { waMessageId, organizationId: orgId },
+      select: { id: true },
+    });
+    if (dup) return;
+  }
+
+  // Widget attribution: detect [ref:wfw_<key>] appended by widget.js and strip it.
+  const widgetRefMatch = text.match(/\[ref:(wfw_[a-f0-9]+)\]/);
+  const widgetKey = widgetRefMatch ? widgetRefMatch[1] : null;
+  const cleanText = widgetKey ? text.replace(/\n?\[ref:[^\]]+\]/, "").trim() : text;
+
   const normalizedPhone = `+${waFrom.replace(/[^0-9]/g, "")}`;
 
   // Strict phone number lookup — exact match only, no suffix matching
@@ -272,9 +300,11 @@ async function processInboundMessage(
   const d = new Date();
   const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
+  const isNewContact = !contact;
+
   if (contact) {
     const updateData: Prisma.ContactUpdateInput = {
-      lastMessage: text,
+      lastMessage: cleanText,
       lastMessageTime: timeStr,
       unreadCount: { increment: 1 },
       lastActiveAt: new Date(),
@@ -288,30 +318,57 @@ async function processInboundMessage(
       data: updateData,
     });
   } else {
+    const baseTags = ["WhatsApp", "Inbound"];
+    if (widgetKey) baseTags.push("widget");
+
+    const baseAttrs: Prisma.JsonObject = {};
+    if (widgetKey) {
+      baseAttrs.source = "widget";
+      baseAttrs.widget_key = widgetKey;
+    }
+
     contact = await prisma.contact.create({
       data: {
         name: profileName,
         phone: normalizedPhone,
-        email: `${waFrom}@whatsapp.customer`,
-        source: "WhatsApp Inbound",
-        tags: ["WhatsApp", "Inbound"],
+        source: widgetKey ? "Widget" : "WhatsApp Inbound",
+        tags: baseTags,
         status: "Active",
-        lastMessage: text,
+        lastMessage: cleanText,
         lastMessageTime: timeStr,
         unreadCount: 1,
         assignedAgent: "Bot",
         organizationId: orgId,
         sourceAdId: referralData?.source_id || null,
         lastActiveAt: new Date(),
+        attributes: Object.keys(baseAttrs).length ? baseAttrs : undefined,
       },
     });
   }
 
+  // Sequence triggers (T-03): a first-ever message enrolls into "signup"
+  // sequences; an ad referral (click-to-WhatsApp) enrolls into "ad_click"
+  // sequences. enrollOnTrigger is idempotent per active enrollment, so a
+  // repeat ad click won't double-enroll a contact mid-drip.
+  if (isNewContact) {
+    await enrollOnTrigger(orgId, "signup", contact.id);
+  }
+  if (referralData?.source_id) {
+    await enrollOnTrigger(orgId, "ad_click", contact.id);
+  }
+
+  // Outbound webhook (T-08): notify subscribers of the inbound message.
+  await emitEvent(orgId, "message.received", {
+    contact: { id: contact.id, name: contact.name, phone: contact.phone, isNew: isNewContact },
+    message: { text: cleanText, waMessageId: waMessageId ?? null },
+    referral: referralData?.source_id ? { sourceAdId: referralData.source_id } : null,
+    widget: widgetKey ? { key: widgetKey } : null,
+  });
+
   await prisma.message.create({
     data: {
       sender: "user",
-      text,
-      timestamp: timeStr,
+      text: cleanText,
       contactId: contact.id,
       organizationId: orgId,
       waMessageId: waMessageId || null,
@@ -320,7 +377,6 @@ async function processInboundMessage(
 
   await prisma.systemLog.create({
     data: {
-      timestamp: timeStr,
       type: "chat",
       message: `WhatsApp from ${contact.name}: "${text.slice(0, 60)}"`,
       organizationId: orgId,
@@ -388,6 +444,19 @@ async function processInboundMessage(
         },
       });
 
+      // Sequence trigger: enroll into order_placed sequences.
+      await enrollOnTrigger(orgId, "order_placed", contact.id);
+
+      // Outbound webhook (T-08): notify subscribers of the new order.
+      await emitEvent(orgId, "order.placed", {
+        orderId: orderIdStr,
+        total: totalCents,
+        currency: "INR",
+        source: "whatsapp_catalog",
+        contact: { id: contact.id, name: contact.name, phone: contact.phone },
+        items: orderItemsToCreate.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price })),
+      });
+
       // Tag + persist cart metadata so the abandoned-cart sweep (60-min) and the
       // unified E-Commerce CRM panels can track this WhatsApp marketplace cart.
       // The cart stays "abandoned" until the pending order is paid (cart_recovered).
@@ -437,7 +506,6 @@ async function processInboundMessage(
         data: {
           sender: "agent",
           text: summaryText,
-          timestamp: timeStr,
           contactId: contact.id,
           organizationId: orgId,
           waMessageId: result.data?.messages?.[0]?.id || null,
@@ -446,6 +514,28 @@ async function processInboundMessage(
     }
     return;
   }
+
+  // COD confirmation intercept: takes priority over all other routing.
+  // Returns true if the message was a YES/NO reply to a pending COD order.
+  const codHandled = await handleCodReply(cleanText, contact, orgId);
+  if (codHandled) return;
+
+  // NDR reply intercept: handles customer responses to non-delivery prompts
+  // (confirm / reschedule / address update / cancel). Returns true when consumed.
+  const ndrHandled = await handleNdrReply(cleanText, contact, orgId);
+  if (ndrHandled) return;
+
+  // Size finder intercept: guides customer through gender → height → weight → size recommendation.
+  const sizeHandled = await handleSizeFinderReply(cleanText, contact, orgId);
+  if (sizeHandled) return;
+
+  // Shade finder intercept: guides customer through skin tone → undertone → shade recommendation.
+  const shadeHandled = await handleShadeFinderReply(cleanText, contact, orgId);
+  if (shadeHandled) return;
+
+  // Replenishment intercept: handles REORDER / STOP replies to the 30-day reminder.
+  const replenishHandled = await handleReplenishmentReply(cleanText, contact, orgId);
+  if (replenishHandled) return;
 
   if (contact.assignedAgent === "Bot") {
     const org = await prisma.organization.findUnique({
