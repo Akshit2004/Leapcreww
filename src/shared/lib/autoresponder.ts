@@ -102,7 +102,6 @@ async function logSystemError(orgId: string, timeStr: string, label: string, err
   const detail = err instanceof Error ? err.message : String(err);
   await prisma.systemLog.create({
     data: {
-      timestamp: timeStr,
       type: "chat",
       message: `${label}: ${detail}`,
       organizationId: orgId,
@@ -253,7 +252,6 @@ async function escalateContact(contact: BotContact, orgId: string, timeStr: stri
 
   await prisma.systemLog.create({
     data: {
-      timestamp: timeStr,
       type: "crm",
       message: `[Escalation Alert] Lead ${contact.name} was autonomously re-assigned to agent '${escalationAgent}': ${reason}`,
       organizationId: orgId,
@@ -264,7 +262,6 @@ async function escalateContact(contact: BotContact, orgId: string, timeStr: stri
     data: {
       sender: "system",
       text: `[Autonomous Escalation: Chat re-assigned to human agent '${escalationAgent}' — ${reason}]`,
-      timestamp: timeStr,
       contactId: contact.id,
       organizationId: orgId,
     },
