@@ -23,9 +23,9 @@ function Counter({ to, suffix = "", prefix = "", duration = 2200 }: { to: number
 }
 
 const stats = [
-  { value: 412, suffix: "M+", label: "Messages dispatched", hint: "across active tenants" },
-  { value: 99, suffix: ".98%", label: "API uptime", hint: "rolling 90-day window" },
-  { value: 41, suffix: "%", label: "Avg. broadcast CTR", hint: "Meta utility templates" },
+  { value: 15, suffix: "+", label: "One-click automations", hint: "cart, COD, NDR, win-back & more" },
+  { value: 100, suffix: "%", label: "Orders attributed", hint: "every rupee tied to its campaign" },
+  { value: 2, suffix: " min", label: "NDR response time", hint: "courier fails → customer pinged" },
   { value: 220, suffix: "ms", label: "Median AI reply", hint: "autoresponder latency" },
 ];
 
@@ -47,13 +47,13 @@ export default function Stats() {
       <div className="max-w-7xl mx-auto relative">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-end pb-16">
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.7 }} className="lg:col-span-6 space-y-3">
-            <span className="font-mono text-[10px] tracking-widest text-[#D05E3C] uppercase font-bold">Aggregated Tenant Telemetry</span>
+            <span className="font-mono text-[10px] tracking-widest text-[#D05E3C] uppercase font-bold">Engine Specifications</span>
             <h2 className="font-serif text-4xl sm:text-5xl font-light tracking-tight text-[#FAF7F2]">
-              Throughput measured, <span className="italic font-normal text-amber-300">not estimated.</span>
+              Built to perform, <span className="italic font-normal text-amber-300">not to impress.</span>
             </h2>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.7, delay: 0.1 }} className="lg:col-span-6">
-            <p className="text-[#FAF7F2]/60 text-sm leading-relaxed font-medium max-w-md">Real numbers from anonymized customer workspaces. We publish the metrics other vendors hide because the architecture earns them.</p>
+            <p className="text-[#FAF7F2]/60 text-sm leading-relaxed font-medium max-w-md">What the engine ships with on day one — measured product capability, not marketing telemetry. Your own workspace dashboard reports your real numbers from the first order.</p>
           </motion.div>
         </div>
 

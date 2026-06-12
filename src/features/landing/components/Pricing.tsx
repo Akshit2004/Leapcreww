@@ -4,20 +4,20 @@ import { Check } from "lucide-react";
 import Link from "next/link";
 
 const pricing = [
-  { name: "Startup Core", price: "$15", period: "per month", desc: "Perfect for scaling teams exploring the WhatsApp channel.", features: ["1 Workspace Seat", "Up to 1,000 CRM Contacts", "Pre-approved Meta Templates", "Core Campaign Broadcasts", "Standard Webhook Logs"], cta: "Activate Core Workspace", popular: false },
-  { name: "Growth Scaler", price: "$29", period: "per month", desc: "Engineered for growing brands requiring visual flow automation.", features: ["Unlimited Support Agents", "Up to 10,000 Sync Contacts", "Visual Chatbot Flow Builder", "Shopify & WooCommerce Webhooks", "Advanced Click-Through Analytics"], cta: "Upgrade to Growth Plan", popular: true },
-  { name: "Enterprise Custom", price: "Custom", period: "dedicated WABA", desc: "For large-scale operations with dedicated SLAs and high volume.", features: ["Dedicated Meta Cloud APIs", "Custom Database Clusters", "Dedicated Support Manager", "Uncapped Message Cadence", "Private API Custom Webhooks"], cta: "Consult Systems Architect", popular: false },
+  { name: "Starter", price: "₹1,499", period: "per month", desc: "For brands taking their first serious step onto WhatsApp.", features: ["3 team agents", "10,000 contacts", "Campaign broadcasts", "Meta template builder", "Shared team inbox"], cta: "Start Free Trial", popular: false },
+  { name: "Growth", price: "₹3,499", period: "per month", desc: "For growing D2C brands automating recovery and post-purchase flows.", features: ["10 team agents", "50,000 contacts", "Visual chatbot builder", "AI sequences & recipes", "Shopify + Shiprocket + Razorpay", "COD confirmation & NDR rescue"], cta: "Start Free Trial", popular: true },
+  { name: "Scale", price: "₹8,999", period: "per month", desc: "For established brands that want every rupee attributed and an open API.", features: ["Unlimited agents", "150,000 contacts", "Attribution ledger & ROI reports", "Smart segments", "REST API + SDKs + MCP server", "Priority support"], cta: "Start Free Trial", popular: false },
 ];
 
 export default function Pricing() {
   return (
     <section id="pricing" className="py-24 md:py-36 px-6 md:px-12 max-w-7xl mx-auto w-full relative z-10 scroll-mt-20">
       <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.7 }} className="text-center space-y-4 max-w-xl mx-auto pb-16">
-        <span className="font-mono text-[10px] tracking-widest text-[#D05E3C] uppercase font-bold">Transparent Tiers</span>
+        <span className="font-mono text-[10px] tracking-widest text-[#D05E3C] uppercase font-bold">INR Pricing · Built for India</span>
         <h2 className="font-serif text-4xl sm:text-5xl font-light tracking-tight text-[#1D211F]">
-          Subscription models <span className="italic font-normal text-[#2E4A3F] shimmer-underline">without hidden cadences.</span>
+          Honest pricing, <span className="italic font-normal text-[#2E4A3F] shimmer-underline">in rupees.</span>
         </h2>
-        <p className="text-[#1D211F]/60 text-sm font-medium">Clear specifications scaled to your operational throughput. Upgrade or downgrade plans natively inside your tenant space.</p>
+        <p className="text-[#1D211F]/60 text-sm font-medium">Every plan starts with a 14-day free trial — no credit card. Annual billing gets 2 months free. Enterprise with dedicated WABA and SLAs available on request.</p>
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto items-stretch">
@@ -59,6 +59,19 @@ export default function Pricing() {
           </motion.div>
         ))}
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={{ duration: 0.6, delay: 0.2 }}
+        className="max-w-6xl mx-auto mt-10 border border-[#1D211F]/12 bg-[#F1EBE0]/50 px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 rounded-lg"
+      >
+        <span className="font-mono text-[9px] tracking-widest text-[#D05E3C] uppercase font-bold shrink-0">About message charges</span>
+        <p className="text-[#1D211F]/65 text-xs font-medium leading-relaxed">
+          Meta charges per conversation (utility, marketing, service) — these are billed separately through a prepaid wallet at transparent rates, on every platform including ours. No surprises: every send is metered, logged, and visible in your dashboard before you spend it.
+        </p>
+      </motion.div>
     </section>
   );
 }

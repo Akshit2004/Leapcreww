@@ -15,13 +15,13 @@ export default function Features() {
     <section id="features" className="py-24 md:py-36 px-6 md:px-12 max-w-7xl mx-auto w-full relative z-10 border-b border-[#1D211F]/8 scroll-mt-20">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start pb-12">
         <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.7 }} className="lg:col-span-5 space-y-3">
-          <span className="font-mono text-[10px] tracking-widest text-[#D05E3C] uppercase font-bold">CRM Architecture Specs</span>
+          <span className="font-mono text-[10px] tracking-widest text-[#D05E3C] uppercase font-bold">The Full Platform</span>
           <h2 className="font-serif text-4xl sm:text-5xl font-light tracking-tight text-[#1D211F]">
-            Engineered with extreme <span className="italic font-normal text-[#2E4A3F] shimmer-underline">visual precision.</span>
+            Everything WhatsApp, <span className="italic font-normal text-[#2E4A3F] shimmer-underline">one workspace.</span>
           </h2>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.7, delay: 0.1 }} className="lg:col-span-7 pt-2 lg:pt-8">
-          <p className="text-[#1D211F]/70 text-sm sm:text-base leading-relaxed max-w-2xl font-medium">We replaced over-decorated radial meshes and floating isometric 3D shapes with rigorous structural layout columns. Every capability maps directly to real CRM utilities engineered for high performance and traceable behavior.</p>
+          <p className="text-[#1D211F]/70 text-sm sm:text-base leading-relaxed max-w-2xl font-medium">Broadcasts, chatbots, shared inbox, CRM, bookings, and automations — the complete toolkit your team needs to run WhatsApp as a serious channel. No tool-switching, no per-feature add-on pricing, no waiting on an agency.</p>
         </motion.div>
       </div>
 

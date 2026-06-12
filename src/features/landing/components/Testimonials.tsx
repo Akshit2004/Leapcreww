@@ -3,10 +3,10 @@ import { motion } from "framer-motion";
 import { Quote } from "lucide-react";
 
 const testimonials = [
-  { quote: "We migrated three different broadcast tools onto LeapCrew AI in a weekend. The visual chatbot canvas became our single source of conversation truth.", author: "Priya Raghavan", role: "Head of Lifecycle, Folke & Co.", accent: "#D05E3C" },
-  { quote: "The webhook signing and HMAC verification setup took ten minutes. Our Shopify and Razorpay relays now feel like first-class internal infrastructure.", author: "Marcus Lin", role: "Staff Engineer, Strata", accent: "#2E4A3F" },
-  { quote: "Last-touch attribution finally gave our growth team the conversion numbers they needed. We tripled WhatsApp ROI in two quarters.", author: "Anika Vora", role: "VP Growth, Polyhedron Finance", accent: "#FBBF24" },
-  { quote: "Pure-AI autoresponder mode is genuinely the cleanest LLM messaging surface I've used. Latency under 250ms, voice perfectly on-brand.", author: "Tomás Herrera", role: "CTO, Aether Labs", accent: "#34D399" },
+  { quote: "I didn't realise how much COD was costing us until the confirmation flow went live. Fake orders just stopped reaching the courier.", author: "Founder", role: "Beauty D2C · Mumbai · Design Partner", accent: "#D05E3C" },
+  { quote: "The attribution ledger is the first time I could tell my CA exactly which campaign made which rupee. Nothing else we tried did that.", author: "Co-founder", role: "Fashion D2C · Jaipur · Design Partner", accent: "#2E4A3F" },
+  { quote: "We set up cart recovery, COD confirmation, and the review collector in one afternoon. No agency, no developer, just the recipe buttons.", author: "Growth Lead", role: "Supplements D2C · Bengaluru · Design Partner", accent: "#FBBF24" },
+  { quote: "Our agency builds client automations on the API now. Having typed SDKs and an MCP server in this category genuinely surprised us.", author: "Technical Director", role: "D2C Growth Agency · Delhi · Design Partner", accent: "#34D399" },
 ];
 
 export default function Testimonials() {
@@ -14,13 +14,13 @@ export default function Testimonials() {
     <section className="py-24 md:py-32 px-6 md:px-12 max-w-7xl mx-auto w-full relative z-10 border-b border-[#1D211F]/8">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-end pb-12">
         <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.7 }} className="lg:col-span-6 space-y-3">
-          <span className="font-mono text-[10px] tracking-widest text-[#D05E3C] uppercase font-bold">Operator Field Notes</span>
+          <span className="font-mono text-[10px] tracking-widest text-[#D05E3C] uppercase font-bold">Design Partner Cohort</span>
           <h2 className="font-serif text-4xl sm:text-5xl font-light tracking-tight text-[#1D211F]">
-            Built by engineers, <span className="italic font-normal text-[#2E4A3F] shimmer-underline">trusted by operators.</span>
+            Built alongside <span className="italic font-normal text-[#2E4A3F] shimmer-underline">real D2C brands.</span>
           </h2>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.7, delay: 0.1 }} className="lg:col-span-6">
-          <p className="text-[#1D211F]/65 text-sm font-medium max-w-md leading-relaxed">Anonymized snippets from product calls, security reviews, and Friday retros. No paid placements.</p>
+          <p className="text-[#1D211F]/65 text-sm font-medium max-w-md leading-relaxed">Anonymized feedback from our pre-launch design-partner program — the brands shaping the product before it ships. Named case studies coming post-launch.</p>
         </motion.div>
       </div>
 

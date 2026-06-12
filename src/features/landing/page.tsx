@@ -8,6 +8,7 @@ import Header from "./components/Header";
 import Hero from "./components/Hero";
 import MessageMarquee from "./components/MessageMarquee";
 import AttributionLive from "./components/AttributionLive";
+import RevenueLeakCalculator from "./components/RevenueLeakCalculator";
 import Features from "./components/Features";
 import HowItWorks from "./components/HowItWorks";
 import Stats from "./components/Stats";
@@ -28,13 +29,14 @@ export default function LandingPage() {
       <Header />
       <Hero />
       <MessageMarquee />
-      <AttributionLive />
+      <TrustedBy />
       <Features />
+      <AttributionLive />
+      <RevenueLeakCalculator />
       <HowItWorks />
       <Stats />
       <KineticBand />
       <DeveloperPlatform />
-      <TrustedBy />
       <Pricing />
       <Testimonials />
       <FAQ />
