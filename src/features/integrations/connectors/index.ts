@@ -7,9 +7,11 @@
  */
 import type { Connector } from "./types";
 import { woocommerceConnector } from "./woocommerce";
+import { shiprocketConnector } from "./shiprocket";
 
 export const connectors: Record<string, Connector> = {
   [woocommerceConnector.id]: woocommerceConnector,
+  [shiprocketConnector.id]: shiprocketConnector,
   // [zapierConnector.id]: zapierConnector,        // TODO(T-07)
   // [googleSheetsConnector.id]: googleSheetsConnector, // TODO(T-07)
   // [hubspotConnector.id]: hubspotConnector,      // TODO(T-07)

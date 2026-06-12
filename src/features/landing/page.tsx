@@ -7,6 +7,7 @@ import KineticBand from "./components/KineticBand";
 import Header from "./components/Header";
 import Hero from "./components/Hero";
 import MessageMarquee from "./components/MessageMarquee";
+import AttributionLive from "./components/AttributionLive";
 import Features from "./components/Features";
 import HowItWorks from "./components/HowItWorks";
 import Stats from "./components/Stats";
@@ -27,6 +28,7 @@ export default function LandingPage() {
       <Header />
       <Hero />
       <MessageMarquee />
+      <AttributionLive />
       <Features />
       <HowItWorks />
       <Stats />

@@ -88,6 +88,9 @@ model Organization {
   appointmentSlots     AppointmentSlot[]
   bookings             Booking[]
   widgetConfig         WidgetConfig?
+  stockAlerts          StockAlert[]
+  launches             Launch[]
+  ndrEvents            NdrEvent[]
   webhookDeliveries    WebhookDelivery[]
   idempotencyKeys      IdempotencyKey[]
   events               Event[]
@@ -145,6 +148,8 @@ model Contact {
   attributionTouches AttributionTouch[]
   bookings       Booking[]
   internalNotes  InternalNote[]
+  stockAlerts    StockAlert[]
+  ndrEvents      NdrEvent[]
   sourceAdId     String?      // Tracks the Meta Ad ID that originated this contact
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -309,6 +314,7 @@ model Order {
   total             Int
   status            String       @default("pending") // "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled"
   paymentStatus     String       @default("pending") // "pending" | "paid" | "failed" | "refunded"
+  codStatus         String?      // null = prepaid; "pending" | "confirmed" | "cancelled" for COD orders
   razorpayOrderId   String?      @unique
   razorpayPaymentId String?
   razorpaySignature String?
@@ -747,4 +753,95 @@ model EmailOtpAttempt {
   status    String   @default("PENDING") // "PENDING" | "VERIFIED" | "EXPIRED"
   createdAt DateTime @default(now())
   expiresAt DateTime
+}
+
+// Back-in-stock alert registration.
+// A customer supplies their phone on a sold-out product page; LeapCrew
+// WhatsApps them the moment inventory comes back.
+model StockAlert {
+  id                     String        @id @default(uuid())
+  organizationId         String
+  organization           Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  phone                  String
+  contactId              String?
+  contact                Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  // Product identification — at least one must be set
+  shopifyInventoryItemId String?       // Shopify inventory_item_id (numeric string)
+  sku                    String?       // Generic identifier for non-Shopify platforms
+  productTitle           String
+  productUrl             String?
+  isNotified             Boolean       @default(false)
+  notifiedAt             DateTime?
+  createdAt              DateTime      @default(now())
+
+  @@index([organizationId, shopifyInventoryItemId, isNotified])
+  @@index([organizationId, sku, isNotified])
+  @@index([organizationId, phone])
+}
+
+// Flash Sale / Launch Countdown — a time-boxed broadcast campaign with
+// auto-generated countdown steps (D-3, D-1, 5-min, Go Live, Last Chance).
+// The cron worker `process-launch-steps` fires each step at its computed sendAt.
+model Launch {
+  id             String       @id @default(uuid())
+  name           String
+  description    String?
+  productUrl     String?
+  launchAt       DateTime
+  status         String       @default("draft") // "draft" | "scheduled" | "ended"
+  targetTag      String?      // tag of contacts to broadcast to; null = all contacts
+  steps          LaunchStep[]
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, status])
+}
+
+model LaunchStep {
+  id             String   @id @default(uuid())
+  launchId       String
+  launch         Launch   @relation(fields: [launchId], references: [id], onDelete: Cascade)
+  label          String
+  offsetMinutes  Int      // negative = before launchAt, 0 = at launch, positive = after
+  message        String   @db.Text
+  sendAt         DateTime // computed: launchAt + offsetMinutes
+  status         String   @default("pending") // "pending" | "sent" | "skipped"
+  sentCount      Int      @default(0)
+  organizationId String
+
+  @@index([status, sendAt])
+  @@index([launchId])
+}
+
+// NDR (Non-Delivery Report) — tracks failed delivery attempts from couriers.
+// When a courier files an NDR the brand contacts the customer on WhatsApp to
+// confirm availability, reschedule, update address, or accept RTO. The status
+// field captures the outcome: "pending" → one of confirmed / rescheduled /
+// address_updated / cancelled / resolved.
+model NdrEvent {
+  id              String       @id @default(uuid())
+  awb             String       // Airway Bill number from courier
+  orderId         String?      // merchant order ID
+  courier         String?      // e.g. "Delhivery", "Shiprocket", "Bluedart"
+  attempt         Int          @default(1)
+  reason          String?      // NDR reason from courier, e.g. "Customer not available"
+  status          String       @default("pending")
+  // status values: "pending" | "confirmed" | "rescheduled" | "address_updated" | "cancelled" | "resolved"
+  customerPhone   String
+  customerName    String?
+  rescheduledDate String?      // customer-provided reschedule date string
+  updatedAddress  String?      // customer-provided updated address
+  contactId       String?
+  contact         Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  resolvedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId, status])
+  @@index([organizationId, awb])
+  @@index([contactId])
 }

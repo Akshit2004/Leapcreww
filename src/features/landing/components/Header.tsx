@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
-import { Bot, ArrowRight, Menu, X } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
 import Link from "next/link";
 
 const navItems = [
@@ -37,12 +37,9 @@ export default function Header() {
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-[#FAF7F2]/85 backdrop-blur-xl border-b border-[#1D211F]/8" : "bg-transparent border-b border-transparent"}`}
     >
       <div className="max-w-7xl mx-auto px-6 md:px-12 h-20 flex items-center justify-between">
-        <a href="#top" className="flex items-center gap-3 group">
-          <div className="relative w-9 h-9 rounded-md bg-[#1D211F] flex items-center justify-center overflow-hidden">
-            <Bot className="w-5 h-5 text-[#FAF7F2] relative z-10" />
-            <div className="absolute inset-0 bg-[#D05E3C] translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out" />
-          </div>
-          <span className="font-sans font-extrabold text-xl tracking-tight text-[#1D211F]">LeapCrew AI</span>
+        <a href="#top" className="flex items-center group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/leapcrew-logo.png" alt="LeapCrew AI" className="h-14 w-auto object-contain transition-opacity group-hover:opacity-75" style={{ maxWidth: 220 }} />
         </a>
 
         <nav className="max-md:hidden md:flex items-center gap-8 lg:gap-10">
@@ -67,9 +64,9 @@ export default function Header() {
         {mobileOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="md:hidden fixed inset-0 z-50 bg-[#FAF7F2]">
             <div className="flex items-center justify-between px-6 h-20 border-b border-[#1D211F]/8">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-md bg-[#1D211F] flex items-center justify-center"><Bot className="w-5 h-5 text-[#FAF7F2]" /></div>
-                <span className="font-sans font-extrabold text-xl text-[#1D211F]">LeapCrew AI</span>
+              <div className="flex items-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/leapcrew-logo.png" alt="LeapCrew AI" className="h-10 w-auto object-contain" style={{ maxWidth: 160, background: "none" }} />
               </div>
               <button onClick={() => setMobileOpen(false)} aria-label="Close menu"><X className="w-6 h-6 text-[#1D211F]" /></button>
             </div>

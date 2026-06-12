@@ -6,7 +6,12 @@ export type SequenceTrigger =
   | "ad_click"
   | "cart_abandoned"
   | "signup"
-  | "order_placed";
+  | "order_placed"
+  | "cod_order_placed"
+  | "ndr_pending"
+  | "order_shipped"
+  | "order_delivered"
+  | "order_rto";
 
 export type StepAction = "send_template" | "send_message" | "add_tag" | "branch";
 

@@ -6,6 +6,7 @@ import { useApp } from "@/shared/context/AppContext";
 import { notify } from "@/shared/lib/toast";
 import { MarketplaceTab } from "@/features/marketplace/components/MarketplaceTab";
 import { AppointmentConsole } from "./AppointmentConsole";
+import { RecipesSection } from "@/features/recipes/components/RecipesSection";
 import { isValidUseCase, isValidPreset, type UseCaseId, type AppointmentPresetId } from "@/shared/config/useCasePresets";
 import { LayoutGrid, ShoppingBag, CalendarClock, Bot, CheckCircle2, RefreshCw } from "lucide-react";
 
@@ -147,6 +148,11 @@ export const UseCasesTab: React.FC = () => {
           </p>
         </div>
       )}
+
+      {/* One-click automation recipes */}
+      <div className="bg-white border border-stone-200 p-5 sm:p-6">
+        <RecipesSection />
+      </div>
     </div>
   );
 };

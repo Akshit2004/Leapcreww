@@ -65,8 +65,8 @@ export default function KineticBand() {
       aria-hidden
       className="py-16 md:py-24 bg-[#F1EBE0] border-b border-[#1D211F]/8 overflow-hidden space-y-2 md:space-y-4"
     >
-      <VelocityRow text="Broadcast · Automate · Convert · " baseVelocity={1.6} />
-      <VelocityRow text="Measure · Attribute · Scale · " baseVelocity={-1.6} outline />
+      <VelocityRow text="Recover Carts · Confirm COD · Rescue NDR · " baseVelocity={1.6} />
+      <VelocityRow text="Attribute Every Rupee · " baseVelocity={-1.6} outline />
     </section>
   );
 }

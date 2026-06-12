@@ -479,9 +479,9 @@ function LoginContent() {
 
         {/* Brand Header */}
         <div className="relative z-20">
-          <Link href="/" className="inline-flex items-center gap-2 text-white font-mono text-xs tracking-[0.2em] font-black uppercase">
-            <Bot className="w-5 h-5 text-emerald-500" />
-            LeapCrew AI
+          <Link href="/">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/leapcrew-logo.png" alt="LeapCrew AI" className="h-11 w-auto object-contain brightness-0 invert" style={{ maxWidth: 180, background: "none" }} />
           </Link>
         </div>
 
@@ -505,10 +505,10 @@ function LoginContent() {
         <div className="absolute inset-0 canvas-dot-grid opacity-85 pointer-events-none" />
 
         {/* Mobile Brand Header */}
-        <div className="md:hidden text-center space-y-2 mb-4 relative z-10">
-          <Link href="/" className="inline-flex items-center gap-1.5 text-stone-900 font-mono text-xs tracking-[0.2em] font-black uppercase">
-            <Bot className="w-5 h-5 text-emerald-850" />
-            LeapCrew AI
+        <div className="md:hidden text-center mb-4 relative z-10">
+          <Link href="/" className="inline-flex">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/leapcrew-logo.png" alt="LeapCrew AI" className="h-10 w-auto object-contain" style={{ maxWidth: 160, background: "none" }} />
           </Link>
         </div>
 

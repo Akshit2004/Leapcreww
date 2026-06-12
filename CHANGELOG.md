@@ -7,7 +7,7 @@
 
 ## 1. Schema & Database Migrations
 
-### `prisma/schema.prisma`
+### `prisma/schema.prisma`  
 - **`Message.timestamp String` removed** — redundant with `createdAt DateTime @default(now())`. Dropped across all write sites.
 - **`SystemLog.timestamp String` removed** — same rationale. All writers updated.
 - **`Contact.email String?`** — made optional. WhatsApp contacts do not have email addresses; synthetic `phone@whatsapp.customer` values are gone.

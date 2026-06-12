@@ -11,6 +11,8 @@ import {
   Plug,
   Target,
   Layers,
+  Rocket,
+  Truck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,7 +39,9 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "analytics", label: "Analytics", icon: BarChart3, keywords: ["reports", "stats", "metrics"] },
   { id: "ads", label: "Ads", icon: Target, keywords: ["advertising", "marketing"] },
   { id: "integrations", label: "Integrations", icon: Plug, keywords: ["shopify", "connect", "apps"] },
+  { id: "ndr", label: "NDR", icon: Truck, keywords: ["delivery", "failed", "rto", "non-delivery", "courier", "return"] },
   { id: "usecases", label: "Use Cases", icon: LayoutGrid, keywords: ["marketplace", "products", "store", "catalog", "orders", "appointment", "booking", "slots", "agent", "bot"] },
+  { id: "launches", label: "Launches", icon: Rocket, keywords: ["flash sale", "countdown", "launch", "drop", "sequence"] },
   { id: "settings", label: "Settings", icon: Settings, keywords: ["preferences", "account", "whatsapp"] },
 ];
 

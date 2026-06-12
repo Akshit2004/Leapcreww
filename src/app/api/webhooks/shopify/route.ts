@@ -1,27 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { prisma } from "@/shared/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
 import { resolveAttribution } from "@/features/analytics/services/attribution";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
+import { verifyShopifyWebhookHmac } from "@/features/integrations/lib/shopifyAuth";
 
-// ─── Shopify webhook HMAC verification ────────────────────────────────
-// Verifies x-shopify-hmac-sha256 (base64 HMAC-SHA256 of the raw body with
-// SHOPIFY_WEBHOOK_SECRET) using a constant-time compare. Returns false when
-// the secret is unset, so the route rejects all traffic until configured.
-function verifyShopifyHmac(rawBody: string, header: string | null): boolean {
-  const secret = process.env.SHOPIFY_CLIENT_SECRET;
-  if (!secret || !header) return false;
-  const digest = crypto.createHmac("sha256", secret).update(rawBody, "utf8").digest("base64");
-  const a = Buffer.from(digest);
-  const b = Buffer.from(header);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-
-// Catalog synchronization moved to the authenticated, org-scoped route
-// POST /api/org/[orgId]/integrations/shopify/sync (see shopifySyncService).
-// This file now only receives Shopify push webhooks (HMAC-verified below).
+// Catalog synchronization lives at POST /api/org/[orgId]/integrations/shopify/sync.
+// This route receives Shopify push webhooks (HMAC-verified) including GDPR
+// mandatory topics required for App Store listing.
 
 // ─── RECEIVE WEBHOOK NOTIFICATIONS (POST) ─────────────────────────────
 export async function POST(request: NextRequest) {
@@ -29,7 +16,8 @@ export async function POST(request: NextRequest) {
     // Read the raw body once and verify the Shopify HMAC before trusting any
     // header or parsing the payload. Reject forged/unsigned requests with 401.
     const rawBody = await request.text();
-    if (!verifyShopifyHmac(rawBody, request.headers.get("x-shopify-hmac-sha256"))) {
+    const secret = process.env.SHOPIFY_CLIENT_SECRET ?? "";
+    if (!verifyShopifyWebhookHmac(rawBody, request.headers.get("x-shopify-hmac-sha256"), secret)) {
       console.warn("⚠️ Shopify webhook: missing or invalid HMAC signature");
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
@@ -56,7 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Store not integrated in WappFlow." }, { status: 404 });
     }
 
-    return await handleWebhookEvent(topic, payload, integration.organizationId);
+    return await handleWebhookEvent(topic, payload, integration.organizationId, shop);
   } catch (err: unknown) {
     console.error("❌ POST Shopify webhook endpoint failed:", err);
     return NextResponse.json({ error: "Internal server error processing webhook." }, { status: 500 });
@@ -88,6 +76,9 @@ interface ShopifyWebhookPayload {
   order_number?: string | number;
   fulfillments?: ShopifyFulfillment[];
   abandoned_checkout_url?: string;
+  // inventory_levels/update fields
+  inventory_item_id?: number | string;
+  available?: number;
 }
 
 // Tenant-scoped contact upsert for Shopify events.
@@ -132,7 +123,7 @@ async function upsertShopifyContact(
 }
 
 // ─── 3. CORE WEBHOOK EVENT PARSER & HANDLER ────────────────────────────
-async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload, orgId: string) {
+async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload, orgId: string, shop: string) {
   const d = new Date();
   const timestampStr = `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
 
@@ -242,7 +233,13 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
 
   // B. HANDLE ORDER CREATED / CONFIRMED
   if (topic === "orders/create") {
-    // 1. Create or Update Customer Contact in WappFlow (tenant-scoped by email)
+    const isCod = payload.financial_status !== "paid";
+    const orderItems = payload.line_items || [];
+    const totalPriceInPaise = Math.round(parseFloat(payload.total_price || "0") * 100);
+    const formattedPrice = (totalPriceInPaise / 100).toFixed(2);
+    const shopifyOrderId = `SHPFY-${payload.order_number || payload.id}`;
+
+    // 1. Upsert contact
     const contact = await upsertShopifyContact(
       orgId,
       email,
@@ -252,23 +249,27 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       ["Shopify", "Shopify-Buyer"]
     );
 
-    // Update attributes to mark cart as recovered
+    // Mark cart as recovered and cancel any active abandoned-cart sequences
     const contactAttributes = (contact.attributes as Record<string, unknown>) || {};
     contactAttributes.cart_recovered = true;
+
+    // For COD orders, store the details the confirmation sequence needs
+    if (isCod) {
+      contactAttributes.cod_status = "pending";
+      contactAttributes.pending_cod_order_id = shopifyOrderId;
+      contactAttributes.pending_cod_order_total = formattedPrice;
+      contactAttributes.pending_cod_order_items = orderItems
+        .map((i: ShopifyLineItem) => `${i.title} (x${i.quantity || 1})`)
+        .join(", ");
+    }
+
     await prisma.contact.update({
       where: { id: contact.id },
       data: { attributes: contactAttributes as Prisma.InputJsonValue },
     });
 
-    // Cancel active abandoned cart sequence enrollments
     const activeEnrollments = await prisma.sequenceEnrollment.findMany({
-      where: {
-        contactId: contact.id,
-        status: "active",
-        sequence: {
-          trigger: "cart_abandoned",
-        },
-      },
+      where: { contactId: contact.id, status: "active", sequence: { trigger: "cart_abandoned" } },
     });
     for (const enrollment of activeEnrollments) {
       await prisma.sequenceEnrollment.update({
@@ -277,52 +278,28 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       });
     }
 
-    // 2. Fetch or create Product placeholders if they don't exist yet
-    const orderItems = payload.line_items || [];
-    const totalPriceInPaise = Math.round(parseFloat(payload.total_price || "0") * 100);
-
+    // 2. Create order record
     const attribution = await resolveAttribution(orgId, contact);
-
     const savedOrder = await prisma.order.create({
       data: {
-        orderId: `SHPFY-${payload.id || Date.now()}`,
+        orderId: shopifyOrderId,
         contactId: contact.id,
         total: totalPriceInPaise,
         status: "confirmed",
-        paymentStatus: payload.financial_status === "paid" ? "paid" : "pending",
+        paymentStatus: isCod ? "pending" : "paid",
+        codStatus: isCod ? "pending" : null,
         phone: phone,
         organizationId: orgId,
         ...attribution,
       },
     });
 
-    // Sequence trigger: enroll into order_placed sequences (e.g. order_confirmation, review).
-    await enrollOnTrigger(orgId, "order_placed", contact.id);
-
-    // Outbound webhook (T-08): notify subscribers of the new order.
-    const { emitEvent } = await import("@/features/webhooks/services/webhookDeliveryService");
-    await emitEvent(orgId, "order.placed", {
-      orderId: savedOrder.orderId,
-      total: totalPriceInPaise,
-      currency: "INR",
-      source: "shopify",
-      contact: { id: contact.id, name: contact.name, phone: contact.phone },
-      items: orderItems.map((i: { title?: string; quantity?: number; price?: string }) => ({
-        name: i.title ?? "Item",
-        quantity: i.quantity ?? 1,
-        price: Math.round(parseFloat(i.price || "0") * 100),
-      })),
-    });
-
-    // Insert order items
+    // 3. Insert order items
     for (const item of orderItems) {
       const itemPriceInPaise = Math.round(parseFloat(item.price || "0") * 100);
-
-      // Verify product exists, create temporary mock if not
       let product = await prisma.product.findFirst({
         where: { name: item.title, organizationId: orgId },
       });
-
       if (!product) {
         product = await prisma.product.create({
           data: {
@@ -336,7 +313,6 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
           },
         });
       }
-
       await prisma.orderItem.create({
         data: {
           orderId: savedOrder.id,
@@ -348,70 +324,103 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       });
     }
 
-    // 3. Log event
-    await prisma.systemLog.create({
-      data: {
-        type: "integration",
-        message: `Shopify Webhook: orders/create - Order #${payload.order_number || payload.id} received from ${name} (₹${(
-          totalPriceInPaise / 100
-        ).toFixed(2)}). Registered order record in WappFlow.`,
-        organizationId: orgId,
-      },
-    });
+    // 4. Enroll in the right sequence + send WhatsApp notification
+    const { emitEvent } = await import("@/features/webhooks/services/webhookDeliveryService");
 
-    // 4. Dispatch Receipt / WhatsApp Confirmation Notification
-    const lastActive = contact.lastActiveAt ? new Date(contact.lastActiveAt).getTime() : 0;
-    const isSessionActive = (Date.now() - lastActive) <= 24 * 60 * 60 * 1000;
-    const formattedPrice = (totalPriceInPaise / 100).toFixed(2);
-    
-    const dbTemplate = await prisma.template.findFirst({
-      where: { name: "order_confirmation", organizationId: orgId, metaStatus: "approved" },
-    });
+    if (isCod) {
+      // COD path: enroll in confirmation sequence (sends the yes/no template).
+      // Skip the direct order_confirmation send — the sequence handles outreach.
+      await enrollOnTrigger(orgId, "cod_order_placed", contact.id);
 
-    let sentSuccessfully = false;
-    let textSent = "";
+      await emitEvent(orgId, "order.cod_pending", {
+        orderId: savedOrder.orderId,
+        total: totalPriceInPaise,
+        currency: "INR",
+        source: "shopify",
+        contact: { id: contact.id, name: contact.name, phone: contact.phone },
+      });
 
-    if (dbTemplate || !isSessionActive) {
-      const templateName = dbTemplate?.name || "order_confirmation";
-      textSent = `[Template: ${templateName}] Confirmed Order #${payload.order_number || payload.id} for ₹${formattedPrice}`;
-      const r = await sendWhatsAppMessage({
-        to: formatPhoneNumber(phone),
-        template: {
-          name: templateName,
-          language: { code: "en_US" },
-          components: [
-            {
+      await prisma.systemLog.create({
+        data: {
+          type: "integration",
+          message: `Shopify COD order #${shopifyOrderId} from ${name} (₹${formattedPrice}). Awaiting WhatsApp confirmation.`,
+          organizationId: orgId,
+        },
+      });
+    } else {
+      // Prepaid path: existing behaviour — enroll in order_placed (confirmation + review).
+      await enrollOnTrigger(orgId, "order_placed", contact.id);
+
+      await emitEvent(orgId, "order.placed", {
+        orderId: savedOrder.orderId,
+        total: totalPriceInPaise,
+        currency: "INR",
+        source: "shopify",
+        contact: { id: contact.id, name: contact.name, phone: contact.phone },
+        items: orderItems.map((i: { title?: string; quantity?: number; price?: string }) => ({
+          name: i.title ?? "Item",
+          quantity: i.quantity ?? 1,
+          price: Math.round(parseFloat(i.price || "0") * 100),
+        })),
+      });
+
+      const lastActive = contact.lastActiveAt ? new Date(contact.lastActiveAt).getTime() : 0;
+      const isSessionActive = (Date.now() - lastActive) <= 24 * 60 * 60 * 1000;
+
+      const dbTemplate = await prisma.template.findFirst({
+        where: { name: "order_confirmation", organizationId: orgId, metaStatus: "approved" },
+      });
+
+      let sentSuccessfully = false;
+      let textSent = "";
+
+      if (dbTemplate || !isSessionActive) {
+        const templateName = dbTemplate?.name || "order_confirmation";
+        textSent = `[Template: ${templateName}] Order #${shopifyOrderId} ₹${formattedPrice}`;
+        const r = await sendWhatsAppMessage({
+          to: formatPhoneNumber(phone),
+          template: {
+            name: templateName,
+            language: { code: "en_US" },
+            components: [{
               type: "body",
               parameters: [
                 { type: "text", text: name },
-                { type: "text", text: `SHPFY-${payload.order_number || payload.id}` },
+                { type: "text", text: shopifyOrderId },
                 { type: "text", text: `₹${formattedPrice}` },
               ],
-            },
-          ],
+            }],
+          },
+        }, orgId);
+        sentSuccessfully = r.ok;
+      }
+
+      if (!sentSuccessfully) {
+        const receiptText =
+          `🛍️ *Order Confirmed!*\n\nHi ${name}, your order #${shopifyOrderId} is confirmed.\n\n` +
+          orderItems.map((item: ShopifyLineItem) => `- ${item.title} (x${item.quantity || 1})`).join("\n") +
+          `\n\n*Total:* ₹${formattedPrice}\n\nWe'll update you when it ships! 🚚`;
+        textSent = receiptText;
+        await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: receiptText }, orgId);
+      }
+
+      await prisma.message.create({
+        data: {
+          sender: "system",
+          text: `[Shopify] Order confirmed: "${textSent.slice(0, 80)}..."`,
+          contactId: contact.id,
+          organizationId: orgId,
         },
-      }, orgId);
-      sentSuccessfully = r.ok;
-    }
+      });
 
-    if (!sentSuccessfully) {
-      // Send text message receipt if session is active or template failed
-      const receiptText = `🛍️ *Order Confirmed!*\n\nHi ${name}, thank you for your purchase. We have received your order #${payload.order_number || payload.id}.\n\n*Items Purchased:*\n` +
-        orderItems.map(item => `- ${item.title} (x${item.quantity || 1})`).join("\n") +
-        `\n\n*Total Amount:* ₹${formattedPrice}\n\nWe will update you as soon as your items are shipped! 🚚`;
-      textSent = receiptText;
-      await sendWhatsAppMessage({ to: formatPhoneNumber(phone), text: receiptText }, orgId);
+      await prisma.systemLog.create({
+        data: {
+          type: "integration",
+          message: `Shopify order #${shopifyOrderId} from ${name} (₹${formattedPrice}) — prepaid.`,
+          organizationId: orgId,
+        },
+      });
     }
-
-    // Create message bubble in WappFlow chat screen
-    await prisma.message.create({
-      data: {
-        sender: "system",
-        text: `[Shopify Automations] Order confirmed! Dispatched confirmation alert: "${textSent.slice(0, 80)}..."`,
-        contactId: contact.id,
-        organizationId: orgId,
-      },
-    });
 
     return NextResponse.json({ success: true, message: "Order creation webhook processed." });
   }
@@ -514,6 +523,105 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
     });
 
     return NextResponse.json({ success: true, message: "Order fulfillment webhook processed." });
+  }
+
+  // D. HANDLE INVENTORY RESTOCKED
+  if (topic === "inventory_levels/update") {
+    const inventoryItemId = String(payload.inventory_item_id ?? "");
+    const available = payload.available ?? 0;
+
+    if (!inventoryItemId || available <= 0) {
+      return NextResponse.json({ success: true, message: "Inventory not restocked, skipping." });
+    }
+
+    const { notifyStockWatchers } = await import("@/features/stock-alerts/services/stockAlertService");
+    const { notified } = await notifyStockWatchers({ orgId, shopifyInventoryItemId: inventoryItemId });
+
+    return NextResponse.json({ success: true, message: `Back-in-stock: notified ${notified} watcher(s).` });
+  }
+
+  // ── E. APP UNINSTALLED ─────────────────────────────────────────────────
+  // Mark integration disconnected so the dashboard reflects reality and future
+  // webhooks for this shop are rejected (org lookup will fail).
+  if (topic === "app/uninstalled") {
+    await prisma.integration.updateMany({
+      where: { id: "shopify", webhookUrl: `https://${shop}`, organizationId: orgId },
+      data: { status: "disconnected" },
+    });
+    await prisma.systemLog.create({
+      data: {
+        type: "integration",
+        message: `Shopify app uninstalled from ${shop}. Integration marked disconnected.`,
+        organizationId: orgId,
+      },
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  // ── F. GDPR — MANDATORY FOR APP STORE LISTING ──────────────────────────
+  // Shopify requires these three topics to be handled. We log the request and
+  // return 200 — no customer data is stored beyond what's needed for the service.
+
+  if (topic === "customers/data_request") {
+    // A customer requested their data. Log receipt; no PII exported automatically.
+    await prisma.systemLog.create({
+      data: {
+        type: "integration",
+        message: `GDPR customers/data_request received from ${shop}. Customer data request logged.`,
+        organizationId: orgId,
+      },
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  if (topic === "customers/redact") {
+    // Shopify asks us to delete customer data. Anonymise the contact record.
+    const customerId: string | undefined = (payload as Record<string, any>).customer?.id;
+    const email: string | undefined = (payload as Record<string, any>).customer?.email;
+    const phone: string | undefined = (payload as Record<string, any>).customer?.phone;
+
+    if (phone || email) {
+      const contact = await prisma.contact.findFirst({
+        where: {
+          organizationId: orgId,
+          ...(phone ? { phone } : { email: email ?? "" }),
+        },
+      });
+      if (contact) {
+        await prisma.contact.update({
+          where: { id: contact.id },
+          data: {
+            name: "[Redacted]",
+            email: null,
+            phone: `redacted_${contact.id}`,
+            attributes: {},
+            tags: [],
+          },
+        });
+      }
+    }
+
+    await prisma.systemLog.create({
+      data: {
+        type: "integration",
+        message: `GDPR customers/redact received from ${shop}. Customer ${customerId ?? email ?? "unknown"} data anonymised.`,
+        organizationId: orgId,
+      },
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  if (topic === "shop/redact") {
+    // Shop owner requested full data deletion (48 h after uninstall).
+    // Integration row is already disconnected by app/uninstalled. Log and ack.
+    await prisma.systemLog.create({
+      data: {
+        type: "integration",
+        message: `GDPR shop/redact received from ${shop}. All shop data deletion acknowledged.`,
+        organizationId: orgId,
+      },
+    });
+    return NextResponse.json({ success: true });
   }
 
   return NextResponse.json({ success: true, message: `Ignored unhandled webhook topic: ${topic}` });

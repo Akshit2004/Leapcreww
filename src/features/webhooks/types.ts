@@ -1,6 +1,6 @@
 /** Webhooks feature types — inbound processing + outbound subscriptions (T-08). */
 
-export const WEBHOOK_EVENTS = ["message.received", "message.status", "order.placed"] as const;
+export const WEBHOOK_EVENTS = ["message.received", "message.status", "order.placed", "order.cod_pending", "inventory.restocked"] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
 export function isWebhookEvent(value: string): value is WebhookEvent {

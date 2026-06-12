@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import {
-  Bot,
+
   ArrowLeft,
   ShieldCheck,
   Database,
@@ -447,11 +447,9 @@ export default function PrivacyPage() {
       {/* 1. Sticky Navigation Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#FAF7F2]/90 backdrop-blur-md border-b border-[#1D211F]/8 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 md:px-12 h-20 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-md bg-[#1D211F] flex items-center justify-center transition-transform group-hover:scale-102">
-              <Bot className="w-5 h-5 text-[#FAF7F2]" />
-            </div>
-            <span className="font-sans font-extrabold text-xl tracking-tight text-[#1D211F]">LeapCrew AI</span>
+          <Link href="/" className="flex items-center group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/leapcrew-logo.png" alt="LeapCrew AI" className="h-11 w-auto object-contain transition-opacity group-hover:opacity-75" style={{ maxWidth: 180, background: "none" }} />
           </Link>
 
           <Link
@@ -749,11 +747,9 @@ export default function PrivacyPage() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-8 text-xs select-none">
 
           <div className="space-y-3 text-left">
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded bg-[#FAF7F2]/10 flex items-center justify-center">
-                <Bot className="w-4 h-4 text-[#FAF7F2]" />
-              </div>
-              <span className="font-sans font-extrabold tracking-tight text-white text-base">LeapCrew AI</span>
+            <div className="flex items-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/leapcrew-logo.png" alt="LeapCrew AI" className="h-10 w-auto object-contain brightness-0 invert" style={{ maxWidth: 160, background: "none" }} />
             </div>
             <p className="text-[#FAF7F2]/40 max-w-sm font-medium">
               A product of smritix AI LLP, India. Architectural customer communication systems with secure multi-tenant CRM isolation.

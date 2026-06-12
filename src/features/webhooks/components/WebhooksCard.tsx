@@ -18,6 +18,8 @@ const EVENT_LABELS: Record<WebhookEvent, string> = {
   "message.received": "Inbound message",
   "message.status": "Delivery status",
   "order.placed": "Order placed",
+  "order.cod_pending": "COD order pending",
+  "inventory.restocked": "Back in stock",
 };
 
 /**

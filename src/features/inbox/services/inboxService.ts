@@ -87,12 +87,26 @@ export async function updateContactFields(
   callerOrgIds: string[],
   body: Record<string, unknown>
 ) {
-  await requireOwnedContact(contactId, callerOrgIds);
+  const existing = await requireOwnedContact(contactId, callerOrgIds);
   const updates: Record<string, unknown> = {};
   for (const key of CONTACT_EDITABLE_FIELDS) {
     if (body[key] !== undefined) updates[key] = body[key];
   }
-  return repo.updateContact(contactId, updates);
+  const updated = await repo.updateContact(contactId, updates);
+
+  // Fire tag_added for each newly added tag so sequences (e.g. win_back) enroll correctly.
+  if (Array.isArray(body.tags)) {
+    const prevTags = new Set<string>(existing.tags ?? []);
+    const addedTags = (body.tags as string[]).filter((t) => !prevTags.has(t));
+    if (addedTags.length > 0) {
+      const { enrollOnTrigger } = await import("@/features/sequences/services/sequenceService");
+      for (const tag of addedTags) {
+        await enrollOnTrigger(existing.organizationId, "tag_added", contactId, { tag });
+      }
+    }
+  }
+
+  return updated;
 }
 
 /** Bulk import contacts for an org after verifying membership. Returns inserted count. */

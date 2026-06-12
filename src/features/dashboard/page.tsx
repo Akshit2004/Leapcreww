@@ -17,6 +17,8 @@ import { SettingsTab } from "@/features/settings/components/SettingsTab";
 import { IntegrationsTab } from "@/features/integrations/components/IntegrationsTab";
 import { AnalyticsTab } from "@/features/analytics/components/AnalyticsTab";
 import { AdsTab } from "@/features/ads/components/AdsTab";
+import { LaunchesTab } from "@/features/launches/components/LaunchesTab";
+import { NdrTab } from "@/features/ndr/components/NdrTab";
 import { AICopilotSidebar } from "@/features/ai/components/AICopilotSidebar";
 import { CommandPalette } from "@/shared/components/CommandPalette";
 import { DashboardSkeleton } from "@/shared/components/ui/Skeleton";
@@ -142,6 +144,10 @@ function TenantDashboardInner() {
         return <UseCasesTab />;
       case "integrations":
         return <IntegrationsTab />;
+      case "ndr":
+        return <NdrTab />;
+      case "launches":
+        return <LaunchesTab />;
       case "settings":
         return <SettingsTab />;
       default:

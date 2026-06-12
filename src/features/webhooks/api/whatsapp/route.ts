@@ -13,6 +13,10 @@ import {
   resumeCampaignsAwaitingTemplate,
   failCampaignsAwaitingTemplate,
 } from "@/features/campaigns/services/strategistActivation";
+import { handleCodReply } from "@/features/cod/services/codService";
+import { handleNdrReply } from "@/features/ndr/services/ndrService";
+import { handleSizeFinderReply, handleShadeFinderReply } from "@/features/size-shade-finder/services/sizeShadeService";
+import { handleReplenishmentReply } from "@/features/replenishment/services/replenishmentService";
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
@@ -510,6 +514,28 @@ async function processInboundMessage(
     }
     return;
   }
+
+  // COD confirmation intercept: takes priority over all other routing.
+  // Returns true if the message was a YES/NO reply to a pending COD order.
+  const codHandled = await handleCodReply(cleanText, contact, orgId);
+  if (codHandled) return;
+
+  // NDR reply intercept: handles customer responses to non-delivery prompts
+  // (confirm / reschedule / address update / cancel). Returns true when consumed.
+  const ndrHandled = await handleNdrReply(cleanText, contact, orgId);
+  if (ndrHandled) return;
+
+  // Size finder intercept: guides customer through gender → height → weight → size recommendation.
+  const sizeHandled = await handleSizeFinderReply(cleanText, contact, orgId);
+  if (sizeHandled) return;
+
+  // Shade finder intercept: guides customer through skin tone → undertone → shade recommendation.
+  const shadeHandled = await handleShadeFinderReply(cleanText, contact, orgId);
+  if (shadeHandled) return;
+
+  // Replenishment intercept: handles REORDER / STOP replies to the 30-day reminder.
+  const replenishHandled = await handleReplenishmentReply(cleanText, contact, orgId);
+  if (replenishHandled) return;
 
   if (contact.assignedAgent === "Bot") {
     const org = await prisma.organization.findUnique({

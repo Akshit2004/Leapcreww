@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import { Bot } from "lucide-react";
 
 const productLinks = [
   { label: "Shared Inbox", href: "/platform#inbox" },
@@ -41,11 +40,9 @@ export default function Footer() {
 
           {/* Column 1 — Brand (col-span-4) */}
           <div className="lg:col-span-4 space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-md bg-[#FAF7F2]/10 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-[#FAF7F2]" />
-              </div>
-              <span className="font-sans font-extrabold tracking-tight text-white text-xl">LeapCrew AI</span>
+            <div className="flex items-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/leapcrew-logo.png" alt="LeapCrew AI" className="h-11 w-auto object-contain brightness-0 invert" style={{ maxWidth: 180, background: "none" }} />
             </div>
 
             <p className="text-[#FAF7F2]/50 text-sm font-medium max-w-xs leading-relaxed">

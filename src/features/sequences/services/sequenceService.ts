@@ -100,7 +100,10 @@ function resolveMessageVariables(text: string, contact: Contact): string {
     .replace(/\{\{contact\.phone\}\}/g, contact.phone || "")
     .replace(/\{\{cart\.total\}\}/g, attrs.cart_total ? `₹${attrs.cart_total}` : "")
     .replace(/\{\{cart\.checkout_url\}\}/g, attrs.cart_checkout_url || attrs.shopify_checkout_url || "")
-    .replace(/\{\{cart\.items_list\}\}/g, attrs.cart_items || "");
+    .replace(/\{\{cart\.items_list\}\}/g, attrs.cart_items || "")
+    .replace(/\{\{order\.id\}\}/g, attrs.pending_cod_order_id || "")
+    .replace(/\{\{order\.total\}\}/g, attrs.pending_cod_order_total ? `₹${attrs.pending_cod_order_total}` : "")
+    .replace(/\{\{tracking_url\}\}/g, attrs.tracking_url || attrs.shiprocket_tracking_url || "");
 }
 
 async function executeStep(step: SequenceStep, contact: Contact, organizationId: string) {
@@ -183,13 +186,28 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
       bodyParameters.push({ type: "text" as const, text: contact.name });
       bodyParameters.push({ type: "text" as const, text: attrs.cart_total ? `₹${attrs.cart_total}` : "" });
     } else if (templateName === "order_shipped") {
+      // {{1}} = customer name, {{2}} = tracking URL (Shiprocket tracking page)
       bodyParameters.push({ type: "text" as const, text: contact.name });
-      bodyParameters.push({ type: "text" as const, text: attrs.last_tracking_carrier || "DHL" });
-      bodyParameters.push({ type: "text" as const, text: attrs.last_tracking_url || "" });
+      bodyParameters.push({ type: "text" as const, text: attrs.tracking_url || attrs.shiprocket_tracking_url || attrs.last_tracking_url || "" });
+    } else if (templateName === "post_delivery_review") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
     } else if (templateName === "review_request") {
       bodyParameters.push({ type: "text" as const, text: contact.name });
     } else if (templateName === "win_back") {
       bodyParameters.push({ type: "text" as const, text: contact.name });
+    } else if (templateName === "cod_confirmation") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+      bodyParameters.push({ type: "text" as const, text: attrs.pending_cod_order_id || "" });
+      bodyParameters.push({ type: "text" as const, text: attrs.pending_cod_order_total || "0" });
+    } else if (templateName === "ndr_alert") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+    } else if (templateName === "size_finder_start") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+    } else if (templateName === "shade_finder_start") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+    } else if (templateName === "beauty_replenishment") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+      bodyParameters.push({ type: "text" as const, text: String(attrs.replenishment_days ?? "30") });
     } else {
       // Default fallback parameter mappings
       bodyParameters.push({ type: "text" as const, text: contact.name });
@@ -214,6 +232,28 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
     );
     sentOk = r.ok;
     if (r.ok) sentPreview = `[Template: ${templateName}]`;
+
+    // Set conversation state attribute so the reply intercept knows to handle
+    // subsequent messages from this contact.
+    if (r.ok && templateName === "beauty_replenishment") {
+      const { prisma: p } = await import("@/shared/lib/prisma");
+      const cAttrs = (contact.attributes as Record<string, any>) || {};
+      await p.contact.update({
+        where: { id: contact.id },
+        data: { attributes: { ...cAttrs, replenishment_prompted: true } },
+      });
+    }
+
+    if (r.ok && (templateName === "size_finder_start" || templateName === "shade_finder_start")) {
+      const { prisma: p } = await import("@/shared/lib/prisma");
+      const cAttrs = (contact.attributes as Record<string, any>) || {};
+      const stateKey = templateName === "size_finder_start" ? "size_finder_state" : "shade_finder_state";
+      const stateVal = templateName === "size_finder_start" ? "awaiting_gender" : "awaiting_skin_tone";
+      await p.contact.update({
+        where: { id: contact.id },
+        data: { attributes: { ...cAttrs, [stateKey]: stateVal } },
+      });
+    }
   }
 
   // Log the sequence send to chat history + record a sequence attribution touch.

@@ -7,7 +7,16 @@ export type RecipeId =
   | "ad_lead_nurture"
   | "order_confirmation"
   | "review_request"
-  | "win_back";
+  | "win_back"
+  | "cod_confirmation"
+  | "launch_waitlist"
+  | "flash_sale_drop"
+  | "ndr_recovery"
+  | "order_shipped_notification"
+  | "post_delivery_review"
+  | "size_finder"
+  | "shade_finder"
+  | "beauty_replenishment";
 
 /** A Meta template the recipe needs; created + submitted during install. */
 export interface RecipeTemplateDef {

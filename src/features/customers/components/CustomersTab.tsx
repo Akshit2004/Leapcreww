@@ -6,7 +6,8 @@ import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
 import { CustomersTable } from "./CustomersTable";
 import { BulkAddTagModal } from "./BulkAddTagModal";
 import { AddCustomerModal } from "./AddCustomerModal";
-import { Users, Search, Tag, Filter, Plus, Trash2, X, AlertCircle } from "lucide-react";
+import { WinBackModal } from "./WinBackModal";
+import { Users, Search, Tag, Filter, Plus, Trash2, X, AlertCircle, Flame } from "lucide-react";
 import { Contact } from "@/shared/context/types";
 import { SegmentRule, SegmentRules, evaluateSegmentRules } from "@/shared/lib/segmentMatch";
 
@@ -22,6 +23,7 @@ export const CustomersTab: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+  const [isWinBackModalOpen, setIsWinBackModalOpen] = useState(false);
 
   // Saved Segments states
   const [segments, setSegments] = useState<any[]>([]);
@@ -277,7 +279,14 @@ export const CustomersTab: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 justify-start md:justify-end">
-          <button 
+          <button
+            onClick={() => setIsWinBackModalOpen(true)}
+            className="flex items-center gap-2 bg-white border border-[#D05E3C] text-[#D05E3C] hover:bg-[#D05E3C] hover:text-white px-4 py-2 text-xs font-bold transition-all cursor-pointer rounded-none active:scale-95"
+          >
+            <Flame className="w-4 h-4" />
+            WIN-BACK
+          </button>
+          <button
             onClick={() => setIsAddCustomerModalOpen(true)}
             className="flex items-center gap-2 bg-stone-950 hover:bg-stone-900 border border-stone-950 text-white px-4 py-2 text-xs font-bold transition-all cursor-pointer rounded-none active:scale-95"
           >
@@ -445,6 +454,13 @@ export const CustomersTab: React.FC = () => {
         onClose={() => setIsBulkAddModalOpen(false)}
         onConfirm={confirmBulkAddTag}
         selectedCount={selectedIds.size}
+      />
+
+      <WinBackModal
+        isOpen={isWinBackModalOpen}
+        onClose={() => setIsWinBackModalOpen(false)}
+        orgId={orgId}
+        contacts={contacts}
       />
 
       <AddCustomerModal
