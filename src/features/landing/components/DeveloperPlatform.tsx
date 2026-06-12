@@ -44,7 +44,7 @@ const CODE: Record<Lang, { label: string; lines: Span[][] }> = {
   curl: {
     label: "curl",
     lines: [
-      [["", "curl -X POST https://app.wappflow.com/api/v1/messages \\"]],
+      [["", "curl -X POST https://app.leapcrew.ai/api/v1/messages \\"]],
       [["", "  -H "], ["text-amber-300", '"Authorization: Bearer wf_live_..."'], ["", " \\"]],
       [["", "  -H "], ["text-amber-300", '"Idempotency-Key: order-8841"'], ["", " \\"]],
       [["", "  -d "], ["text-amber-300", "'{\"to\":\"+919876543210\",\"template\":\"cart_recovery\"}'"]],

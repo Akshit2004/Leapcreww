@@ -450,7 +450,7 @@ function LoginContent() {
   };
 
   const copyCodeToClipboard = () => {
-    navigator.clipboard.writeText(`Hi, I'd like to verify my Account Signup for WappFlow. Verification Code: ${verificationCode}`);
+    navigator.clipboard.writeText(`Hi, I'd like to verify my Account Signup for LeapCrew AI. Verification Code: ${verificationCode}`);
     setSuccessMsg("WhatsApp message text copied to clipboard!");
     setTimeout(() => setSuccessMsg(""), 3000);
   };
@@ -471,7 +471,7 @@ function LoginContent() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/login_showcase.png"
-            alt="WappFlow SaaS Dashboard Illustration"
+            alt="LeapCrew AI SaaS Dashboard Illustration"
             className="w-full h-full object-cover opacity-60 mix-blend-luminosity hover:opacity-75 transition-opacity duration-700"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/20 to-transparent z-10" />
@@ -481,7 +481,7 @@ function LoginContent() {
         <div className="relative z-20">
           <Link href="/" className="inline-flex items-center gap-2 text-white font-mono text-xs tracking-[0.2em] font-black uppercase">
             <Bot className="w-5 h-5 text-emerald-500" />
-            WappFlow
+            LeapCrew AI
           </Link>
         </div>
 
@@ -508,7 +508,7 @@ function LoginContent() {
         <div className="md:hidden text-center space-y-2 mb-4 relative z-10">
           <Link href="/" className="inline-flex items-center gap-1.5 text-stone-900 font-mono text-xs tracking-[0.2em] font-black uppercase">
             <Bot className="w-5 h-5 text-emerald-850" />
-            WappFlow
+            LeapCrew AI
           </Link>
         </div>
 

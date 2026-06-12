@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus } from "lucide-react";
 
 const faqs = [
-  { q: "Do I need my own WhatsApp Business API approval first?", a: "No. WappFlow connects via Meta's Embedded Signup flow, which provisions a WhatsApp Business Account, phone number, and template surface from inside your workspace. If you already have a WABA, you can authorize it in the same wizard." },
+  { q: "Do I need my own WhatsApp Business API approval first?", a: "No. LeapCrew AI connects via Meta's Embedded Signup flow, which provisions a WhatsApp Business Account, phone number, and template surface from inside your workspace. If you already have a WABA, you can authorize it in the same wizard." },
   { q: "Which database powers the broadcast engine?", a: "Every tenant runs on isolated PostgreSQL schemas with row-level multi-tenancy. Outbound sends, attribution touches, and usage events are all auditable from your own admin console — no shared opaque storage." },
   { q: "How does the chatbot builder handle dynamic intent?", a: "You can wire deterministic node flows (trigger → filter → action) or flip on Pure AI Mode, which routes every inbound message to an LLM with your brand profile, fallback rules, and per-org safety configuration." },
   { q: "What integrations ship out of the box?", a: "Shopify, WooCommerce, Google Sheets, Razorpay, and a generic webhook connector are available immediately. The connector registry is open — any vendor that publishes a webhook can be normalized into the inbound lead pipeline." },

@@ -77,7 +77,7 @@ export default function Hero() {
           </h1>
 
           <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.6 }} className="text-[#1D211F]/70 text-sm sm:text-base leading-relaxed max-w-xl font-medium">
-            Scale client communications with complete clarity. WappFlow orchestrates Meta-approved broadcasts, visual chatbot automation, AI-composed drip sequences — and a full developer platform with REST API, typed SDKs, and an MCP server for AI agents — under one unified workspace.
+            Scale client communications with complete clarity. LeapCrew AI orchestrates Meta-approved broadcasts, visual chatbot automation, AI-composed drip sequences — and a full developer platform with REST API, typed SDKs, and an MCP server for AI agents — under one unified workspace.
           </motion.p>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.75 }} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4">

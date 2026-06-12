@@ -30,8 +30,8 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "WappFlow | WhatsApp Marketing Automation & Team Inbox",
-  description: "Scale your business with WappFlow's ultimate WhatsApp Marketing Platform. Broadcast campaigns, automate with chatbots, and manage customer communications through a shared Team Inbox.",
+  title: "LeapCrew AI | WhatsApp Marketing Automation & Team Inbox",
+  description: "Scale your business with LeapCrew AI's ultimate WhatsApp Marketing Platform. Broadcast campaigns, automate with chatbots, and manage customer communications through a shared Team Inbox.",
 };
 
 export default function RootLayout({
