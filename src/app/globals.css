@@ -315,3 +315,12 @@ input::placeholder, textarea::placeholder {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%231f2c34' fill-opacity='0.25'%3E%3Cpath d='M15 15h2v2h-2zm4 0h2v2h-2zm-8 4h2v2h-2zm0 4h2v2h-2zm8 0h2v2h-2zm-4 4h2v2h-2zm12-4h2v2h-2zm0 4h2v2h-2zm4 4h2v2h-2zm0 4h2v2h-2zm-4 4h2v2h-2zm-8 0h2v2h-2zm-4-4h2v2h-2zm0-8h2v2h-2zm8 4h2v2h-2zm-4 8h2v2h-2zm12 4h2v2h-2zm-4 4h2v2h-2zm-8 0h2v2h-2zm0-4h2v2h-2zm4-4h2v2h-2zm12-12h2v2h-2zm0 4h2v2h-2z'/%3E%3C/g%3E%3C/svg%3E");
 }
 
+
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 3s ease infinite;
+}

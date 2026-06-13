@@ -49,5 +49,12 @@ export const GET = route(async (req) => {
     prisma.organization.count({ where }),
   ]);
 
-  return ok({ orgs, total, page, take });
+  const flat = orgs.map(({ _count, ...o }) => ({
+    ...o,
+    memberCount: _count.memberships,
+    contactCount: _count.contacts,
+    campaignCount: _count.campaigns,
+  }));
+
+  return ok({ orgs: flat, total, page, take });
 });
