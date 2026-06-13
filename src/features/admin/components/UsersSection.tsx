@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Users, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 
 interface Membership {
@@ -156,9 +156,8 @@ export function UsersSection() {
                 </tr>
               ) : (
                 users.map((user) => (
-                  <>
+                  <React.Fragment key={user.id}>
                     <tr
-                      key={user.id}
                       className="border-b border-stone-50 hover:bg-stone-50 transition-colors"
                     >
                       <td className="px-4 py-3 font-bold text-stone-950">
@@ -260,7 +259,7 @@ export function UsersSection() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))
               )}
             </tbody>

@@ -210,7 +210,8 @@ function LoginContent() {
           await new Promise(r => setTimeout(r, 400));
           return poll();
         } else {
-          router.push("/");
+          // No org — could be platform admin. Send to /admin and let it handle access check.
+          router.push("/admin");
         }
       };
       await poll();
