@@ -55,6 +55,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "No order identifier in payload" }, { status: 400 });
       }
 
+      // Check if this is a Wallet Topup order
+      const { findTopupByRazorpayOrderId, creditWalletForTopup } = await import("@/features/wallet/repositories/walletRepo");
+      const topup = await findTopupByRazorpayOrderId(razorpayOrderId);
+      if (topup) {
+        if (topup.status === "pending") {
+          await creditWalletForTopup(topup.id, topup.organizationId, topup.amount);
+        }
+        return NextResponse.json({ status: "wallet_topup_credited" });
+      }
+
       // Appointments are collected offline (no Razorpay), so payment events
       // only ever resolve to marketplace Order rows.
       const order = await prisma.order.findFirst({
@@ -129,6 +139,16 @@ export async function POST(req: NextRequest) {
         razorpayOrderId = payload.payload?.payment_link?.entity?.id;
       }
       if (razorpayOrderId) {
+        // Check if this is a Wallet Topup order
+        const { findTopupByRazorpayOrderId, markTopupFailed } = await import("@/features/wallet/repositories/walletRepo");
+        const topup = await findTopupByRazorpayOrderId(razorpayOrderId);
+        if (topup) {
+          if (topup.status === "pending") {
+            await markTopupFailed(topup.id);
+          }
+          return NextResponse.json({ status: "wallet_topup_failed" });
+        }
+
         const order = await prisma.order.findFirst({
           where: { razorpayOrderId },
           include: { contact: true },

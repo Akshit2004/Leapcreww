@@ -1,4 +1,6 @@
 import crypto from "crypto";
+import { encryptSecret, decryptSecret } from "@/shared/lib/crypto";
+
 
 // ── HMAC verification (install request + webhook payloads) ────────────────
 // Shopify signs install redirects by computing HMAC-SHA256 over all query
@@ -68,34 +70,16 @@ export function parseSignedState(
 }
 
 // ── Token encryption ─────────────────────────────────────────────────────
-// AES-256-GCM with a 32-byte key from SHOPIFY_TOKEN_KEY env var.
-// Falls back to plaintext storage when key is absent (dev only).
-const ALGO = "aes-256-gcm";
-
+// Re-exports of canonical crypto secrets helper
 export function encryptToken(plaintext: string): string {
-  const keyHex = process.env.SHOPIFY_TOKEN_KEY;
-  if (!keyHex) return plaintext; // dev fallback — warn in prod via health check
-  const key = Buffer.from(keyHex, "hex");
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv(ALGO, key, iv);
-  const enc = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `enc:${iv.toString("hex")}:${tag.toString("hex")}:${enc.toString("hex")}`;
+  return encryptSecret(plaintext);
 }
 
 export function decryptToken(stored: string): string {
   if (!stored.startsWith("enc:")) return stored; // plaintext / dev mode
-  const keyHex = process.env.SHOPIFY_TOKEN_KEY;
-  if (!keyHex) throw new Error("SHOPIFY_TOKEN_KEY not set — cannot decrypt access token");
-  const [, ivHex, tagHex, encHex] = stored.split(":");
-  const key = Buffer.from(keyHex, "hex");
-  const iv = Buffer.from(ivHex, "hex");
-  const tag = Buffer.from(tagHex, "hex");
-  const enc = Buffer.from(encHex, "hex");
-  const decipher = crypto.createDecipheriv(ALGO, key, iv);
-  decipher.setAuthTag(tag);
-  return decipher.update(enc).toString("utf8") + decipher.final("utf8");
+  return decryptSecret(stored);
 }
+
 
 // ── Webhook HMAC (raw body) ──────────────────────────────────────────────
 export function verifyShopifyWebhookHmac(rawBody: string, header: string | null, secret: string): boolean {

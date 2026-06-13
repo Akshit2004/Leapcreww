@@ -136,8 +136,8 @@ export async function GET(request: NextRequest) {
   } catch { /* non-fatal */ }
 
   // 6. Encrypt token at rest, persist integration
-  const encryptedToken = encryptToken(accessToken);
-  const serializedApiKey = JSON.stringify({ shopDomain: shop, accessToken: encryptedToken });
+  const creds = { shopDomain: shop, accessToken };
+  const encryptedApiKey = encryptToken(JSON.stringify(creds));
 
   await prisma.integration.upsert({
     where: { id_organizationId: { id: "shopify", organizationId: orgId } },
@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
       description: "Sync products, track orders, recover carts, and automate post-purchase flows.",
       status: "connected",
       icon: "ShoppingBag",
-      apiKey: serializedApiKey,
+      apiKey: encryptedApiKey,
       webhookUrl: `https://${shop}`,
     },
     create: {
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
       description: "Sync products, track orders, recover carts, and automate post-purchase flows.",
       status: "connected",
       icon: "ShoppingBag",
-      apiKey: serializedApiKey,
+      apiKey: encryptedApiKey,
       webhookUrl: `https://${shop}`,
     },
   });

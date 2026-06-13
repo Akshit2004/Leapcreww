@@ -28,6 +28,19 @@ agents that might run `git stash` / `checkout` / `reset` until everything is com
   `verify-payment` intentionally remain unauthenticated (customer-facing checkout via WhatsApp
   bot; trust boundary = Razorpay signature). Updated `MarketplaceTab.tsx` to pass `?orgId=` on
   PATCH/DELETE product calls. Verified clean via `tsc --noEmit`.
+- **#3 — Wallet topup flow (Razorpay)**:
+  - Added `WalletTopup` model to `schema.prisma` and resolved baseline migration issue.
+  - Implemented `createPlatformRazorpayOrder` in `src/shared/lib/razorpay.ts`.
+  - Refactored `src/features/wallet/api/topup/route.ts` to use layered architecture and roles.
+  - Integrated top-up payment success/failure routing inside the Razorpay webhook.
+- **#4 — Encrypt integration credentials at rest**:
+  - Rewrote `src/shared/lib/crypto.ts` as a canonical AES-256-GCM module with `encryptSecret`, `decryptSecret`, and `decryptSecretSafe`.
+  - Re-exported token methods in `shopifyAuth.ts` as wrappers of canonical helpers.
+  - Added `INTEGRATION_TOKEN_KEY` placeholder in `.env.example`.
+  - Refactored `src/features/integrations/api/route.ts` to be thin routes using `integrationsService`.
+  - Deleted duplicate Shopify-only route at `src/features/integrations/api/integrations/route.ts`.
+  - Updated Shopify callback route to encrypt full credentials JSON blob.
+  - Integrated `decryptSecretSafe` in `razorpay.ts` configuration lookup.
 - **#17 — Public-api key revoke route**: added `apiKeyRepo.findById`, fixed
   `apiKeyService.revokeKey(organizationId, id)` signature, wired up
   `DELETE /api/org/:orgId/api-keys/:keyId`, and added revoke UI to
@@ -35,49 +48,7 @@ agents that might run `git stash` / `checkout` / `reset` until everything is com
 
 ## 🚧 In progress
 
-- **#3 — Wallet topup flow (Razorpay)** — *currently being redone, partially done*:
-  - ✅ Prisma schema: `WalletTopup` model + `Organization.walletTopups` relation added,
-    `prisma validate` / `prisma generate` succeed (migration NOT yet run — see Blockers).
-  - ✅ Service/repo layer intact: `src/features/wallet/services/walletService.ts`
-    (`createTopupOrder`), `src/features/wallet/repositories/walletRepo.ts`
-    (`createTopup`, `findTopupByRazorpayOrderId`, `creditWalletForTopup`, `markTopupFailed`),
-    `src/features/wallet/types.ts`.
-  - ❌ **Not yet done**: add `createPlatformRazorpayOrder(amountPaise, receipt)` to
-    `src/shared/lib/razorpay.ts` using platform-level `RAZORPAY_KEY_ID` /
-    `RAZORPAY_KEY_SECRET` env vars (distinct from the per-org `getRazorpayConfig`). This is the
-    edit that was about to be made when this session was interrupted.
-  - ❌ Rewrite `src/features/wallet/api/topup/route.ts` (currently still the original stub
-    that just echoes `{ success: true, amount }`) to `requireOrg(orgId, "ADMIN")` +
-    `walletService.createTopupOrder`.
-  - ❌ Update `src/features/webhooks/api/razorpay/route.ts`: on `payment.captured` /
-    `order.paid` / `payment_link.paid`, look up `WalletTopup` via
-    `walletRepo.findTopupByRazorpayOrderId` first; if found, credit via
-    `walletRepo.creditWalletForTopup` and return early. Handle `payment.failed` /
-    `payment_link.cancelled` via `walletRepo.markTopupFailed`.
-
 ## ⏳ Not started
-
-- **#4 — Encrypt integration credentials at rest**:
-  - Service/repo layer survived (`integrationsService.ts`, `integrationsRepo.ts`,
-    `shopifySyncService.ts`), but `integrationsService.ts` imports `encryptSecret` /
-    `decryptSecretSafe` from `@/shared/lib/crypto`, which **don't exist yet** (currently
-    reverted to old `encrypt`/`decrypt` AES module).
-  - Needs: rewrite `src/shared/lib/crypto.ts` to canonical AES-256-GCM module exporting
-    `encryptSecret`, `decryptSecret`, `decryptSecretSafe` (format `enc:<iv>:<tag>:<ciphertext>`,
-    key from `INTEGRATION_TOKEN_KEY` falling back to legacy `SHOPIFY_TOKEN_KEY`,
-    `decryptSecretSafe` falls back to raw value with a `console.warn` for legacy plaintext rows).
-  - `src/features/integrations/lib/shopifyAuth.ts` → make `encryptToken`/`decryptToken` thin
-    re-exports of `encryptSecret`/`decryptSecret`.
-  - Add `INTEGRATION_TOKEN_KEY` to `.env.example`.
-  - Rewrite `src/features/integrations/api/route.ts` (currently direct prisma, no
-    `requireOrg`, plaintext `apiKey` storage) → thin route using `integrationsService`,
-    `requireOrg(orgId,"AGENT")` for GET / `requireOrg(orgId,"ADMIN")` for POST.
-  - **Delete** duplicate Shopify-only route at
-    `src/features/integrations/api/integrations/route.ts`.
-  - `src/app/api/shopify/callback/route.ts` → encrypt the whole `{shopDomain, accessToken}`
-    JSON blob with `encryptToken` (currently only encrypts `accessToken`).
-  - `src/shared/lib/razorpay.ts` `getRazorpayConfig` → apply `decryptSecretSafe` when reading
-    stored integration credentials.
 
 - **#5 — Persist "Add Customer" to DB** — reported done by a prior agent
   (`useContactState.ts`, `contactRepo.ts`, `inboxService.ts`, `AppContext.tsx`, `types.ts`,

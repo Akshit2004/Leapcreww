@@ -1,11 +1,16 @@
-import { NextResponse } from "next/server";
+import { ok, route, requireOrg, body, requireFields } from "@/shared/lib/api";
+import { createTopupOrder } from "../../services/walletService";
 
-export async function POST(req: Request, { params }: { params: Promise<{ orgId: string }> }) {
-  try {
-    const { amount } = await req.json();
-    // TODO: In a real app, you would create a payment order here (e.g., via Razorpay)
-    return NextResponse.json({ success: true, amount });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+export const POST = route(async (req, { params }) => {
+  const orgId = params?.orgId as string;
+  const input = await body<{ amount: number }>(req);
+  requireFields(input, ["amount"]);
+  await requireOrg(orgId, "ADMIN");
+
+  const result = await createTopupOrder({
+    organizationId: orgId,
+    amount: input.amount,
+  });
+
+  return ok(result);
+});

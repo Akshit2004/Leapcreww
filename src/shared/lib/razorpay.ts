@@ -1,6 +1,8 @@
 import Razorpay from "razorpay";
 import * as crypto from "crypto";
 import { prisma } from "./prisma";
+import { decryptSecretSafe } from "./crypto";
+
 
 export async function getRazorpayConfig(orgId: string) {
   const integration = await prisma.integration.findUnique({
@@ -18,7 +20,7 @@ export async function getRazorpayConfig(orgId: string) {
 
   let config;
   try {
-    config = JSON.parse(integration.apiKey);
+    config = JSON.parse(decryptSecretSafe(integration.apiKey));
   } catch (e) {
     throw new Error("Invalid Razorpay configuration.");
   }
@@ -43,6 +45,19 @@ export async function createRazorpayOrder(amountPaise: number, receipt: string, 
     { amount: amountPaise, currency: "INR", receipt, payment_capture: 1 }
   )) as { id: string; amount: number; currency: string; receipt: string; status: string };
   return { ...order, keyId: config.keyId };
+}
+
+export async function createPlatformRazorpayOrder(amountPaise: number, receipt: string) {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) {
+    throw new Error("Platform Razorpay credentials are not configured in environment variables.");
+  }
+  const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
+  const order = (await (rzp.orders.create as unknown as (params: Record<string, unknown>) => Promise<unknown>)(
+    { amount: amountPaise, currency: "INR", receipt, payment_capture: 1 }
+  )) as { id: string; amount: number; currency: string; receipt: string; status: string };
+  return { ...order, keyId };
 }
 
 export async function createRazorpayPaymentLink(amountPaise: number, referenceId: string, phone: string, name: string, orgId: string) {
