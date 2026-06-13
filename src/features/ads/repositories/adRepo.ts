@@ -26,3 +26,34 @@ export function getOrganizationBrandProfile(organizationId: string) {
     select: { brandProfile: true },
   });
 }
+
+export function listAdCampaigns(organizationId: string) {
+  return prisma.adCampaign.findMany({
+    where: { organizationId },
+    include: { ads: true },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export function findAdCampaign(organizationId: string, campaignId: string) {
+  return prisma.adCampaign.findFirst({
+    where: { id: campaignId, organizationId },
+    include: { ads: true },
+  });
+}
+
+export function createAdCampaign(
+  campaignData: Omit<Prisma.AdCampaignUncheckedCreateInput, "ads">,
+  adData: Omit<Prisma.AdUncheckedCreateInput, "organizationId" | "adCampaignId">
+) {
+  return prisma.adCampaign.create({
+    data: { ...campaignData, ads: { create: { ...adData, organizationId: campaignData.organizationId } } },
+    include: { ads: true },
+  });
+}
+
+/** Returns the number of rows deleted (0 if the campaign doesn't belong to this org). */
+export async function deleteAdCampaign(organizationId: string, campaignId: string): Promise<number> {
+  const { count } = await prisma.adCampaign.deleteMany({ where: { id: campaignId, organizationId } });
+  return count;
+}

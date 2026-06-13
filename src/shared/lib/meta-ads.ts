@@ -58,6 +58,46 @@ async function callMetaApi(path: string, method: string, payload: any, token: st
   return data;
 }
 
+export interface AdCampaignInsights {
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  spent: number;
+}
+
+/**
+ * Fetch live spend/reach metrics for a campaign from the Meta Marketing API.
+ * Returns null if Meta isn't configured or the campaign has no live metaCampaignId
+ * (e.g. simulated campaigns) — callers should fall back to zeroed metrics.
+ */
+export async function getCampaignInsights(orgId: string, metaCampaignId: string): Promise<AdCampaignInsights | null> {
+  const config = await getMetaAdsConfig(orgId);
+  if (!config || !metaCampaignId || metaCampaignId.startsWith("sim_")) return null;
+
+  try {
+    const url =
+      `https://graph.facebook.com/v20.0/${metaCampaignId}/insights` +
+      `?fields=impressions,clicks,ctr,spend&access_token=${config.accessToken}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) {
+      console.warn(`[Meta Ads] Insights fetch failed for ${metaCampaignId}:`, data.error?.message);
+      return null;
+    }
+    const row = data.data?.[0];
+    if (!row) return { impressions: 0, clicks: 0, ctr: 0, spent: 0 };
+    return {
+      impressions: parseInt(row.impressions || "0", 10),
+      clicks: parseInt(row.clicks || "0", 10),
+      ctr: parseFloat(row.ctr || "0"),
+      spent: parseFloat(row.spend || "0"),
+    };
+  } catch (err) {
+    console.error(`[Meta Ads] Insights request error for ${metaCampaignId}:`, err);
+    return null;
+  }
+}
+
 /**
  * Publishes a Click-to-WhatsApp Campaign, Ad Set, Creative, and Ad to Meta.
  * Requires valid Meta token and permissions.

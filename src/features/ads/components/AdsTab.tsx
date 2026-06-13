@@ -12,16 +12,26 @@ import {
   Plus, 
   Trash2, 
   Check, 
-  TrendingUp, 
-  DollarSign, 
-  MousePointerClick, 
-  Eye, 
-  Settings2, 
+  TrendingUp,
+  DollarSign,
+  MousePointerClick,
+  Eye,
+  Settings2,
+  Users,
   FileText,
   ChevronRight,
   Send,
   X
 } from "lucide-react";
+
+interface AdCampaignMetrics {
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  spent: number;
+  leads: number;
+  live: boolean;
+}
 
 interface AdCampaignWithAds {
   id: string;
@@ -29,6 +39,7 @@ interface AdCampaignWithAds {
   objective: string;
   budget: number;
   status: string;
+  metaCampaignId: string | null;
   createdAt: string;
   ads: Array<{
     id: string;
@@ -37,6 +48,7 @@ interface AdCampaignWithAds {
     creative: any; // { headline, primaryText, imagePrompt, imageUrl }
     linkedTemplate?: string | null;
   }>;
+  metrics: AdCampaignMetrics;
 }
 
 export const AdsTab: React.FC = () => {
@@ -202,28 +214,6 @@ export const AdsTab: React.FC = () => {
     }
   };
 
-  // Generate deterministic mock metrics for demo/simulation purposes
-  const getMockMetrics = (campaignId: string, status: string) => {
-    const seed = campaignId.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const isInactive = status !== "ACTIVE";
-    
-    if (isInactive) {
-      return {
-        impressions: 0,
-        clicks: 0,
-        ctr: 0,
-        spent: 0,
-      };
-    }
-    
-    const impressions = Math.floor((seed % 400) + 1200);
-    const clicks = Math.floor(impressions * ((seed % 5 === 0 ? 0.08 : 0.05) + 0.02));
-    const ctr = parseFloat(((clicks / impressions) * 100).toFixed(2));
-    const spent = parseFloat((clicks * 24.50).toFixed(2)); // ₹24.50 cost-per-click mock
-
-    return { impressions, clicks, ctr, spent };
-  };
-
   return (
     <div className="flex-1 p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9] overflow-y-auto text-left w-full items-stretch justify-start">
       {/* Header section */}
@@ -275,7 +265,7 @@ export const AdsTab: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {campaigns.map((camp) => {
-            const metrics = getMockMetrics(camp.id, camp.status);
+            const metrics = camp.metrics;
             const activeAd = camp.ads[0];
 
             return (
@@ -323,7 +313,7 @@ export const AdsTab: React.FC = () => {
                 </div>
 
                 {/* Metrics Stats row */}
-                <div className="grid grid-cols-3 gap-3 pt-1">
+                <div className="grid grid-cols-4 gap-3 pt-1">
                   <div className="bg-stone-50 p-2.5 rounded-none border border-stone-200 flex flex-col">
                     <span className="text-[9px] text-stone-400 font-bold uppercase tracking-wider flex items-center gap-1">
                       <Eye className="w-3 h-3 text-stone-400" /> Impressions
@@ -342,7 +332,18 @@ export const AdsTab: React.FC = () => {
                     </span>
                     <span className="text-sm font-bold text-stone-900 mt-1">{metrics.ctr}%</span>
                   </div>
+                  <div className="bg-stone-50 p-2.5 rounded-none border border-stone-200 flex flex-col">
+                    <span className="text-[9px] text-stone-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                      <Users className="w-3 h-3 text-stone-400" /> Leads
+                    </span>
+                    <span className="text-sm font-bold text-stone-900 mt-1">{metrics.leads.toLocaleString()}</span>
+                  </div>
                 </div>
+                {!metrics.live && (
+                  <p className="text-[9px] text-stone-400 -mt-3 italic">
+                    Impressions/clicks/spend require a live Meta Ads connection — leads are tracked locally regardless.
+                  </p>
+                )}
 
                 {/* Bottom Footer spend */}
                 <div className="border-t border-stone-200 pt-4 flex justify-between items-center text-xs font-semibold text-stone-500 select-none">
