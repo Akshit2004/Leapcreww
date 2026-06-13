@@ -59,6 +59,14 @@ export const CampaignsTab: React.FC = () => {
   const [connectingWaba, setConnectingWaba] = useState(false);
   const [loadingStepText, setLoadingStepText] = useState("Analyzing market positioning...");
   const [isApplyingStrategy, setIsApplyingStrategy] = useState(false);
+  const [strategistResult, setStrategistResult] = useState<{
+    templateApproved: boolean;
+    templateName: string;
+    templateBody: string;
+    enrolledCount: number;
+    scheduledAt: string | null;
+    steps: Array<{ delayMinutes: number; message: string }>;
+  } | null>(null);
 
   // Load FB SDK for embedded WABA connection within strategist modal
   useEffect(() => {
@@ -1129,6 +1137,7 @@ export const CampaignsTab: React.FC = () => {
                 onClick={() => {
                   setIsStrategistOpen(false);
                   setStrategistStrategy(null);
+                  setStrategistResult(null);
                   setStrategistError("");
                 }}
                 className="p-1 rounded-none hover:bg-stone-200 text-stone-500 transition-colors border border-transparent cursor-pointer"
@@ -1140,7 +1149,93 @@ export const CampaignsTab: React.FC = () => {
             {/* Content Body */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
 
-              {!strategistStrategy ? (
+              {strategistResult ? (
+                /* Result Screen — shown after apply succeeds */
+                <div className="max-w-2xl mx-auto py-6 space-y-6">
+                  {/* Hero */}
+                  <div className="text-center space-y-3 pb-6 border-b border-stone-100">
+                    <div className="w-16 h-16 bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center mx-auto">
+                      <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-stone-950 tracking-tight">Campaign Built</h3>
+                      <p className="text-sm text-stone-500 mt-1.5 leading-relaxed">
+                        {strategistResult.templateApproved
+                          ? "Your campaign is live. Contacts have been enrolled and will receive the broadcast."
+                          : "Strategy saved. The campaign will launch automatically once Meta approves the template."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 4 stat cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Template</div>
+                      <div className="font-black text-stone-950 text-sm leading-snug break-words">{strategistResult.templateName}</div>
+                      <div className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 ${strategistResult.templateApproved ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-amber-100 text-amber-700 border border-amber-200"}`}>
+                        {strategistResult.templateApproved ? "Approved & Live" : "Pending Meta Review"}
+                      </div>
+                    </div>
+
+                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">
+                        {strategistResult.templateApproved ? "Enrolled" : "Queued"}
+                      </div>
+                      <div className="text-3xl font-black text-stone-950">{strategistResult.enrolledCount.toLocaleString()}</div>
+                      <div className="text-xs text-stone-500">contacts</div>
+                    </div>
+
+                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Broadcast Time</div>
+                      <div className="font-bold text-stone-950 text-sm">
+                        {strategistResult.scheduledAt
+                          ? new Date(strategistResult.scheduledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+                          : "Immediate"}
+                      </div>
+                    </div>
+
+                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Follow-Up Drip</div>
+                      <div className="text-3xl font-black text-stone-950">{strategistResult.steps.length}</div>
+                      <div className="text-xs text-stone-500">automated steps</div>
+                    </div>
+                  </div>
+
+                  {/* Message body preview */}
+                  <div className="bg-stone-950 p-5 space-y-2">
+                    <div className="text-[9px] font-black uppercase tracking-wider text-stone-500">Message Preview</div>
+                    <p className="text-sm leading-relaxed text-stone-100 whitespace-pre-wrap">{strategistResult.templateBody}</p>
+                  </div>
+
+                  {/* Drip sequence timeline */}
+                  {strategistResult.steps.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Drip Sequence</div>
+                      <div className="space-y-2">
+                        {strategistResult.steps.map((step, i) => (
+                          <div key={i} className="flex gap-3 items-start">
+                            <div className="w-5 h-5 bg-stone-950 text-white text-[9px] font-black flex items-center justify-center shrink-0 mt-0.5">
+                              {i + 1}
+                            </div>
+                            <div className="flex-1 bg-stone-50 border border-stone-100 p-3">
+                              <div className="text-[10px] font-bold text-stone-400 mb-1">
+                                {step.delayMinutes === 0
+                                  ? "Immediate"
+                                  : step.delayMinutes < 60
+                                  ? `After ${step.delayMinutes} min`
+                                  : `After ${Math.round(step.delayMinutes / 60)}h`}
+                              </div>
+                              <p className="text-xs text-stone-700 leading-snug">
+                                {step.message.length > 140 ? step.message.slice(0, 140) + "…" : step.message}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : !strategistStrategy ? (
                 /* Prompt State */
                 <div className="max-w-xl mx-auto py-12 space-y-6 text-center">
                   <div className="space-y-2">
@@ -1455,6 +1550,51 @@ export const CampaignsTab: React.FC = () => {
 
             {/* Footer */}
             <div className="p-6 border-t border-stone-200 flex justify-between items-center shrink-0 bg-[#fafaf9] select-none">
+              {strategistResult ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStrategistResult(null);
+                      setStrategistStrategy(null);
+                      setStrategistPrompt("");
+                      setStrategistError("");
+                    }}
+                    className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-300"
+                  >
+                    Build Another
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsStrategistOpen(false);
+                        setStrategistStrategy(null);
+                        setStrategistResult(null);
+                        setStrategistError("");
+                      }}
+                      className="px-4 py-2 bg-white hover:bg-stone-50 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-200"
+                    >
+                      Done
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsStrategistOpen(false);
+                        setStrategistStrategy(null);
+                        setStrategistResult(null);
+                        setStrategistError("");
+                        router.push(`${pathname}?tab=campaigns`, { scroll: false });
+                      }}
+                      className="px-5 py-2 bg-stone-950 hover:bg-stone-800 text-white font-black text-xs rounded-none cursor-pointer flex items-center gap-1.5 border border-stone-950"
+                    >
+                      View Campaigns
+                      <TrendingUp className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+              <>
               <div>
                 {strategistStrategy && (
                   <button
@@ -1502,19 +1642,14 @@ export const CampaignsTab: React.FC = () => {
                         const data = await res.json();
                         if (!res.ok) throw new Error(data.error || "Failed to apply strategy");
 
-                        if (data.templateApproved) {
-                          notify.success(
-                            "Strategy applied",
-                            `Your campaign is live${typeof data.enrolledCount === "number" ? ` — ${data.enrolledCount} contact(s) enrolled` : ""}. Check Campaigns and workflows.`
-                          );
-                        } else {
-                          notify.success(
-                            "Template submitted to Meta",
-                            "Your campaign is queued — it will broadcast automatically the moment Meta approves the new template."
-                          );
-                        }
-                        setIsStrategistOpen(false);
-                        setStrategistStrategy(null);
+                        setStrategistResult({
+                          templateApproved: data.templateApproved,
+                          templateName: strategistStrategy.template.name,
+                          templateBody: strategistStrategy.template.body,
+                          enrolledCount: data.enrolledCount ?? data.pendingCount ?? 0,
+                          scheduledAt: strategistStrategy.schedule.scheduledAt ?? null,
+                          steps: strategistStrategy.sequence.steps ?? [],
+                        });
                         if (orgId) await refreshWorkspace(orgId);
                       } catch (err: any) {
                         notify.error("Couldn't apply strategy", err.message || "Something went wrong. Please try again.");
@@ -1538,6 +1673,8 @@ export const CampaignsTab: React.FC = () => {
                   </button>
                 )}
               </div>
+              </>
+              )}
             </div>
 
           </div>
