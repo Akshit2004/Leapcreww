@@ -3,12 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 const SPEC = {
   openapi: "3.1.0",
   info: {
-    title: "WappFlow Public API",
+    title: "LeapCreww Public API",
     version: "1.0.0",
     description:
       "Send WhatsApp messages, manage contacts, and read templates programmatically. " +
       "All endpoints require a Bearer API key issued from Settings → Developer.",
-    contact: { url: "https://wappflow.com/docs" },
+    contact: { url: "https://leapcreww.com/docs" },
   },
   servers: [{ url: "/api/v1", description: "Production" }],
   security: [{ bearerAuth: [] }],

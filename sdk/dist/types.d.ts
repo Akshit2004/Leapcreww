@@ -91,9 +91,9 @@ export interface ListEventsResult {
     /** Pass as `after` on the next call to fetch only newer events. */
     nextAfter: string | null;
 }
-export interface WappFlowOptions {
+export interface LeapCrewwOptions {
     apiKey: string;
-    /** Override the base URL. Defaults to "https://app.wappflow.com". */
+    /** Override the base URL. Defaults to "https://app.leapcreww.com". */
     baseUrl?: string;
     /** Fetch timeout in milliseconds. Defaults to 30 000. */
     timeout?: number;

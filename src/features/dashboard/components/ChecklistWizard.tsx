@@ -40,7 +40,7 @@ export const ChecklistWizard: React.FC<ChecklistWizardProps> = ({
       
       <div className="mb-5 relative z-10">
         <span className="text-[9px] font-extrabold uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-250/20 px-2.5 py-1 rounded-md mb-2 inline-block">Workspace Setup</span>
-        <h3 className="text-xl font-extrabold tracking-tight text-slate-900 mb-1">Welcome to WappFlow! Let&apos;s get you set up.</h3>
+        <h3 className="text-xl font-extrabold tracking-tight text-slate-900 mb-1">Welcome to LeapCreww! Let&apos;s get you set up.</h3>
         <p className="text-stone-500 text-xs font-semibold">Complete these simple steps to start broadcasting campaigns on WhatsApp.</p>
       </div>
       

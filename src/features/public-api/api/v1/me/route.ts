@@ -17,7 +17,7 @@ export const GET = route(async (req) => {
   });
   return ok({
     organizationId: ctx.organizationId,
-    name: org?.name ?? "WappFlow Workspace",
+    name: org?.name ?? "LeapCreww Workspace",
     scopes: ctx.scopes,
   });
 });

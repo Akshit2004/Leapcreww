@@ -1,5 +1,5 @@
 /**
- * shopifySyncService.ts — Shopify catalog → WappFlow Product sync.
+ * shopifySyncService.ts — Shopify catalog → LeapCreww Product sync.
  *
  * Pulls products from the org's connected Shopify store and upserts them into
  * the tenant's Product catalog. All access is org-scoped: the caller (an

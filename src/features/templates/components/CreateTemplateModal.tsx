@@ -168,7 +168,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
         setSuggestedCategory(data.categoryFit);
         setCategoryReasoning(data.categoryReasoning || null);
         setCategoryApplied(false);
-        addSystemLog("crm", "Template body optimized via WappFlow AI Copilot");
+        addSystemLog("crm", "Template body optimized via LeapCreww AI Copilot");
       }
     } catch (err) {
       console.error(err);

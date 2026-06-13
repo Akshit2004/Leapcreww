@@ -395,7 +395,7 @@ function LoginContent() {
         // Wait, for WhatsApp, they didn't provide email yet! Let's just use a dummy one or ask for it?
         // Actually, we should collect email if they used whatsapp. 
         // For passwordless, we need an email as primary key.
-        payload.email = `${verifiedEmailOrPhone.replace(/[^0-9]/g, "")}@wa.wappflow.internal`; // temporary placeholder
+        payload.email = `${verifiedEmailOrPhone.replace(/[^0-9]/g, "")}@wa.leapcreww.internal`; // temporary placeholder
         payload.phone = verifiedEmailOrPhone;
       }
 
@@ -748,7 +748,7 @@ function LoginContent() {
                       type="email"
                       required
                       disabled={loading}
-                      placeholder="e.g. alex@wappflow.com"
+                      placeholder="e.g. alex@leapcreww.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"

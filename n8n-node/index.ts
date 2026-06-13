@@ -1,2 +1,2 @@
-export { WappFlow } from "./nodes/WappFlow/WappFlow.node";
-export { WappFlowApi } from "./credentials/WappFlowApi.credentials";
+export { LeapCreww } from "./nodes/LeapCreww/LeapCreww.node";
+export { LeapCrewwApi } from "./credentials/LeapCrewwApi.credentials";

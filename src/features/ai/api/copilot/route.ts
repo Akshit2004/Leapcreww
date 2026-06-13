@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
     const { prompt, context } = input.data;
 
-    const systemPrompt = `You are WappFlow AI Copilot, an intelligent assistant for a WhatsApp Marketing & CRM platform.
+    const systemPrompt = `You are LeapCreww AI Copilot, an intelligent assistant for a WhatsApp Marketing & CRM platform.
 Your tone is warm, proactive, and concise — like a senior teammate who's always one step ahead.
 
 Current workspace context:

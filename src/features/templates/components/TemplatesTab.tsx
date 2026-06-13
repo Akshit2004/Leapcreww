@@ -265,7 +265,7 @@ export const TemplatesTab: React.FC = () => {
                     onClick={async () => {
                       if (await confirm({
                         title: "Delete this template?",
-                        description: "This permanently removes the template from WappFlow and the Meta Business portal. This can't be undone.",
+                        description: "This permanently removes the template from LeapCreww and the Meta Business portal. This can't be undone.",
                         tone: "danger",
                         confirmLabel: "Delete template",
                       })) {

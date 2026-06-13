@@ -1,41 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/features/auth/api/[...nextauth]/route";
-import { prisma } from "@/shared/lib/prisma";
+import { ok, route, requireOrg, body, requireFields } from "@/shared/lib/api";
+import { disconnectWhatsapp } from "../../services/whatsappConnectionService";
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+export const POST = route(async (req) => {
+  const input = await body<{ orgId: string }>(req);
+  requireFields(input, ["orgId"]);
+  await requireOrg(input.orgId, "ADMIN");
 
-    const { orgId } = await request.json();
-    if (!orgId) {
-      return NextResponse.json({ error: "Missing orgId" }, { status: 400 });
-    }
-
-    await prisma.organization.update({
-      where: { id: orgId },
-      data: {
-        whatsappBusinessAccountId: null,
-        whatsappPhoneNumberId: null,
-        metaBusinessId: null,
-        whatsappConnected: false,
-      },
-    });
-
-    // Log the disconnection
-    await prisma.systemLog.create({
-      data: {
-        type: "crm",
-        message: "WhatsApp Business Account disconnected from workspace.",
-        organizationId: orgId,
-      },
-    });
-
-    return NextResponse.json({ ok: true });
-  } catch (err: unknown) {
-    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
-  }
-}
+  await disconnectWhatsapp(input.orgId);
+  return ok({ ok: true });
+});

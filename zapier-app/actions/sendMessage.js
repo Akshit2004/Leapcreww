@@ -1,6 +1,6 @@
 "use strict";
 
-const BASE_URL = process.env.BASE_URL || "https://app.wappflow.com";
+const BASE_URL = process.env.BASE_URL || "https://app.leapcreww.com";
 
 const perform = async (z, bundle) => {
   const payload = { to: bundle.inputData.to };
@@ -78,7 +78,7 @@ module.exports = {
         required: false,
         type: "string",
         helpText:
-          "Name of a Meta-approved WappFlow template (e.g. `order_confirmation`). Overrides Text.",
+          "Name of a Meta-approved LeapCreww template (e.g. `order_confirmation`). Overrides Text.",
       },
       {
         key: "templateLanguage",

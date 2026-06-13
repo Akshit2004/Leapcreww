@@ -1,4 +1,4 @@
-# WappFlow Architecture & Folder Structure
+# LeapCreww Architecture & Folder Structure
 
 This codebase follows a **feature-sliced** layout with a **thin-route / service / repository** layering. This document is the house style — build every roadmap task (see `PRODUCT_COMPARISON_AISENSY.md`) into this shape.
 

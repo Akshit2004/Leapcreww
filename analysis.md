@@ -1,14 +1,14 @@
-# WappFlow — Product Analysis & God-Level Roadmap
+# LeapCreww — Product Analysis & God-Level Roadmap
 
 > **Updated:** 2026-06-11 · Reflects integration-layer build + round-2 (billing gates, message dedup, order_placed trigger, 3 new recipes, widget attribution, OpenAPI spec, /v1/events polling)
-> **North star:** A business goes from "found WappFlow" to "WhatsApp working with their system" in **minutes, with clicks, not code.**
+> **North star:** A business goes from "found LeapCreww" to "WhatsApp working with their system" in **minutes, with clicks, not code.**
 > **Companion docs:** [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md) · [`docs/FEATURE_LIST.md`](docs/FEATURE_LIST.md) · [`CONSTITUTION.md`](CONSTITUTION.md)
 
 ---
 
-## 1. Where WappFlow stands vs the market
+## 1. Where LeapCreww stands vs the market
 
-| Capability | WappFlow | AiSensy | WATI | Interakt |
+| Capability | LeapCreww | AiSensy | WATI | Interakt |
 |---|---|---|---|---|
 | Campaign broadcasts + scheduling | ✅ | ✅ | ✅ | ✅ |
 | Visual chatbot builder | ✅ | ✅ | ✅ | ⚠️ basic |
@@ -65,7 +65,7 @@ Settings → Developer Quickstart: ① Generate key (shown once, injected into s
 ### ✅ 2.4 Outbound Webhooks + Test Button — SHIPPED
 Paste URL → pick events → Subscribe → `whsec_` secret shown once → **Send test** → `✓ 200 OK — 142ms`.
 - Events: `message.received`, `message.status`, `order.placed` (all 4 order paths)
-- HMAC-SHA256 signed (`x-wappflow-signature`) · 5s timeout · 5 retries, exponential backoff (1m→4m→16m→1h) via `/api/cron/process-webhooks`
+- HMAC-SHA256 signed (`x-leapcreww-signature`) · 5s timeout · 5 retries, exponential backoff (1m→4m→16m→1h) via `/api/cron/process-webhooks`
 - Files: `src/features/webhooks/` (deliveryService, subscriptionRepo, WebhooksCard)
 
 ### ⚠️ 2.5 Platform connect buttons — PARTIAL
@@ -110,7 +110,7 @@ Shopify OAuth ✅ · WooCommerce/Sheets webhook-based ✅ · **Zapier/Make/n8n m
 | 6 | **Team inbox depth** — conversation assignment UI (RoutingRule model exists, no UI), canned replies, internal notes, working hours/auto-away, unassigned queue | WATI wins deals on inbox alone; daily-use surface for every agent seat | L | ⏳ |
 | 7 | **Zapier + Make + n8n connectors** — `GET /api/v1/events` polling endpoint now live (trigger source); needs Zapier/Make app publication + n8n community node | The no-code integration channel every competitor has; unlocks 5,000+ app pairings | M | ⚠️ partial |
 | 8 | **OpenAPI 3.1 spec** → ~~serve at `/api/v1/openapi`~~ ✅ → Scalar/Mintlify docs page → generated Node + Python SDKs | Time-to-first-call is the real "easy to integrate" metric; no competitor ships real SDKs | M | ⚠️ partial |
-| 9 | ~~**More recipes**~~ — ~~order_confirmation, review_request, win_back added; order_placed trigger wired across all order paths~~ | ~~Each recipe = one more "enable and done" reason to choose WappFlow~~ | M | ✅ |
+| 9 | ~~**More recipes**~~ — ~~order_confirmation, review_request, win_back added; order_placed trigger wired across all order paths~~ | ~~Each recipe = one more "enable and done" reason to choose LeapCreww~~ | M | ✅ |
 | 10 | ~~**Widget → chatbot bridge**~~ — ~~widget-sourced contacts auto-tagged (`source:widget`, `widget` tag, `widget_key` attr)~~ | ~~Closes the loop: paste snippet → visitor chats → CRM + automation, all attributed~~ | S | ✅ |
 | 11 | **Multi-number support** — N phone numbers per org, number picker on campaigns/inbox | Agencies and multi-brand businesses require it | L | ⏳ |
 
@@ -146,4 +146,4 @@ Shopify OAuth ✅ · WooCommerce/Sheets webhook-based ✅ · **Zapier/Make/n8n m
 
 **Scorecard: integration layer ~95% · reliability ~60% · inbox parity ~30% · moat features 0% (designed, not built).**
 
-The honest summary: WappFlow now *integrates* like a god-level product. To *be* one, P0 (trust) and P1-6/7 (inbox, Zapier) are the gap between "demo that wows" and "platform businesses bet on."
+The honest summary: LeapCreww now *integrates* like a god-level product. To *be* one, P0 (trust) and P1-6/7 (inbox, Zapier) are the gap between "demo that wows" and "platform businesses bet on."

@@ -158,7 +158,7 @@ export const WebhooksCard: React.FC = () => {
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://api.yourapp.com/wappflow-events"
+              placeholder="https://api.yourapp.com/leapcreww-events"
               className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all"
             />
           </div>
@@ -206,7 +206,7 @@ export const WebhooksCard: React.FC = () => {
               </button>
             </div>
             <p className="text-[10px] text-emerald-600">
-              Verify deliveries by comparing <code>x-wappflow-signature</code> to HMAC-SHA256(secret, raw body).
+              Verify deliveries by comparing <code>x-leapcreww-signature</code> to HMAC-SHA256(secret, raw body).
             </p>
           </div>
         )}

@@ -1,4 +1,4 @@
-# WappFlow Deployment Runbook
+# LeapCreww Deployment Runbook
 
 > Operational reference for provisioning environments. Pair with [`.env.example`](../.env.example)
 > for the full variable list and [`SECURITY_REMEDIATION_PLAN.md`](SECURITY_REMEDIATION_PLAN.md) for
@@ -23,7 +23,7 @@ committed default.
 
 ### Important: do not ship committed defaults
 
-`WHATSAPP_WEBHOOK_VERIFY_TOKEN` historically shipped as `wappflow_verify_2026` in `.env.example`.
+`WHATSAPP_WEBHOOK_VERIFY_TOKEN` historically shipped as `leapcreww_verify_2026` in `.env.example`.
 That default has been neutralized (the example is now empty). Generate a unique random token per
 environment and set the **same** value in the Meta App webhook config.
 

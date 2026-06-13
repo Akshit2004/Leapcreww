@@ -3,7 +3,7 @@ import { prisma } from "./prisma";
 const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
 
 /**
- * Syncs a WappFlow Product to Meta Commerce Catalog via Graph API
+ * Syncs a LeapCreww Product to Meta Commerce Catalog via Graph API
  */
 export async function syncProductToMetaCatalog(productId: string) {
   const product = await prisma.product.findUnique({
@@ -32,9 +32,9 @@ export async function syncProductToMetaCatalog(productId: string) {
   formData.append("description", product.description || product.name);
   formData.append("price", Math.floor(product.price).toString()); // Price is typically in cents/paise for API
   formData.append("currency", "INR"); // Hardcoded to INR for now as in marketplace.ts
-  formData.append("url", "https://wappflow.com"); // Dummy URL if not provided
+  formData.append("url", "https://leapcreww.com"); // Dummy URL if not provided
   formData.append("image_url", imageUrl);
-  formData.append("brand", "WappFlow");
+  formData.append("brand", "LeapCreww");
 
   try {
     const res = await fetch(url, {

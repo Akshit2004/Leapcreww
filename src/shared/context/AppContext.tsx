@@ -62,6 +62,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     lockSync,
     unlockSync,
     setChatHistory: (val) => setChatHistory(val),
+    organizationId: organization?.id,
   });
 
   const {

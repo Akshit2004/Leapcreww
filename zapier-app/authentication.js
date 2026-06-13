@@ -1,11 +1,11 @@
 "use strict";
 
-const BASE_URL = process.env.BASE_URL || "https://app.wappflow.com";
+const BASE_URL = process.env.BASE_URL || "https://app.leapcreww.com";
 
 /**
  * Custom API key authentication.
  *
- * The user pastes their WappFlow API key (wf_live_...) into Zapier once.
+ * The user pastes their LeapCreww API key (wf_live_...) into Zapier once.
  * The test call hits GET /api/v1/me; a 200 confirms the key is valid and
  * the org name is returned so Zapier can label the connected account.
  */
@@ -19,7 +19,7 @@ module.exports = {
       required: true,
       type: "string",
       helpText:
-        "Your WappFlow API key. Find it in **Settings → Developer → API Keys**. " +
+        "Your LeapCreww API key. Find it in **Settings → Developer → API Keys**. " +
         "Keys look like `wf_live_...`.",
     },
   ],

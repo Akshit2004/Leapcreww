@@ -20,7 +20,7 @@ const transporter = nodemailer.createTransport({
 export const sendEmail = async ({ to, subject, text, html }: SendEmailOptions) => {
   try {
     const info = await transporter.sendMail({
-      from: `"${process.env.NEXT_PUBLIC_APP_NAME || 'WappFlow'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      from: `"${process.env.NEXT_PUBLIC_APP_NAME || 'LeapCreww'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
       to,
       subject,
       text,
@@ -36,7 +36,7 @@ export const sendEmail = async ({ to, subject, text, html }: SendEmailOptions) =
 
 export const sendEmailOtp = async (to: string, otp: string) => {
   const subject = `Your verification code is ${otp}`;
-  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'WappFlow';
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'LeapCreww';
   
   const html = `
     <!DOCTYPE html>

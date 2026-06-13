@@ -318,7 +318,7 @@ export function LaunchesTab() {
           <div className="space-y-1">
             <p className="font-bold text-sm text-[#1D211F] uppercase tracking-wide font-serif">No launches yet</p>
             <p className="text-xs text-[#1D211F]/50 max-w-xs">
-              Create a launch sequence and WappFlow will auto-fire your countdown messages — teaser, reminder, and post-launch follow-ups.
+              Create a launch sequence and LeapCreww will auto-fire your countdown messages — teaser, reminder, and post-launch follow-ups.
             </p>
           </div>
           <button

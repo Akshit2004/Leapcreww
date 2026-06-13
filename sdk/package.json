@@ -1,7 +1,7 @@
 {
-  "name": "@wappflow/sdk",
+  "name": "@leapcreww/sdk",
   "version": "1.0.0",
-  "description": "Official TypeScript / Node.js SDK for the WappFlow API",
+  "description": "Official TypeScript / Node.js SDK for the LeapCreww API",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": ["dist", "src"],
@@ -10,7 +10,7 @@
     "test": "node --experimental-vm-modules node_modules/.bin/jest --passWithNoTests",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["whatsapp", "wappflow", "sdk", "messaging", "crm"],
+  "keywords": ["whatsapp", "leapcreww", "sdk", "messaging", "crm"],
   "license": "MIT",
   "engines": { "node": ">=18" },
   "dependencies": {},
@@ -21,6 +21,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/wappflow/sdk-node"
+    "url": "https://github.com/leapcreww/sdk-node"
   }
 }

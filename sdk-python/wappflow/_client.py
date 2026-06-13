@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 import httpx
 
-from ._exceptions import WappFlowError
+from ._exceptions import LeapCrewwError
 
 _SDK_VERSION = "1.0.0"
 
@@ -17,7 +17,7 @@ class HttpClient:
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                "User-Agent": f"wappflow-python/{_SDK_VERSION}",
+                "User-Agent": f"leapcreww-python/{_SDK_VERSION}",
             },
             timeout=timeout,
         )
@@ -54,7 +54,7 @@ class HttpClient:
 
         if res.is_error:
             message = body.get("error", f"HTTP {res.status_code}") if isinstance(body, dict) else f"HTTP {res.status_code}"
-            raise WappFlowError(message, res.status_code, body)
+            raise LeapCrewwError(message, res.status_code, body)
 
         return body
 

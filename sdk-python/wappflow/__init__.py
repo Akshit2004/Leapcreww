@@ -1,14 +1,14 @@
 """
-WappFlow Python SDK
+LeapCreww Python SDK
 ===================
 
-Official client library for the WappFlow API.
+Official client library for the LeapCreww API.
 
 Quick start::
 
-    from wappflow import WappFlow
+    from leapcreww import LeapCreww
 
-    client = WappFlow(api_key="wf_live_...")
+    client = LeapCreww(api_key="wf_live_...")
 
     # Verify connection
     me = client.me()
@@ -35,7 +35,7 @@ from __future__ import annotations
 from typing import Optional
 
 from ._client import HttpClient
-from ._exceptions import WappFlowError
+from ._exceptions import LeapCrewwError
 from ._types import (
     Contact,
     Event,
@@ -55,8 +55,8 @@ from .resources.messages import MessagesResource
 from .resources.templates import TemplatesResource
 
 __all__ = [
-    "WappFlow",
-    "WappFlowError",
+    "LeapCreww",
+    "LeapCrewwError",
     # Types
     "Contact",
     "Event",
@@ -71,15 +71,15 @@ __all__ = [
     "UpsertContactResult",
 ]
 
-_DEFAULT_BASE_URL = "https://app.wappflow.com"
+_DEFAULT_BASE_URL = "https://app.leapcreww.com"
 _DEFAULT_TIMEOUT = 30.0
 
 
-class WappFlow:
-    """WappFlow API client.
+class LeapCreww:
+    """LeapCreww API client.
 
     Args:
-        api_key:  Your WappFlow API key (``wf_live_...``).
+        api_key:  Your LeapCreww API key (``wf_live_...``).
                   Find it in Settings → Developer → API Keys.
         base_url: Override the default API base URL.
                   Useful for self-hosted instances or local development.
@@ -91,12 +91,12 @@ class WappFlow:
     Example::
 
         # As a plain instance
-        client = WappFlow(api_key="wf_live_...")
+        client = LeapCreww(api_key="wf_live_...")
         client.messages.send(to="+91...", text="hi")
         client.close()
 
         # As a context manager
-        with WappFlow(api_key="wf_live_...") as client:
+        with LeapCreww(api_key="wf_live_...") as client:
             client.messages.send(to="+91...", text="hi")
     """
 
@@ -129,7 +129,7 @@ class WappFlow:
         """Close the underlying HTTP session."""
         self._http.close()
 
-    def __enter__(self) -> "WappFlow":
+    def __enter__(self) -> "LeapCreww":
         return self
 
     def __exit__(self, *_: object) -> None:

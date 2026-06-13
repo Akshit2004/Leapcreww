@@ -1,11 +1,11 @@
 {
-  "name": "@wappflow/mcp-server",
+  "name": "@leapcreww/mcp-server",
   "version": "0.1.0",
-  "description": "Model Context Protocol server for WappFlow — gives AI agents access to WhatsApp messaging and CRM",
+  "description": "Model Context Protocol server for LeapCreww — gives AI agents access to WhatsApp messaging and CRM",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
-  "bin": { "wappflow-mcp": "dist/index.js" },
+  "bin": { "leapcreww-mcp": "dist/index.js" },
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "start": "node dist/index.js",

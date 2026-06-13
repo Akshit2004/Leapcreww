@@ -24,7 +24,7 @@ export const FlowsTab: React.FC = () => {
   const [targetTag, setTargetTag] = useState("all");
   const [messageTitle, setMessageTitle] = useState("Please fill out this form.");
   const [ctaText, setCtaText] = useState("Open Form");
-  const [messageFooter, setMessageFooter] = useState("WappFlow Broadcast");
+  const [messageFooter, setMessageFooter] = useState("LeapCreww Broadcast");
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [activeTab, setActiveTab] = useState<"editor" | "submissions">("editor");
   const [showJsonMode, setShowJsonMode] = useState(false);
@@ -142,7 +142,7 @@ export const FlowsTab: React.FC = () => {
     setTargetTag("all");
     setMessageTitle("Hey! Please take a moment to fill out our form.");
     setCtaText("Open Form");
-    setMessageFooter("WappFlow");
+    setMessageFooter("LeapCreww");
     setShowBroadcastModal(true);
   };
 

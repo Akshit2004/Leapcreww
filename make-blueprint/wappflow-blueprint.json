@@ -1,6 +1,6 @@
 {
-  "name": "WappFlow — WhatsApp Automation",
-  "description": "Connect WappFlow to any Make.com scenario. Pre-wired: watch for new inbound messages, send a WhatsApp message, and upsert a CRM contact.",
+  "name": "LeapCreww — WhatsApp Automation",
+  "description": "Connect LeapCreww to any Make.com scenario. Pre-wired: watch for new inbound messages, send a WhatsApp message, and upsert a CRM contact.",
   "version": 2,
   "metadata": {
     "instant": false,
@@ -18,7 +18,7 @@
       "mapper": {},
       "metadata": {
         "designer": { "x": 0, "y": 0 },
-        "restore": { "parameters": { "hook": { "data": { "editable": true }, "label": "WappFlow inbound trigger" } } },
+        "restore": { "parameters": { "hook": { "data": { "editable": true }, "label": "LeapCreww inbound trigger" } } },
         "expect": [
           { "name": "type",      "type": "text",   "label": "Event type" },
           { "name": "data",      "type": "any",    "label": "Event payload" },
@@ -37,7 +37,7 @@
       "version": 3,
       "parameters": { "handleErrors": true, "useNewZLibDeCompress": true },
       "mapper": {
-        "url": "https://app.wappflow.com/api/v1/messages",
+        "url": "https://app.leapcreww.com/api/v1/messages",
         "serializeUrl": false,
         "method": "post",
         "headers": [
@@ -90,7 +90,7 @@
       "version": 3,
       "parameters": { "handleErrors": true, "useNewZLibDeCompress": true },
       "mapper": {
-        "url": "https://app.wappflow.com/api/v1/contacts",
+        "url": "https://app.leapcreww.com/api/v1/contacts",
         "serializeUrl": false,
         "method": "post",
         "headers": [
@@ -137,19 +137,19 @@
   "notes": [
     {
       "module": 1,
-      "label": "SETUP: Create a Make.com webhook, paste its URL into WappFlow Settings → Webhooks → Add Endpoint (event: message.received). The webhook secret is optional but recommended — set X-WappFlow-Signature validation in your Make scenario if used."
+      "label": "SETUP: Create a Make.com webhook, paste its URL into LeapCreww Settings → Webhooks → Add Endpoint (event: message.received). The webhook secret is optional but recommended — set X-LeapCreww-Signature validation in your Make scenario if used."
     },
     {
       "module": 2,
-      "label": "SETUP: Replace {{connection.apiKey}} with your WappFlow API key from Settings → Developer → API Keys. Customize the message body with your own text or Map fields from the trigger payload."
+      "label": "SETUP: Replace {{connection.apiKey}} with your LeapCreww API key from Settings → Developer → API Keys. Customize the message body with your own text or Map fields from the trigger payload."
     },
     {
       "module": 3,
       "label": "SETUP: This module upserts the sender as a CRM contact. Tags are merged (not replaced). Add more tags or custom attributes in the body as needed."
     }
   ],
-  "wappflow_api_reference": {
-    "base_url": "https://app.wappflow.com/api/v1",
+  "leapcreww_api_reference": {
+    "base_url": "https://app.leapcreww.com/api/v1",
     "auth": "Bearer token — set in Authorization header",
     "key_format": "wf_live_<hex>  (sandbox: wf_test_<hex>)",
     "endpoints": {

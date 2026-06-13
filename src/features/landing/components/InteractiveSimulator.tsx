@@ -88,7 +88,7 @@ export default function InteractiveSimulator() {
         <div className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-[#D05E3C]/80" /><span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" /><span className="w-2.5 h-2.5 rounded-full bg-[#2E4A3F]/80" />
         </div>
-        <div className="bg-[#1D211F] rounded-md px-3 py-1 text-[10px] font-mono tracking-wider text-[#FAF7F2]/50 border border-[#FAF7F2]/5 w-[50%] text-center truncate">wappflow.app/workspace/active</div>
+        <div className="bg-[#1D211F] rounded-md px-3 py-1 text-[10px] font-mono tracking-wider text-[#FAF7F2]/50 border border-[#FAF7F2]/5 w-[50%] text-center truncate">leapcreww.app/workspace/active</div>
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500 pulse-ring" />
           <span className="font-mono text-[9px] text-emerald-400 tracking-wider">LIVE</span>
@@ -138,7 +138,7 @@ export default function InteractiveSimulator() {
                   <div className="bg-[#171A19] border border-[#FAF7F2]/5 rounded-lg p-3 space-y-1.5">
                     <div className="text-[9px] font-mono text-[#FAF7F2]/40 uppercase tracking-wider">Meta Broadcast Template Preview:</div>
                     <p className="text-xs bg-[#1D211F] rounded p-2 text-[#FAF7F2]/80 border border-[#FAF7F2]/5 leading-relaxed font-mono">
-                      &quot;Hello <span className="text-[#D05E3C] font-bold">{"{customer_name}"}</span>, your subscription is ready. Log in to <span className="text-emerald-400">wappflow.app/verify</span> to authorize access.&quot;
+                      &quot;Hello <span className="text-[#D05E3C] font-bold">{"{customer_name}"}</span>, your subscription is ready. Log in to <span className="text-emerald-400">leapcreww.app/verify</span> to authorize access.&quot;
                     </p>
                   </div>
                 </div>

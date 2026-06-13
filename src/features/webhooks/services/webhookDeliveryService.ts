@@ -5,7 +5,7 @@
  * creation, status updates). It creates a WebhookDelivery row per matching
  * subscription and tries each immediately; failures are retried by the
  * process-webhooks cron with exponential backoff. Every delivery is signed
- * with the subscription's secret (`x-wappflow-signature: sha256=<hmac>`)
+ * with the subscription's secret (`x-leapcreww-signature: sha256=<hmac>`)
  * so subscribers can verify authenticity — same scheme we require of Meta.
  */
 import * as crypto from "crypto";
@@ -71,8 +71,8 @@ async function post(url: string, secret: string, envelope: WebhookEnvelope): Pro
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-wappflow-event": envelope.event,
-        "x-wappflow-signature": sign(secret, body),
+        "x-leapcreww-event": envelope.event,
+        "x-leapcreww-signature": sign(secret, body),
       },
       body,
       signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -178,7 +178,7 @@ export async function sendTestEvent(organizationId: string, subscriptionId: stri
     event: "test",
     createdAt: new Date().toISOString(),
     data: {
-      message: "Test delivery from WappFlow. Verify the x-wappflow-signature header with your signing secret.",
+      message: "Test delivery from LeapCreww. Verify the x-leapcreww-signature header with your signing secret.",
       subscribedEvents: sub.events,
     },
   });

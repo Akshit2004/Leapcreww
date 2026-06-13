@@ -1,6 +1,6 @@
 "use strict";
 
-const BASE_URL = process.env.BASE_URL || "https://app.wappflow.com";
+const BASE_URL = process.env.BASE_URL || "https://app.leapcreww.com";
 
 /** Fetch inbound messages created after the given ISO timestamp. */
 const perform = async (z, bundle) => {
@@ -39,7 +39,7 @@ module.exports = {
   display: {
     label: "New Inbound Message",
     description:
-      "Triggers when a customer sends a WhatsApp message to your WappFlow inbox.",
+      "Triggers when a customer sends a WhatsApp message to your LeapCreww inbox.",
   },
 
   operation: {

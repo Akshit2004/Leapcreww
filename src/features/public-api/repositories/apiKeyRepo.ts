@@ -18,6 +18,10 @@ export function findByHash(hashedKey: string) {
   return prisma.apiKey.findUnique({ where: { hashedKey } });
 }
 
+export function findById(id: string, organizationId: string) {
+  return prisma.apiKey.findFirst({ where: { id, organizationId } });
+}
+
 export function touch(id: string) {
   return prisma.apiKey.update({ where: { id }, data: { lastUsedAt: new Date() } });
 }

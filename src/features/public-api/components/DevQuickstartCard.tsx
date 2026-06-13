@@ -11,6 +11,7 @@ interface KeyRow {
   scopes: string[];
   createdAt: string;
   lastUsedAt: string | null;
+  revokedAt: string | null;
 }
 
 type SnippetLang = "curl" | "node" | "python";
@@ -40,7 +41,7 @@ function buildSnippet(lang: SnippetLang, origin: string, key: string): string {
   },
   body: JSON.stringify({
     to: "+919876543210",
-    text: "Hello from WappFlow!",
+    text: "Hello from LeapCreww!",
   }),
 });
 console.log(await res.json()); // { ok: true, waMessageId: "wamid..." }`;
@@ -53,7 +54,7 @@ res = requests.post(
         "Authorization": "Bearer ${apiKey}",
         "Idempotency-Key": "order-1042-confirm",
     },
-    json={"to": "+919876543210", "text": "Hello from WappFlow!"},
+    json={"to": "+919876543210", "text": "Hello from LeapCreww!"},
 )
 print(res.json())  # { "ok": True, "waMessageId": "wamid..." }`;
 }
@@ -77,6 +78,7 @@ export const DevQuickstartCard: React.FC = () => {
   const [testPhone, setTestPhone] = useState("");
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; detail: string } | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -120,6 +122,23 @@ export const DevQuickstartCard: React.FC = () => {
       setError("Network error. Please try again.");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleRevoke = async (keyId: string) => {
+    if (!orgId) return;
+    setRevokingId(keyId);
+    try {
+      const res = await fetch(`/api/org/${orgId}/api-keys/${keyId}`, { method: "DELETE" });
+      if (res.ok) await fetchKeys();
+      else {
+        const data = await res.json();
+        setError(data.error || "Failed to revoke key.");
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setRevokingId(null);
     }
   };
 
@@ -204,6 +223,28 @@ export const DevQuickstartCard: React.FC = () => {
                 </span>
               )}
             </div>
+          )}
+          {keys && keys.filter((k) => !k.revokedAt).length > 0 && (
+            <ul className="space-y-1.5 pt-1">
+              {keys.filter((k) => !k.revokedAt).map((k) => (
+                <li
+                  key={k.id}
+                  className="flex items-center justify-between gap-3 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2"
+                >
+                  <span className="text-[11px] font-mono text-stone-600 truncate">
+                    {k.name} — {k.prefix}…
+                  </span>
+                  <button
+                    onClick={() => handleRevoke(k.id)}
+                    disabled={revokingId === k.id}
+                    className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-red-600 hover:text-red-700 disabled:opacity-50 cursor-pointer shrink-0"
+                  >
+                    {revokingId === k.id ? <Loader className="w-3 h-3 animate-spin" /> : null}
+                    Revoke
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
 

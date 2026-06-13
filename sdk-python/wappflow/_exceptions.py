@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 
-class WappFlowError(Exception):
-    """Raised whenever the WappFlow API returns a non-2xx status code.
+class LeapCrewwError(Exception):
+    """Raised whenever the LeapCreww API returns a non-2xx status code.
 
     Attributes:
         status:  HTTP status code (e.g. 402, 401, 403).
@@ -13,7 +13,7 @@ class WappFlowError(Exception):
 
         try:
             client.messages.send(to="+91...", text="hello")
-        except WappFlowError as e:
+        except LeapCrewwError as e:
             if e.status == 402:
                 print("Top up your wallet:", e.message)
     """
@@ -25,4 +25,4 @@ class WappFlowError(Exception):
         self.body = body
 
     def __repr__(self) -> str:
-        return f"WappFlowError(status={self.status}, message={self.message!r})"
+        return f"LeapCrewwError(status={self.status}, message={self.message!r})"

@@ -18,7 +18,7 @@ export const POST = route(async (req, { params }) => {
   const { to } = await parseBody(req, TestMessageSchema);
   const result = await sendV1Message(orgId, {
     to,
-    text: "🚀 Test message from WappFlow — your API integration path works end-to-end.",
+    text: "🚀 Test message from LeapCreww — your API integration path works end-to-end.",
   });
   return ok(result);
 });

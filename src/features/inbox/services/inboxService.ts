@@ -109,6 +109,25 @@ export async function updateContactFields(
   return updated;
 }
 
+/** Create a single contact for an org (e.g. manual "Add Customer" entry). */
+export async function createContact(
+  orgId: string,
+  input: { name: string; phone: string; email?: string; source?: string; tags?: string[]; status?: "Active" | "Inactive" }
+) {
+  if (!input.name?.trim() || !input.phone?.trim()) {
+    throw new ApiError("name and phone are required", 400);
+  }
+  return repo.createContact({
+    name: input.name.trim(),
+    phone: input.phone.trim(),
+    email: input.email?.trim() || null,
+    source: input.source?.trim() || "Manual",
+    tags: input.tags ?? [],
+    status: input.status ?? "Active",
+    organizationId: orgId,
+  });
+}
+
 /** Bulk import contacts for an org after verifying membership. Returns inserted count. */
 export async function importContacts(
   userId: string,

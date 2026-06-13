@@ -1123,7 +1123,7 @@ export const CampaignsTab: React.FC = () => {
                       What are you selling / promoting?
                     </h4>
                     <p className="text-xs text-stone-500">
-                      WappFlow AI will draft a complete marketing template, target segment, broadcast schedule, and a 3-step follow-up drip sequence.
+                      LeapCreww AI will draft a complete marketing template, target segment, broadcast schedule, and a 3-step follow-up drip sequence.
                     </p>
                   </div>
 
@@ -1204,7 +1204,7 @@ export const CampaignsTab: React.FC = () => {
                         </span>
                         <p className="text-[11px] text-emerald-700 leading-relaxed font-semibold">
                           An approved template named <strong className="text-emerald-950 font-bold">&quot;{strategistStrategy.template.name}&quot;</strong> fits your objective.
-                          WappFlow will reuse this template, so no new Meta registration is needed and you can launch immediately!
+                          LeapCreww will reuse this template, so no new Meta registration is needed and you can launch immediately!
                         </p>
                       </div>
                     </div>
@@ -1217,7 +1217,7 @@ export const CampaignsTab: React.FC = () => {
                         </span>
                         <p className="text-[11px] text-amber-700 leading-relaxed font-semibold">
                           No suitable approved template was found in your library for this objective.
-                          To launch this strategy, WappFlow will submit the proposed template <strong className="text-amber-950 font-bold">&quot;{strategistStrategy.template.name}&quot;</strong> to Meta for approval.
+                          To launch this strategy, LeapCreww will submit the proposed template <strong className="text-amber-950 font-bold">&quot;{strategistStrategy.template.name}&quot;</strong> to Meta for approval.
                         </p>
                       </div>
                     </div>

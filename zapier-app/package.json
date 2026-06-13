@@ -1,7 +1,7 @@
 {
-  "name": "wappflow",
+  "name": "leapcreww",
   "version": "1.0.0",
-  "description": "WappFlow — WhatsApp Marketing, CRM & Chatbot automation platform",
+  "description": "LeapCreww — WhatsApp Marketing, CRM & Chatbot automation platform",
   "main": "index.js",
   "scripts": {
     "test": "jest --testPathPattern=test",

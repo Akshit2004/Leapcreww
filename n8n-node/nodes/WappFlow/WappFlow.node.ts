@@ -7,16 +7,16 @@ import type {
 } from "n8n-workflow";
 import { NodeConnectionType, NodeOperationError } from "n8n-workflow";
 
-export class WappFlow implements INodeType {
+export class LeapCreww implements INodeType {
   description: INodeTypeDescription = {
-    displayName: "WappFlow",
+    displayName: "LeapCreww",
     name: "wappFlow",
-    icon: "file:wappflow.svg",
+    icon: "file:leapcreww.svg",
     group: ["output"],
     version: 1,
     subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-    description: "Send WhatsApp messages and manage CRM contacts via WappFlow",
-    defaults: { name: "WappFlow" },
+    description: "Send WhatsApp messages and manage CRM contacts via LeapCreww",
+    defaults: { name: "LeapCreww" },
     inputs: [NodeConnectionType.Main],
     outputs: [NodeConnectionType.Main],
     credentials: [{ name: "wappFlowApi", required: true }],

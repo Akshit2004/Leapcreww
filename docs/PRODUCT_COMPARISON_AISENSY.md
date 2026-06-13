@@ -1,4 +1,4 @@
-# WappFlow vs AiSensy — Feature Comparison & Build Plan
+# LeapCreww vs AiSensy — Feature Comparison & Build Plan
 
 > Goal: Ship a WhatsApp engagement platform that is **at parity with AiSensy on the table-stakes** and **clearly better on 4–5 wedges** (AI, commerce, pricing transparency, UX).
 > This document is a working build spec. Each gap is written as a **task** with: what it is, why it matters, the exact code/schema touchpoints in this repo, and a rough effort size.
@@ -10,7 +10,7 @@
 
 ## 0. TL;DR — Where we stand
 
-WappFlow is already a **surprisingly complete AiSensy clone**. The core loop (WhatsApp Cloud API send/receive → broadcasts → templates → CRM → visual chatbot → team inbox → analytics → commerce + payments) is genuinely built, not stubbed. Real Meta Graph API integration exists in `src/shared/lib/whatsapp.ts`, with a sandbox fallback for demos.
+LeapCreww is already a **surprisingly complete AiSensy clone**. The core loop (WhatsApp Cloud API send/receive → broadcasts → templates → CRM → visual chatbot → team inbox → analytics → commerce + payments) is genuinely built, not stubbed. Real Meta Graph API integration exists in `src/shared/lib/whatsapp.ts`, with a sandbox fallback for demos.
 
 **What we already beat AiSensy on (keep pushing):**
 - **AI depth** — AI Copilot, AI flow architect (Groq/Llama), AI template compliance auditor, brand-aware generation. AiSensy's AI is thinner.
@@ -30,7 +30,7 @@ WappFlow is already a **surprisingly complete AiSensy clone**. The core loop (Wh
 
 ---
 
-## 1. Current WappFlow feature inventory (what's there)
+## 1. Current LeapCreww feature inventory (what's there)
 
 Mapped to the actual code so you know the starting line.
 
@@ -89,7 +89,7 @@ Sources: [aisensy.com](https://aisensy.com/), [Features](https://aisensy.com/fea
 
 ## 3. Parity matrix
 
-| Capability | AiSensy | WappFlow | Verdict |
+| Capability | AiSensy | LeapCreww | Verdict |
 |---|:---:|:---:|---|
 | WhatsApp Cloud API send/receive | ✅ | ✅ | **Par** |
 | Template broadcasts + scheduling | ✅ | ✅ | **Par** |
@@ -272,4 +272,4 @@ Field additions: `Contact.attributes Json?`, `Contact.lastActiveAt DateTime?`, `
 
 ---
 
-*Built from a read of the WappFlow codebase (Next.js 16 / Prisma / WhatsApp Cloud API / Groq) and AiSensy's public feature set. Use the task IDs (T-xx / D-xx) as your backlog tickets.*
+*Built from a read of the LeapCreww codebase (Next.js 16 / Prisma / WhatsApp Cloud API / Groq) and AiSensy's public feature set. Use the task IDs (T-xx / D-xx) as your backlog tickets.*

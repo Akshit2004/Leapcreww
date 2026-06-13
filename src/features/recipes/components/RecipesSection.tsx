@@ -8,7 +8,11 @@ import type { RecipeWithStatus } from "../types";
 
 const ALL = "All";
 
-export const RecipesSection: React.FC = () => {
+interface RecipesSectionProps {
+  hideHeader?: boolean;
+}
+
+export const RecipesSection: React.FC<RecipesSectionProps> = ({ hideHeader = false }) => {
   const { organization } = useApp();
   const orgId = organization?.id;
 
@@ -106,9 +110,11 @@ export const RecipesSection: React.FC = () => {
 
   return (
     <div>
-      <h3 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-3">
-        One-Click Automations
-      </h3>
+      {!hideHeader && (
+        <h3 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-3">
+          One-Click Automations
+        </h3>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-medium px-4 py-2.5 mb-3 flex items-center gap-2">

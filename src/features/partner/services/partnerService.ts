@@ -22,7 +22,7 @@ export function listClientOrgs(partnerId: string) {
   return repo.listClientOrgs(partnerId);
 }
 
-/** Resolve branding for a request host (custom domain) or slug; null = default WappFlow brand. */
+/** Resolve branding for a request host (custom domain) or slug; null = default LeapCreww brand. */
 export async function resolveBranding(opts: { host?: string; slug?: string }): Promise<PartnerBranding | null> {
   const partner = opts.host
     ? await repo.findByDomain(opts.host)

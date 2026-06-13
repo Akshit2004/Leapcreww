@@ -13,9 +13,9 @@ const CODE: Record<Lang, { label: string; lines: Span[][] }> = {
   typescript: {
     label: "TypeScript",
     lines: [
-      [["text-[#D05E3C]", "import"], ["", " { WappFlow } "], ["text-[#D05E3C]", "from"], ["text-amber-300", ' "@wappflow/sdk"'], ["", ";"]],
+      [["text-[#D05E3C]", "import"], ["", " { LeapCreww } "], ["text-[#D05E3C]", "from"], ["text-amber-300", ' "@leapcreww/sdk"'], ["", ";"]],
       [["", ""]],
-      [["text-[#D05E3C]", "const"], ["", " wf = "], ["text-[#D05E3C]", "new"], ["", " WappFlow({ apiKey: "], ["text-amber-300", '"wf_live_..."'], ["", " });"]],
+      [["text-[#D05E3C]", "const"], ["", " wf = "], ["text-[#D05E3C]", "new"], ["", " LeapCreww({ apiKey: "], ["text-amber-300", '"wf_live_..."'], ["", " });"]],
       [["", ""]],
       [["text-[#FAF7F2]/40", "// Send a template broadcast"]],
       [["text-[#D05E3C]", "await"], ["", " wf.messages.send({"]],
@@ -30,9 +30,9 @@ const CODE: Record<Lang, { label: string; lines: Span[][] }> = {
   python: {
     label: "Python",
     lines: [
-      [["text-[#D05E3C]", "from"], ["", " wappflow "], ["text-[#D05E3C]", "import"], ["", " WappFlow"]],
+      [["text-[#D05E3C]", "from"], ["", " leapcreww "], ["text-[#D05E3C]", "import"], ["", " LeapCreww"]],
       [["", ""]],
-      [["text-[#D05E3C]", "with"], ["", " WappFlow(api_key="], ["text-amber-300", '"wf_live_..."'], ["", ") "], ["text-[#D05E3C]", "as"], ["", " wf:"]],
+      [["text-[#D05E3C]", "with"], ["", " LeapCreww(api_key="], ["text-amber-300", '"wf_live_..."'], ["", ") "], ["text-[#D05E3C]", "as"], ["", " wf:"]],
       [["", "    wf.messages.send(to="], ["text-amber-300", '"+919876543210"'], ["", ", text="], ["text-amber-300", '"Hi!"'], ["", ")"]],
       [["", ""]],
       [["text-[#FAF7F2]/40", "    # Poll inbound messages as a cursor stream"]],
@@ -133,8 +133,8 @@ export default function DeveloperPlatform() {
           </div>
 
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.6, duration: 0.8 }} className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[9px] tracking-widest text-[#1D211F]/40 uppercase">
-            <span>[ npm i @wappflow/sdk ]</span>
-            <span>[ pip install wappflow ]</span>
+            <span>[ npm i @leapcreww/sdk ]</span>
+            <span>[ pip install leapcreww ]</span>
             <Link href="/api-docs" className="text-[#D05E3C]/80 hover:text-[#D05E3C] transition-colors inline-flex items-center gap-1">
               [ Interactive API reference <ArrowUpRight className="w-2.5 h-2.5" /> ]
             </Link>

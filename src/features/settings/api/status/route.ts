@@ -1,43 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/features/auth/api/[...nextauth]/route";
-import { prisma } from "@/shared/lib/prisma";
+import { ok, route, requireOrg, ApiError } from "@/shared/lib/api";
+import { getStatus } from "../../services/whatsappConnectionService";
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+/** GET /api/whatsapp/status?orgId=xxx */
+export const GET = route(async (req) => {
+  const { searchParams } = new URL(req.url);
+  const orgId = searchParams.get("orgId");
+  if (!orgId) throw new ApiError("Missing orgId", 400);
+  await requireOrg(orgId, "AGENT");
 
-    const { searchParams } = new URL(request.url);
-    const orgId = searchParams.get("orgId");
-
-    if (!orgId) {
-      return NextResponse.json({ error: "Missing orgId" }, { status: 400 });
-    }
-
-    const org = await prisma.organization.findUnique({
-      where: { id: orgId },
-      select: {
-        whatsappConnected: true,
-        whatsappBusinessAccountId: true,
-        whatsappPhoneNumberId: true,
-        metaBusinessId: true,
-      },
-    });
-
-    if (!org) {
-      return NextResponse.json({ error: "Organization not found" }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      connected: org.whatsappConnected,
-      businessAccountId: org.whatsappBusinessAccountId,
-      phoneNumberId: org.whatsappPhoneNumberId,
-      businessId: org.metaBusinessId,
-    });
-  } catch (err: unknown) {
-    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) }, { status: 500 });
-  }
-}
+  const result = await getStatus(orgId);
+  return ok(result);
+});

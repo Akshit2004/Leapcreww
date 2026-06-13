@@ -6,6 +6,7 @@ interface BulkAddTagModalProps {
   onClose: () => void;
   onConfirm: (tag: string) => void;
   selectedCount: number;
+  isSubmitting?: boolean;
 }
 
 export const BulkAddTagModal: React.FC<BulkAddTagModalProps> = ({
@@ -13,6 +14,7 @@ export const BulkAddTagModal: React.FC<BulkAddTagModalProps> = ({
   onClose,
   onConfirm,
   selectedCount,
+  isSubmitting = false,
 }) => {
   const [tagValue, setTagValue] = useState("");
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -85,10 +87,10 @@ export const BulkAddTagModal: React.FC<BulkAddTagModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={!tagValue.trim()}
+              disabled={!tagValue.trim() || isSubmitting}
               className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-wa-green hover:bg-wa-green-dark shadow-md shadow-wa-green/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Add Tag
+              {isSubmitting ? "Adding..." : "Add Tag"}
             </button>
           </div>
         </form>

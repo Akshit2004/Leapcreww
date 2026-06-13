@@ -41,7 +41,7 @@ interface StoredIntegration {
 const GUIDE_STEPS = [
   "Go to admin.shopify.com and open your store.",
   "Navigate to Settings → Apps and sales channels → Develop apps.",
-  'Click "Create an app" and name it WappFlow Integration.',
+  'Click "Create an app" and name it LeapCreww Integration.',
   "Under Configuration, enable Admin API scopes for Products, Orders, and Customers (read + write).",
   'Click "Install app" then copy the Admin API Access Token shown (starts with shpat_...).',
 ];

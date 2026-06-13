@@ -33,7 +33,7 @@ export const POST = route(async (req, { params }) => {
       flowCta: "Open Form",
       screen: screenId,
       title: `Test Flow: ${flow.name}`,
-      footer: "WappFlow Testing Mode",
+      footer: "LeapCreww Testing Mode",
     }
   }, orgId);
 

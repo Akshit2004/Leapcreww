@@ -506,16 +506,18 @@ export const InboxTab: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-1.5">
-                {/* Simulate button */}
-                <button
-                  type="button"
-                  onClick={() => setShowSimulate(!showSimulate)}
-                  className="text-[9px] px-2.5 py-1.5 bg-stone-950 text-white hover:bg-stone-800 border border-stone-950 font-bold uppercase tracking-wider flex items-center gap-1.5 select-none transition-all shrink-0 cursor-pointer rounded-lg"
-                  title="Simulate Inbound Customer Message"
-                >
-                  <Bot className="w-3.5 h-3.5" />
-                  <span className="max-sm:hidden">Simulate</span>
-                </button>
+                {/* Simulate button — dev-only sandbox utility */}
+                {process.env.NODE_ENV !== "production" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSimulate(!showSimulate)}
+                    className="text-[9px] px-2.5 py-1.5 bg-stone-950 text-white hover:bg-stone-800 border border-stone-950 font-bold uppercase tracking-wider flex items-center gap-1.5 select-none transition-all shrink-0 cursor-pointer rounded-lg"
+                    title="Simulate Inbound Customer Message"
+                  >
+                    <Bot className="w-3.5 h-3.5" />
+                    <span className="max-sm:hidden">Simulate</span>
+                  </button>
+                )}
 
                 {/* Agent badge — desktop */}
                 <span className="max-sm:hidden text-[9px] px-3 py-1.5 bg-stone-50 text-stone-500 font-bold flex items-center gap-1.5 shrink-0 border border-stone-200 uppercase tracking-wider rounded-lg">

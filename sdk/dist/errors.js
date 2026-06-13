@@ -1,27 +1,27 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WappFlowError = void 0;
+exports.LeapCrewwError = void 0;
 /**
- * Thrown whenever the WappFlow API returns a non-2xx status code.
+ * Thrown whenever the LeapCreww API returns a non-2xx status code.
  *
  * @example
  * try {
  *   await client.messages.send({ to: "+91...", text: "hi" });
  * } catch (err) {
- *   if (err instanceof WappFlowError && err.status === 402) {
+ *   if (err instanceof LeapCrewwError && err.status === 402) {
  *     console.error("Top up your wallet:", err.message);
  *   }
  * }
  */
-class WappFlowError extends Error {
+class LeapCrewwError extends Error {
     constructor(message, status, body) {
         super(message);
         this.status = status;
         this.body = body;
-        this.name = "WappFlowError";
+        this.name = "LeapCrewwError";
         // Maintain a proper prototype chain in compiled JS (TS quirk).
-        Object.setPrototypeOf(this, WappFlowError.prototype);
+        Object.setPrototypeOf(this, LeapCrewwError.prototype);
     }
 }
-exports.WappFlowError = WappFlowError;
+exports.LeapCrewwError = LeapCrewwError;
 //# sourceMappingURL=errors.js.map

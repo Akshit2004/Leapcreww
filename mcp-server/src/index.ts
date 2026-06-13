@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 /**
- * WappFlow MCP Server
- * Gives AI agents access to WappFlow's WhatsApp messaging and CRM capabilities.
+ * LeapCreww MCP Server
+ * Gives AI agents access to LeapCreww's WhatsApp messaging and CRM capabilities.
  *
  * Usage:
- *   WAPPFLOW_API_KEY=wf_live_... node dist/index.js
+ *   LEAPCREWW_API_KEY=wf_live_... node dist/index.js
  *   # or
- *   npx @wappflow/mcp-server --api-key wf_live_...
+ *   npx @leapcreww/mcp-server --api-key wf_live_...
  *
  * Configure in Claude Desktop (claude_desktop_config.json):
  *   {
  *     "mcpServers": {
- *       "wappflow": {
+ *       "leapcreww": {
  *         "command": "npx",
- *         "args": ["@wappflow/mcp-server"],
- *         "env": { "WAPPFLOW_API_KEY": "wf_live_..." }
+ *         "args": ["@leapcreww/mcp-server"],
+ *         "env": { "LEAPCREWW_API_KEY": "wf_live_..." }
  *       }
  *     }
  *   }
@@ -26,19 +26,19 @@ import { z } from "zod";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const apiKey = process.env.WAPPFLOW_API_KEY
+const apiKey = process.env.LEAPCREWW_API_KEY
   ?? process.argv.find((a) => a.startsWith("--api-key="))?.split("=")[1]
   ?? "";
 
 if (!apiKey) {
-  process.stderr.write("Error: WAPPFLOW_API_KEY environment variable is required.\n");
+  process.stderr.write("Error: LEAPCREWW_API_KEY environment variable is required.\n");
   process.exit(1);
 }
 
 const baseUrl = (
-  process.env.WAPPFLOW_BASE_URL
+  process.env.LEAPCREWW_BASE_URL
   ?? process.argv.find((a) => a.startsWith("--base-url="))?.split("=")[1]
-  ?? "https://app.wappflow.com"
+  ?? "https://app.leapcreww.com"
 ).replace(/\/$/, "");
 
 const apiBase = `${baseUrl}/api/v1`;
@@ -71,7 +71,7 @@ async function call<T>(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(`WappFlow API error ${res.status}: ${(err as { error?: string }).error ?? res.statusText}`);
+    throw new Error(`LeapCreww API error ${res.status}: ${(err as { error?: string }).error ?? res.statusText}`);
   }
   return res.json() as Promise<T>;
 }
@@ -79,7 +79,7 @@ async function call<T>(
 // ─── MCP Server ──────────────────────────────────────────────────────────────
 
 const server = new McpServer({
-  name: "wappflow",
+  name: "leapcreww",
   version: "0.1.0",
 });
 
@@ -174,7 +174,7 @@ server.tool(
 // Tool: get_events
 server.tool(
   "get_events",
-  "Fetch recent events from the WappFlow event log (inbound messages, new contacts, placed orders). Use 'after' for pagination.",
+  "Fetch recent events from the LeapCreww event log (inbound messages, new contacts, placed orders). Use 'after' for pagination.",
   {
     type: z.enum(["message.received", "contact.created", "order.placed", "message.status"]).optional()
       .describe("Filter by event type"),
@@ -206,4 +206,4 @@ server.tool(
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
-process.stderr.write(`WappFlow MCP server running (${baseUrl})\n`);
+process.stderr.write(`LeapCreww MCP server running (${baseUrl})\n`);

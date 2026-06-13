@@ -1,6 +1,6 @@
 "use strict";
 
-const BASE_URL = process.env.BASE_URL || "https://app.wappflow.com";
+const BASE_URL = process.env.BASE_URL || "https://app.leapcreww.com";
 
 const perform = async (z, bundle) => {
   const payload = { phone: bundle.inputData.phone };
@@ -50,7 +50,7 @@ module.exports = {
   display: {
     label: "Create or Update Contact",
     description:
-      "Create a new WappFlow CRM contact, or update an existing one matched by phone number. Tags are merged; attributes are shallow-merged.",
+      "Create a new LeapCreww CRM contact, or update an existing one matched by phone number. Tags are merged; attributes are shallow-merged.",
   },
 
   operation: {

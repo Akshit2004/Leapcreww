@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     if (!integration) {
       console.warn(`⚠️ Shopify webhook received for unconnected shop: ${shop}`);
-      return NextResponse.json({ error: "Store not integrated in WappFlow." }, { status: 404 });
+      return NextResponse.json({ error: "Store not integrated in LeapCreww." }, { status: 404 });
     }
 
     return await handleWebhookEvent(topic, payload, integration.organizationId, shop);
@@ -139,7 +139,7 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
 
   // A. HANDLE ABANDONED CART TRIGGER
   if (topic === "checkouts/create" || topic === "checkouts/update") {
-    // 1. Create or Update Customer Contact in WappFlow (tenant-scoped by email)
+    // 1. Create or Update Customer Contact in LeapCreww (tenant-scoped by email)
     const contact = await upsertShopifyContact(
       orgId,
       email,

@@ -2,16 +2,16 @@ import { MessagesResource } from "./resources/messages";
 import { ContactsResource } from "./resources/contacts";
 import { TemplatesResource } from "./resources/templates";
 import { EventsResource } from "./resources/events";
-import type { Me, WappFlowOptions } from "./types";
-export { WappFlowError } from "./errors";
+import type { Me, LeapCrewwOptions } from "./types";
+export { LeapCrewwError } from "./errors";
 export type * from "./types";
 /**
- * WappFlow API client.
+ * LeapCreww API client.
  *
  * @example
- * import { WappFlow } from "@wappflow/sdk";
+ * import { LeapCreww } from "@leapcreww/sdk";
  *
- * const client = new WappFlow({ apiKey: "wf_live_..." });
+ * const client = new LeapCreww({ apiKey: "wf_live_..." });
  *
  * // Send a WhatsApp message
  * await client.messages.send({ to: "+919876543210", text: "Hello!" });
@@ -22,13 +22,13 @@ export type * from "./types";
  * // Poll recent events
  * const { events } = await client.events.list({ type: "message.received" });
  */
-export declare class WappFlow {
+export declare class LeapCreww {
     readonly messages: MessagesResource;
     readonly contacts: ContactsResource;
     readonly templates: TemplatesResource;
     readonly events: EventsResource;
     private http;
-    constructor(options: WappFlowOptions);
+    constructor(options: LeapCrewwOptions);
     /**
      * Verify the API key and retrieve workspace info.
      * Useful as a health-check on startup.

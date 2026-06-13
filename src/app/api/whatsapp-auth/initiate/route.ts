@@ -18,7 +18,7 @@ export async function POST() {
     });
 
     const botNumber = process.env.NEXT_PUBLIC_SYSTEM_WHATSAPP_NUMBER;
-    const textMessage = `Hi, I'd like to verify my Account Signup for WappFlow. Verification Code: ${code}`;
+    const textMessage = `Hi, I'd like to verify my Account Signup for LeapCreww. Verification Code: ${code}`;
     const waUrl = `https://wa.me/${botNumber}?text=${encodeURIComponent(textMessage)}`;
 
     return NextResponse.json({

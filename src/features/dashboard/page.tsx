@@ -230,7 +230,7 @@ function TenantDashboardInner() {
               <div className="w-7 h-7 rounded-lg bg-wa-green flex items-center justify-center shadow-md shadow-wa-green/20">
                 <Bot className="w-4 h-4 text-white" />
               </div>
-              <span className="font-extrabold text-sm tracking-tight text-slate-900">WappFlow</span>
+              <span className="font-extrabold text-sm tracking-tight text-slate-900">LeapCreww</span>
             </div>
           </div>
         </header>

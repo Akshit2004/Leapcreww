@@ -7,7 +7,7 @@ import {
 // Shopify App Store install entry point.
 // Shopify GET /api/shopify/auth?shop=xxx&hmac=yyy&timestamp=zzz[&orgId=aaa]
 //
-// orgId can be passed as a query param when installing from inside the WappFlow
+// orgId can be passed as a query param when installing from inside the LeapCreww
 // dashboard (the Connect button appends it). When installing cold from the App
 // Store, orgId arrives via the `state` Shopify round-trips back to our callback.
 export async function GET(request: NextRequest) {

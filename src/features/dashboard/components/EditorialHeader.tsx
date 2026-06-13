@@ -27,7 +27,7 @@ export const EditorialHeader: React.FC<EditorialHeaderProps> = ({
       {/* Editorial Meta Banner */}
       <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-stone-500 uppercase tracking-widest border-b border-stone-200/60 pb-3">
         <div>
-          <span>WAPPFLOW JOURNAL</span>
+          <span>LEAPCREWW JOURNAL</span>
           <span className="mx-2 text-stone-300">{"//"}</span>
           <span>{formattedDate}</span>
         </div>

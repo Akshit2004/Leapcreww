@@ -643,7 +643,7 @@ export const AdsTab: React.FC = () => {
                             {campaignName ? campaignName.slice(0, 2) : "AD"}
                           </div>
                           <div>
-                            <div className="text-xs font-bold text-stone-900">{campaignName || "WappFlow Client Page"}</div>
+                            <div className="text-xs font-bold text-stone-900">{campaignName || "LeapCreww Client Page"}</div>
                             <div className="text-[9px] text-stone-500 mt-0.5">Sponsored · 🌐</div>
                           </div>
                         </div>

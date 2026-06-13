@@ -1,4 +1,4 @@
-# WappFlow Security Remediation Plan
+# LeapCreww Security Remediation Plan
 
 > **Status:** Proposed · Created 2026-06-07
 > **Source:** Static security audit (OWASP Top 10 + API checklist). Overall score at audit time: **6/10**.
@@ -236,7 +236,7 @@ Switch to `crypto.timingSafeEqual` (with a length guard), matching the WhatsApp 
 Type the inbound payloads (`updateData`, `contact.attributes`, etc.) to satisfy Article IV's no-`any` rule.
 
 ### 2.5 — Confirm prod overrides the default verify token  *(Finding #13)*
-`WHATSAPP_WEBHOOK_VERIFY_TOKEN` defaults to `wappflow_verify_2026` in `.env.example`. Ensure each
+`WHATSAPP_WEBHOOK_VERIFY_TOKEN` defaults to `leapcreww_verify_2026` in `.env.example`. Ensure each
 environment sets a unique, secret value; document it in the deploy runbook.
 
 ---

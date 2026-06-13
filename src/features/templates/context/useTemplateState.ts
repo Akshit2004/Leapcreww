@@ -51,7 +51,7 @@ export const useTemplateState = ({
     lockSync();
     setTemplates((prev) => prev.filter((t) => t.id !== id));
     try {
-      addSystemLog("crm", `Permanently deleting template ID ${id} from WappFlow and Meta...`);
+      addSystemLog("crm", `Permanently deleting template ID ${id} from LeapCreww and Meta...`);
       const res = await fetch(`/api/whatsapp/delete-template/${id}`, {
         method: "DELETE",
       });
@@ -60,7 +60,7 @@ export const useTemplateState = ({
         const err = await res.json();
         addSystemLog("crm", `Failed to delete template ID ${id} completely: ${err.error}`);
       } else {
-        addSystemLog("crm", `Successfully deleted template ID ${id} from WappFlow and Meta.`);
+        addSystemLog("crm", `Successfully deleted template ID ${id} from LeapCreww and Meta.`);
       }
     } catch (err: unknown) {
       addSystemLog("crm", `Error deleting template ID ${id}: ${err instanceof Error ? err.message : String(err)}`);

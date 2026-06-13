@@ -30,6 +30,10 @@ export function bulkCreateContacts(data: Prisma.ContactCreateManyInput[]) {
   return prisma.contact.createMany({ data });
 }
 
+export function createContact(data: Prisma.ContactUncheckedCreateInput) {
+  return prisma.contact.create({ data });
+}
+
 export function findMembership(userId: string, organizationId: string) {
   return prisma.membership.findUnique({
     where: { userId_organizationId: { userId, organizationId } },

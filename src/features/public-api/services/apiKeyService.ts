@@ -31,7 +31,10 @@ export function listKeys(organizationId: string) {
   return repo.listKeys(organizationId);
 }
 
-export function revokeKey(id: string) {
+export async function revokeKey(organizationId: string, id: string) {
+  const key = await repo.findById(id, organizationId);
+  if (!key) throw new ApiError("Not found", 404);
+  if (key.revokedAt) return key;
   return repo.revoke(id);
 }
 

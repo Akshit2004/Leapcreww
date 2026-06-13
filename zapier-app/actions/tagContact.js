@@ -1,6 +1,6 @@
 "use strict";
 
-const BASE_URL = process.env.BASE_URL || "https://app.wappflow.com";
+const BASE_URL = process.env.BASE_URL || "https://app.leapcreww.com";
 
 /**
  * Add tags to an existing contact (identified by phone).
@@ -44,7 +44,7 @@ module.exports = {
   display: {
     label: "Tag a Contact",
     description:
-      "Add one or more tags to a WappFlow contact (found by phone number). Tags are merged with existing ones — no duplicates are created.",
+      "Add one or more tags to a LeapCreww contact (found by phone number). Tags are merged with existing ones — no duplicates are created.",
   },
 
   operation: {

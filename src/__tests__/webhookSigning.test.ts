@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import * as crypto from "crypto";
 
-// Inbound (Meta → WappFlow)
+// Inbound (Meta → LeapCreww)
 import { validateWebhookSignature } from "@/shared/lib/whatsapp";
 
-// Outbound (WappFlow → subscriber)
+// Outbound (LeapCreww → subscriber)
 import { sign, verify } from "@/features/webhooks/lib/signing";
 
 const APP_SECRET = "test-app-secret-32chars-exactly!!";

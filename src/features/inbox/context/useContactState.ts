@@ -8,6 +8,7 @@ interface UseContactStateProps {
   lockSync: () => void;
   unlockSync: () => void;
   setChatHistory: React.Dispatch<React.SetStateAction<ChatHistory>>;
+  organizationId?: string;
 }
 
 export const useContactState = ({
@@ -15,23 +16,42 @@ export const useContactState = ({
   lockSync,
   unlockSync,
   setChatHistory,
+  organizationId,
 }: UseContactStateProps) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activeContactId, setActiveContactId] = useState<string | null>(null);
 
-  const addContact = useCallback((newContact: Omit<Contact, "id">) => {
-    const id = `c-${Date.now()}`;
-    const contact: Contact = {
-      ...newContact,
-      id,
-      unreadCount: 0,
-    };
-    setContacts((prev) => [contact, ...prev]);
-    // Pre-populate empty chat history
-    setChatHistory((prev) => ({ ...prev, [id]: [] }));
-    addSystemLog("crm", `Added new contact: ${contact.name} (${contact.phone})`);
-    return contact;
-  }, [addSystemLog, setChatHistory]);
+  const addContact = useCallback(async (newContact: Omit<Contact, "id">) => {
+    if (!organizationId) {
+      addSystemLog("crm", `Failed to add contact ${newContact.name}: no active workspace.`);
+      return undefined;
+    }
+
+    lockSync();
+    try {
+      const res = await fetch(`/api/org/${organizationId}/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newContact),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        addSystemLog("crm", `Failed to add contact ${newContact.name}: ${data?.error || "request failed"}`);
+        return undefined;
+      }
+      const { contact } = (await res.json()) as { contact: Contact };
+      setContacts((prev) => [contact, ...prev]);
+      // Pre-populate empty chat history
+      setChatHistory((prev) => ({ ...prev, [contact.id]: [] }));
+      addSystemLog("crm", `Added new contact: ${contact.name} (${contact.phone})`);
+      return contact;
+    } catch (err: unknown) {
+      addSystemLog("crm", `Error adding contact ${newContact.name}: ${err instanceof Error ? err.message : String(err)}`);
+      return undefined;
+    } finally {
+      unlockSync();
+    }
+  }, [addSystemLog, setChatHistory, organizationId, lockSync, unlockSync]);
 
   const updateContact = useCallback(async (id: string, updates: Partial<Contact>) => {
     lockSync();

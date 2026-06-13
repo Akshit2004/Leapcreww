@@ -22,6 +22,7 @@ export const CustomersTab: React.FC = () => {
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
+  const [isBulkTagging, setIsBulkTagging] = useState(false);
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
   const [isWinBackModalOpen, setIsWinBackModalOpen] = useState(false);
 
@@ -118,27 +119,52 @@ export const CustomersTab: React.FC = () => {
     updateContact(id, { name: newName });
   };
 
-  const handleAddCustomer = (customer: Omit<Contact, "id">) => {
-    addContact(customer);
+  const handleAddCustomer = async (customer: Omit<Contact, "id">) => {
+    await addContact(customer);
   };
 
   const handleBulkAddTag = () => {
     setIsBulkAddModalOpen(true);
   };
 
-  const confirmBulkAddTag = (tag: string) => {
+  const confirmBulkAddTag = async (tag: string) => {
     const cleanTag = tag.trim();
-    
-    selectedIds.forEach((id) => {
-      const contact = contacts.find((c) => c.id === id);
-      if (contact) {
+    if (!cleanTag) return;
+
+    const contactIds = Array.from(selectedIds);
+    if (contactIds.length === 0) return;
+
+    setIsBulkTagging(true);
+    try {
+      const res = await fetch(`/api/org/${orgId}/contacts/bulk-tag`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tag: cleanTag, contactIds }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Failed to add tag to contacts");
+      }
+
+      // Single bulk request already made above; reflect the new tag in
+      // client-side state for the affected contacts.
+      contactIds.forEach((id) => {
+        const contact = contacts.find((c) => c.id === id);
+        if (!contact) return;
         const currentTags = contact.tags || [];
         if (!currentTags.includes(cleanTag)) {
           updateContact(id, { tags: [...currentTags, cleanTag] });
         }
-      }
-    });
-    setSelectedIds(new Set()); // clear selection after action
+      });
+
+      notify.success(`Added tag "${cleanTag}" to ${contactIds.length} customer${contactIds.length !== 1 ? "s" : ""}`);
+      setSelectedIds(new Set()); // clear selection after action
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : "Failed to add tag to contacts");
+    } finally {
+      setIsBulkTagging(false);
+    }
   };
 
   const handleDeleteSegment = async (id: string) => {
@@ -454,6 +480,7 @@ export const CustomersTab: React.FC = () => {
         onClose={() => setIsBulkAddModalOpen(false)}
         onConfirm={confirmBulkAddTag}
         selectedCount={selectedIds.size}
+        isSubmitting={isBulkTagging}
       />
 
       <WinBackModal

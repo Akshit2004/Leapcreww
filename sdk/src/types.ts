@@ -120,9 +120,9 @@ export interface ListEventsResult {
 
 // ─── SDK options ─────────────────────────────────────────────────────────────
 
-export interface WappFlowOptions {
+export interface LeapCrewwOptions {
   apiKey: string;
-  /** Override the base URL. Defaults to "https://app.wappflow.com". */
+  /** Override the base URL. Defaults to "https://app.leapcreww.com". */
   baseUrl?: string;
   /** Fetch timeout in milliseconds. Defaults to 30 000. */
   timeout?: number;

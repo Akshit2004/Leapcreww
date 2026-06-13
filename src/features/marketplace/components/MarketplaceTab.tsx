@@ -227,7 +227,7 @@ export const MarketplaceTab: React.FC<{ embedded?: boolean }> = ({ embedded = fa
     };
 
     if (editProduct) {
-      await fetch(`/api/marketplace/products/${editProduct.id}`, {
+      await fetch(`/api/marketplace/products/${editProduct.id}?orgId=${orgId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -245,7 +245,7 @@ export const MarketplaceTab: React.FC<{ embedded?: boolean }> = ({ embedded = fa
   };
 
   const deleteProduct = async (id: string) => {
-    await fetch(`/api/marketplace/products/${id}`, { method: "DELETE" });
+    await fetch(`/api/marketplace/products/${id}?orgId=${orgId}`, { method: "DELETE" });
     await fetchProducts();
   };
 

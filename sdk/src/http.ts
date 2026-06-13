@@ -1,4 +1,4 @@
-import { WappFlowError } from "./errors";
+import { LeapCrewwError } from "./errors";
 
 export interface RequestOptions {
   params?: Record<string, unknown>;
@@ -37,7 +37,7 @@ export class HttpClient {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
-      "User-Agent": "@wappflow/sdk/1.0.0",
+      "User-Agent": "@leapcreww/sdk/1.0.0",
       ...options.headers,
     };
 
@@ -59,7 +59,7 @@ export class HttpClient {
     if (!res.ok) {
       const message =
         (data as { error?: string })?.error ?? `HTTP ${res.status} ${res.statusText}`;
-      throw new WappFlowError(message, res.status, data);
+      throw new LeapCrewwError(message, res.status, data);
     }
 
     return data as T;

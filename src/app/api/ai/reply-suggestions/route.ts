@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       ? products.map(p => `- ${p.name} (Price: ₹${(p.price / 100).toFixed(2)}, SKU: ${p.sku || "N/A"}): ${p.description}`).join("\n")
       : "No products currently listed in the catalog.";
 
-    const systemPrompt = `You are an inbox assistant for WappFlow CRM. Your goal is to draft exactly 3 brief, helpful suggested replies that a customer support agent can send to the user.
+    const systemPrompt = `You are an inbox assistant for LeapCreww CRM. Your goal is to draft exactly 3 brief, helpful suggested replies that a customer support agent can send to the user.
 Ground your suggestions strictly in:
 1. Recent chat messages.
 2. The product catalog provided below (if empty, do not suggest products).

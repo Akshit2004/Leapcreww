@@ -1,6 +1,6 @@
-# WappFlow App WhatsApp Onboarding UX & System Flow
+# LeapCreww App WhatsApp Onboarding UX & System Flow
 
-This document standardizes the customer-facing WhatsApp Business onboarding flow inside the **WappFlow / AiSensy Clone** application. It maps out the user experience (UX) states, screens, backend endpoints, and database transitions to align development and support teams.
+This document standardizes the customer-facing WhatsApp Business onboarding flow inside the **LeapCreww / AiSensy Clone** application. It maps out the user experience (UX) states, screens, backend endpoints, and database transitions to align development and support teams.
 
 ---
 
@@ -25,7 +25,7 @@ graph TD
 ## 🖥️ Onboarding Screens & UX States
 
 ### State 1: The "Not Connected" Landing Screen
-This is the starting screen for a customer who hasn't integrated WhatsApp yet. It builds trust by explaining how WappFlow manages security and privacy.
+This is the starting screen for a customer who hasn't integrated WhatsApp yet. It builds trust by explaining how LeapCreww manages security and privacy.
 
 * **UI File Path:** `src/features/settings/components/SettingsTab.tsx`
 * **Visual Components:**
@@ -49,7 +49,7 @@ When the user clicks **"Connect with WhatsApp"**, the app loads the Facebook Jav
      * **Step B:** Selects or creates their Meta Business Portfolio (e.g. *Smritix*).
      * **Step C:** Selects or creates their WhatsApp Business Account (WABA).
      * **Step D:** Adds their display name and verifies their phone number using a 6-digit SMS/Voice OTP.
-     * **Step E:** Approves permissions (`whatsapp_business_management`, `whatsapp_business_messaging`, `business_management`) for the WappFlow App.
+     * **Step E:** Approves permissions (`whatsapp_business_management`, `whatsapp_business_messaging`, `business_management`) for the LeapCreww App.
   3. Upon completion, the popup closes, and the SDK returns a short-lived authorization `code` to the frontend callback handler `handleSignupCallback(code)`.
 
 ---
@@ -69,7 +69,7 @@ The frontend immediately sends the short-lived `code` to the backend to discover
   1. **Token Exchange:** The backend calls Meta's Graph API (`/oauth/access_token`) to exchange the short-lived code for a user access token.
   2. **WABA Discovery:** Using the token, it queries Meta to discover all WABAs and Business IDs linked to the customer's portfolio.
   3. **Phone Number Discovery:** For each discovered WABA, it queries all associated phone numbers, display names, and quality ratings.
-  4. **Security Enforcement:** **Important!** WappFlow *never* saves this short-lived access token in the database. It is used strictly in-memory during this request to discover IDs and is then permanently discarded. All future messaging calls use WappFlow's secure, platform-level **System User Token**.
+  4. **Security Enforcement:** **Important!** LeapCreww *never* saves this short-lived access token in the database. It is used strictly in-memory during this request to discover IDs and is then permanently discarded. All future messaging calls use LeapCreww's secure, platform-level **System User Token**.
 
 ---
 

@@ -65,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const sessionUser = session?.user as { name?: string; organizations?: { role: string }[] } | undefined;
   const agentName = sessionUser?.name || "User";
   const userRole = sessionUser?.organizations?.[0]?.role || "Member";
-  const appName = "WappFlow";
+  const appName = "LeapCreww";
   const appVersion = "v2.4.0";
 
   const primaryItems = [

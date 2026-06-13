@@ -1,43 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
+import { ok, route, requireOrg, body, ApiError } from "@/shared/lib/api";
+import { getProduct, updateProduct, deleteProduct, type ProductUpdateInput } from "../../../services/catalogService";
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const product = await prisma.product.findUnique({ where: { id } });
-  if (!product) {
-    return NextResponse.json({ error: "Product not found" }, { status: 404 });
-  }
-  return NextResponse.json({ product });
-}
+/** GET /api/marketplace/products/:id?orgId=xxx */
+export const GET = route(async (req, ctx) => {
+  const { id } = ctx.params!;
+  const { searchParams } = new URL(req.url);
+  const orgId = searchParams.get("orgId");
+  if (!orgId) throw new ApiError("Missing orgId", 400);
+  await requireOrg(orgId, "AGENT");
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const [{ id }, body] = await Promise.all([params, req.json()]);
-  const product = await prisma.product.update({
-    where: { id },
-    data: {
-      sku: body.sku !== undefined ? body.sku : undefined,
-      name: body.name,
-      description: body.description,
-      price: body.price,
-      images: body.images,
-      category: body.category,
-      stock: body.stock,
-      isActive: body.isActive,
-    },
-  });
+  const product = await getProduct(orgId, id);
+  return ok({ product });
+});
 
-  // Sync to Meta Catalog
-  import("@/shared/lib/meta-catalog").then((m) => m.syncProductToMetaCatalog(product.id));
+/** PATCH /api/marketplace/products/:id?orgId=xxx */
+export const PATCH = route(async (req, ctx) => {
+  const { id } = ctx.params!;
+  const { searchParams } = new URL(req.url);
+  const orgId = searchParams.get("orgId");
+  if (!orgId) throw new ApiError("Missing orgId", 400);
+  await requireOrg(orgId, "ADMIN");
 
-  return NextResponse.json({ product });
-}
+  const input = await body<ProductUpdateInput>(req);
+  const product = await updateProduct(orgId, id, input);
+  return ok({ product });
+});
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const product = await prisma.product.findUnique({ where: { id } });
-  if (product) {
-    await prisma.product.delete({ where: { id } });
-    import("@/shared/lib/meta-catalog").then((m) => m.deleteProductFromMetaCatalog(product.id, product.organizationId, product.sku));
-  }
-  return NextResponse.json({ status: "deleted" });
-}
+/** DELETE /api/marketplace/products/:id?orgId=xxx */
+export const DELETE = route(async (req, ctx) => {
+  const { id } = ctx.params!;
+  const { searchParams } = new URL(req.url);
+  const orgId = searchParams.get("orgId");
+  if (!orgId) throw new ApiError("Missing orgId", 400);
+  await requireOrg(orgId, "ADMIN");
+
+  await deleteProduct(orgId, id);
+  return ok({ status: "deleted" });
+});

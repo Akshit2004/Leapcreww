@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
       recentCampaigns: campaignsData,
     };
 
-    const systemPrompt = `You are WappFlow AI Analytics Narrator. Unlike competitors who only report engagement, WappFlow ties revenue to messages. Analyze the telemetry and write a plain-English, executive overview explaining:
+    const systemPrompt = `You are LeapCreww AI Analytics Narrator. Unlike competitors who only report engagement, LeapCreww ties revenue to messages. Analyze the telemetry and write a plain-English, executive overview explaining:
 1. The MONEY first: total attributed revenue, ROI (revenue ÷ send cost), and which campaigns and which agents are driving the most revenue (use topCampaignsByRevenue and revenueByAgent).
 2. Overall engagement health (delivery, read, click rates) as supporting context.
 3. Which campaigns are underperforming (e.g. high sends but low attributed revenue, read rate under 30%, CTR under 3%) and exactly WHY.

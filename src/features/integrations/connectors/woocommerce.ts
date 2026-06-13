@@ -9,7 +9,7 @@ import type { Connector, ConnectorContext, InboundLead } from "./types";
 export const woocommerceConnector: Connector = {
   id: "woocommerce",
   name: "WooCommerce",
-  description: "Sync WooCommerce orders & abandoned carts into WappFlow.",
+  description: "Sync WooCommerce orders & abandoned carts into LeapCreww.",
 
   async connect(ctx: ConnectorContext) {
     if (!ctx.apiKey) return { ok: false, error: "WooCommerce consumer key/secret required" };

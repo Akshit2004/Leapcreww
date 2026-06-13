@@ -18,7 +18,7 @@ const MANDATORY_PROD_SECRETS = [
 
 /** Values that are insecure if they ever reach production (committed defaults). */
 const INSECURE_DEFAULTS: Record<string, string> = {
-  WHATSAPP_WEBHOOK_VERIFY_TOKEN: "wappflow_verify_2026",
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN: "leapcreww_verify_2026",
 };
 
 export function assertProdSecrets(): void {

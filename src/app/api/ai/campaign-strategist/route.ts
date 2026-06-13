@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      const systemPrompt = `You are WappFlow AI Campaign Strategist. Your job is to draft a comprehensive WhatsApp campaign strategy based on the user's objective (e.g. "It's Diwali, I sell sarees").
+      const systemPrompt = `You are LeapCreww AI Campaign Strategist. Your job is to draft a comprehensive WhatsApp campaign strategy based on the user's objective (e.g. "It's Diwali, I sell sarees").
 Your response MUST be a single, valid JSON object containing a template selection/draft, a target segment, a campaign schedule, and a 3-step sequence.
 
 Current Date/Time (UTC): ${new Date().toISOString()}
@@ -152,7 +152,7 @@ You MUST decide and generate:
      - "buttons": Array of up to 3 string button text labels (e.g., ["Shop Collection", "Talk to Us"]).
 3. "segment": A target segment to select matching contacts.
    - "name": Concise name (e.g., "Saree Buyers & Leads").
-   - "rules": Rules to resolve contacts. Must match WappFlow's SegmentRules schema:
+   - "rules": Rules to resolve contacts. Must match LeapCreww's SegmentRules schema:
      {
        "all": [
          { "field": "tags" | "status" | "source", "op": "in" | "eq", "value": "diwali_promo" | "Active" }

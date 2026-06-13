@@ -25,7 +25,7 @@ class HttpClient {
         const headers = {
             Authorization: `Bearer ${this.apiKey}`,
             "Content-Type": "application/json",
-            "User-Agent": "@wappflow/sdk/1.0.0",
+            "User-Agent": "@leapcreww/sdk/1.0.0",
             ...options.headers,
         };
         const signal = AbortSignal.timeout(this.timeout);
@@ -44,7 +44,7 @@ class HttpClient {
         }
         if (!res.ok) {
             const message = data?.error ?? `HTTP ${res.status} ${res.statusText}`;
-            throw new errors_1.WappFlowError(message, res.status, data);
+            throw new errors_1.LeapCrewwError(message, res.status, data);
         }
         return data;
     }

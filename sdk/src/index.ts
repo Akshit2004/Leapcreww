@@ -3,21 +3,21 @@ import { MessagesResource } from "./resources/messages";
 import { ContactsResource } from "./resources/contacts";
 import { TemplatesResource } from "./resources/templates";
 import { EventsResource } from "./resources/events";
-import type { Me, WappFlowOptions } from "./types";
+import type { Me, LeapCrewwOptions } from "./types";
 
-export { WappFlowError } from "./errors";
+export { LeapCrewwError } from "./errors";
 export type * from "./types";
 
-const DEFAULT_BASE_URL = "https://app.wappflow.com";
+const DEFAULT_BASE_URL = "https://app.leapcreww.com";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 /**
- * WappFlow API client.
+ * LeapCreww API client.
  *
  * @example
- * import { WappFlow } from "@wappflow/sdk";
+ * import { LeapCreww } from "@leapcreww/sdk";
  *
- * const client = new WappFlow({ apiKey: "wf_live_..." });
+ * const client = new LeapCreww({ apiKey: "wf_live_..." });
  *
  * // Send a WhatsApp message
  * await client.messages.send({ to: "+919876543210", text: "Hello!" });
@@ -28,7 +28,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
  * // Poll recent events
  * const { events } = await client.events.list({ type: "message.received" });
  */
-export class WappFlow {
+export class LeapCreww {
   readonly messages: MessagesResource;
   readonly contacts: ContactsResource;
   readonly templates: TemplatesResource;
@@ -36,8 +36,8 @@ export class WappFlow {
 
   private http: HttpClient;
 
-  constructor(options: WappFlowOptions) {
-    if (!options.apiKey) throw new Error("WappFlow: apiKey is required");
+  constructor(options: LeapCrewwOptions) {
+    if (!options.apiKey) throw new Error("LeapCreww: apiKey is required");
     this.http = new HttpClient(
       options.baseUrl ?? DEFAULT_BASE_URL,
       options.apiKey,

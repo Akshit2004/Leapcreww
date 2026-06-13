@@ -152,7 +152,7 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
                 type: "body",
                 parameters: [
                   { type: "text", text: contact.name },
-                  { type: "text", text: attrs.cart_checkout_url || attrs.shopify_checkout_url || "https://wappflow.com" },
+                  { type: "text", text: attrs.cart_checkout_url || attrs.shopify_checkout_url || "https://leapcreww.com" },
                 ],
               },
             ],
@@ -181,7 +181,7 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
 
     if (templateName === "cart_recovery") {
       bodyParameters.push({ type: "text" as const, text: contact.name });
-      bodyParameters.push({ type: "text" as const, text: attrs.cart_checkout_url || attrs.shopify_checkout_url || "https://wappflow.com" });
+      bodyParameters.push({ type: "text" as const, text: attrs.cart_checkout_url || attrs.shopify_checkout_url || "https://leapcreww.com" });
     } else if (templateName === "order_confirmation") {
       bodyParameters.push({ type: "text" as const, text: contact.name });
       bodyParameters.push({ type: "text" as const, text: attrs.cart_total ? `₹${attrs.cart_total}` : "" });

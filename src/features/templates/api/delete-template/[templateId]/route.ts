@@ -75,7 +75,7 @@ export async function DELETE(
     await prisma.systemLog.create({
       data: {
         type: "crm",
-        message: `Permanently deleted template: "${template.name}" from WappFlow${!isMock ? " and Meta Business Manager" : ""}.`,
+        message: `Permanently deleted template: "${template.name}" from LeapCreww${!isMock ? " and Meta Business Manager" : ""}.`,
         organizationId: template.organizationId
       }
     });

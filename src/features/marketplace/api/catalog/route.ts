@@ -1,59 +1,23 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
+import { ok, route, requireOrg, body, requireFields, ApiError } from "@/shared/lib/api";
+import { listCatalog, createProduct, type CreateProductInput } from "../../services/catalogService";
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = req.nextUrl;
+/** GET /api/marketplace/catalog?orgId=xxx&category=yyy — public storefront listing. */
+export const GET = route(async (req) => {
+  const { searchParams } = new URL(req.url);
   const orgId = searchParams.get("orgId");
-  const category = searchParams.get("category");
+  if (!orgId) throw new ApiError("Missing orgId", 400);
+  const category = searchParams.get("category") || undefined;
 
-  if (!orgId) {
-    return NextResponse.json({ error: "orgId required" }, { status: 400 });
-  }
+  const result = await listCatalog(orgId, category);
+  return ok(result);
+});
 
-  const where: { organizationId: string; isActive: boolean; category?: string } = { organizationId: orgId, isActive: true };
-  if (category) where.category = category;
+/** POST /api/marketplace/catalog — create a product (admin only). */
+export const POST = route(async (req) => {
+  const input = await body<CreateProductInput & { organizationId: string }>(req);
+  requireFields(input, ["name", "price", "category", "organizationId"]);
+  await requireOrg(input.organizationId, "ADMIN");
 
-  const [products, categories] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.product.findMany({
-      where: { organizationId: orgId, isActive: true },
-      select: { category: true },
-      distinct: ["category"],
-    }),
-  ]);
-
-  return NextResponse.json({
-    products,
-    categories: [...new Set(categories.map((c) => c.category))],
-  });
-}
-
-export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { name, description, price, images, category, stock, organizationId } = body;
-
-  if (!name || !price || !category || !organizationId) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-  }
-
-  const product = await prisma.product.create({
-    data: {
-      sku: body.sku || null,
-      name,
-      description: description || "",
-      price,
-      images: images || [],
-      category,
-      stock: stock ?? 0,
-      organizationId,
-    },
-  });
-
-  // Sync to Meta Catalog
-  import("@/shared/lib/meta-catalog").then((m) => m.syncProductToMetaCatalog(product.id));
-
-  return NextResponse.json({ product }, { status: 201 });
-}
+  const product = await createProduct(input.organizationId, input);
+  return ok({ product }, { status: 201 });
+});

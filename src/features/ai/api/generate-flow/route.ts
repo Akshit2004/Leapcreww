@@ -34,10 +34,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing conversational prompt" }, { status: 400 });
     }
 
-    const systemInstruction = `You are a visual AI Chatbot Architect for WappFlow.
-Your task is to analyze the user's conversational description of a chatbot flow and compile it into a fully connected, valid array of WappFlow ChatbotNode JSON structures.
+    const systemInstruction = `You are a visual AI Chatbot Architect for LeapCreww.
+Your task is to analyze the user's conversational description of a chatbot flow and compile it into a fully connected, valid array of LeapCreww ChatbotNode JSON structures.
 
-WappFlow ChatbotNode Specifications:
+LeapCreww ChatbotNode Specifications:
 1. Node Types:
    - "trigger" (Initiates flow. Usually matches words like "inbound 'Hi'", "starts when user sends 'hi'". The first node ID must always be "n1").
    - "message" (A standard reply bubble. Contains text inside 'content'. Has 'nextId' pointing to next node).

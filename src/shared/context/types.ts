@@ -137,7 +137,7 @@ export interface AppContextType {
   activeContactId: string | null;
   setActiveContactId: (id: string | null) => void;
   // Actions
-  addContact: (contact: Omit<Contact, "id">) => Contact;
+  addContact: (contact: Omit<Contact, "id">) => Promise<Contact | undefined>;
   updateContact: (id: string, updates: Partial<Contact>) => void;
   deleteContact: (id: string) => void;
   deleteCampaign: (id: string) => Promise<void>;

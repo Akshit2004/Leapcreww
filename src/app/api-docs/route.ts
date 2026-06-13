@@ -8,7 +8,7 @@ export async function GET(_req: NextRequest): Promise<Response> {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>WappFlow API Reference</title>
+    <title>LeapCreww API Reference</title>
     <style>
       body { margin: 0; }
     </style>

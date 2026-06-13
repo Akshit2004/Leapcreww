@@ -1,4 +1,4 @@
-# WappFlow — Changelog
+# LeapCreww — Changelog
 
 > All changes below are included in a single pre-commit working tree.
 > Organised by domain; green = new file, yellow = modified, migration = schema.
@@ -91,15 +91,15 @@ Full Model Context Protocol server built with `@modelcontextprotocol/sdk`. Expos
 - `list_templates` — approved template catalogue
 - `get_events` — recent event stream
 
-Reads `WAPPFLOW_API_KEY` from env or `--api-key=` CLI arg.
+Reads `LEAPCREWW_API_KEY` from env or `--api-key=` CLI arg.
 
 ### n8n Community Node (`n8n-node/`)
-Two resources (`Message`, `Contact`), four operations (`send`, `upsert`, `list`, `get`). Credential type `WappFlowApi` with `apiKey` + `baseUrl` and a test call to `/api/v1/me`.
+Two resources (`Message`, `Contact`), four operations (`send`, `upsert`, `list`, `get`). Credential type `LeapCrewwApi` with `apiKey` + `baseUrl` and a test call to `/api/v1/me`.
 
 ### Zapier App (`zapier-app/`)
 Polling trigger (`New Event`) and two creates (`Send Message`, `Upsert Contact`) using Zapier Platform Core v15.
 
-### Make.com Blueprint (`make-blueprint/wappflow-blueprint.json`)
+### Make.com Blueprint (`make-blueprint/leapcreww-blueprint.json`)
 3-module scenario: webhook trigger → send message → upsert contact. Import directly into Make.com.
 
 ### API Docs (`src/app/api-docs/route.ts`)
@@ -224,9 +224,9 @@ src/features/public-api/repositories/publicApiRepo.ts
 src/features/public-api/services/v1Service.ts
 src/features/webhooks/services/webhookDeliveryService.ts
 mcp-server/src/index.ts
-n8n-node/WappFlow.node.ts
+n8n-node/LeapCreww.node.ts
 zapier-app/index.js
-make-blueprint/wappflow-blueprint.json
+make-blueprint/leapcreww-blueprint.json
 ```
 
 ### Key modified files

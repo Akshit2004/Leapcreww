@@ -1,4 +1,4 @@
-# WappFlow Engineering Constitution
+# LeapCreww Engineering Constitution
 
 > **STATUS: MANDATORY.** This document governs all development in this repository — human or AI.
 > Every change MUST comply. If a change cannot comply, the constitution must be amended first

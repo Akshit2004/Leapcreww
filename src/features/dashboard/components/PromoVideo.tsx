@@ -75,7 +75,7 @@ export const PromoVideo: React.FC<PromoVideoProps> = ({
               <Play className="w-6 h-6 text-stone-950 fill-stone-950 ml-0.5" />
             </span>
             <span className="text-[11px] font-bold uppercase tracking-wider text-white">
-              Watch how WappFlow works
+              Watch how LeapCreww works
             </span>
           </button>
         )}

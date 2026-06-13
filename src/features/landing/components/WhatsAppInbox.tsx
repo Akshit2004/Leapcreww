@@ -168,7 +168,7 @@ export default function WhatsAppInbox() {
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-1 custom-scrollbar relative" style={{ backgroundImage: "radial-gradient(circle at 20% 20%,rgba(37,211,102,0.04),transparent 50%),radial-gradient(circle at 80% 70%,rgba(208,94,60,0.04),transparent 50%)", backgroundColor: "#0B141A" }}>
         <div className="flex justify-center py-2"><span className="bg-[#1F2C34] text-[#FAF7F2]/60 font-mono text-[9px] px-2 py-0.5 rounded tracking-wider">TODAY</span></div>
-        <div className="flex justify-center pb-2"><span className="bg-[#1F2C34]/80 text-amber-200/70 text-[9px] px-2.5 py-1 rounded max-w-[80%] text-center leading-snug">🔒 Messages and calls are end-to-end encrypted. WappFlow Business verified ✓</span></div>
+        <div className="flex justify-center pb-2"><span className="bg-[#1F2C34]/80 text-amber-200/70 text-[9px] px-2.5 py-1 rounded max-w-[80%] text-center leading-snug">🔒 Messages and calls are end-to-end encrypted. LeapCreww Business verified ✓</span></div>
         <AnimatePresence initial={false}>
           {messages.map((m, idx) => (
             <MessageBubble key={m.id} msg={m} isLastOfGroup={idx === messages.length - 1 || messages[idx + 1]?.dir !== m.dir} />

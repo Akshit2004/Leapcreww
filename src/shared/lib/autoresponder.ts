@@ -114,7 +114,7 @@ async function analyzeConversationAgent(recentMessages: BotMessage[]): Promise<C
     const analysisPrompt = [
       {
         role: "system",
-        content: `You are an expert CRM Data & Escalation Agent for WappFlow.
+        content: `You are an expert CRM Data & Escalation Agent for LeapCreww.
 Analyze the latest customer message and overall chat history. Your task is to determine customer attributes and return a structured analysis.
 
 Specifically:
@@ -573,7 +573,7 @@ async function handleReorderFlow(contact: any, orgId: string, timeStr: string): 
   const newOrderId = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
   try {
-    let paymentShortUrl = `https://wappflow.com/pay/sandbox/${newOrderId}?amount=${total}&phone=${contact.phone}`;
+    let paymentShortUrl = `https://leapcreww.com/pay/sandbox/${newOrderId}?amount=${total}&phone=${contact.phone}`;
     let rzpOrderId = `plink_sim_${Math.random().toString(36).substring(2, 10)}`;
 
     const { getRazorpayInstance, createRazorpayPaymentLink } = await import("@/shared/lib/razorpay");

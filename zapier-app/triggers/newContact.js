@@ -1,6 +1,6 @@
 "use strict";
 
-const BASE_URL = process.env.BASE_URL || "https://app.wappflow.com";
+const BASE_URL = process.env.BASE_URL || "https://app.leapcreww.com";
 
 const perform = async (z, bundle) => {
   const after = bundle.cursor || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -34,7 +34,7 @@ module.exports = {
   display: {
     label: "New Contact",
     description:
-      "Triggers when a new contact is added to your WappFlow CRM — via WhatsApp, Shopify sync, CSV import, or the API.",
+      "Triggers when a new contact is added to your LeapCreww CRM — via WhatsApp, Shopify sync, CSV import, or the API.",
   },
 
   operation: {

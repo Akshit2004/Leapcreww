@@ -1,12 +1,12 @@
 {
-  "name": "n8n-nodes-wappflow",
+  "name": "n8n-nodes-leapcreww",
   "version": "0.1.0",
-  "description": "n8n community node for WappFlow — WhatsApp Marketing & CRM",
+  "description": "n8n community node for LeapCreww — WhatsApp Marketing & CRM",
   "keywords": ["n8n-community-node-package"],
   "license": "MIT",
-  "homepage": "https://wappflow.com",
-  "author": "WappFlow <hello@wappflow.com>",
-  "repository": { "type": "git", "url": "https://github.com/wappflow/wappflow" },
+  "homepage": "https://leapcreww.com",
+  "author": "LeapCreww <hello@leapcreww.com>",
+  "repository": { "type": "git", "url": "https://github.com/leapcreww/leapcreww" },
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc --project tsconfig.json",
@@ -15,8 +15,8 @@
   "files": ["dist"],
   "n8n": {
     "n8nNodesApiVersion": 1,
-    "credentials": ["dist/credentials/WappFlowApi.credentials.js"],
-    "nodes": ["dist/nodes/WappFlow/WappFlow.node.js"]
+    "credentials": ["dist/credentials/LeapCrewwApi.credentials.js"],
+    "nodes": ["dist/nodes/LeapCreww/LeapCreww.node.js"]
   },
   "devDependencies": {
     "n8n-workflow": "^1.0.0",

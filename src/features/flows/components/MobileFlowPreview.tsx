@@ -78,7 +78,7 @@ export const MobileFlowPreview: React.FC<MobileFlowPreviewProps> = ({ screens, a
               <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
                 <span className="text-xs font-bold">WF</span>
               </div>
-              <span className="font-semibold text-sm">WappFlow</span>
+              <span className="font-semibold text-sm">LeapCreww</span>
             </div>
           </div>
           <MoreVertical className="w-5 h-5 opacity-80" />

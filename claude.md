@@ -1,4 +1,4 @@
-# WappFlow (AiSennsy Clone) Project Context
+# LeapCreww (AiSennsy Clone) Project Context
 
 > ⚖️ **MANDATORY:** All development MUST comply with [`CONSTITUTION.md`](CONSTITUTION.md).
 > Read it before writing or changing code. It defines the layering (`api/ services/ repositories/`),
@@ -7,7 +7,7 @@
 > **constitution wins**. Architecture details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Overview
-**WappFlow** is an advanced SaaS application designed as a clone of AiSennsy. It operates as a WhatsApp Marketing, CRM, and Chatbot automation platform. Users can broadcast campaigns, build conversational chatbot flows using a visual node editor, manage CRM contacts, and process Meta-approved templates.
+**LeapCreww** is an advanced SaaS application designed as a clone of AiSennsy. It operates as a WhatsApp Marketing, CRM, and Chatbot automation platform. Users can broadcast campaigns, build conversational chatbot flows using a visual node editor, manage CRM contacts, and process Meta-approved templates.
 
 ## Tech Stack
 - **Framework:** Next.js 16 (App Router)

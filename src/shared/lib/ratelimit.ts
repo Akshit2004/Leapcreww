@@ -60,7 +60,7 @@ function getLimiter(tier: RateLimitTier): Ratelimit | null {
   const limiter = new Ratelimit({
     redis: client,
     limiter: Ratelimit.slidingWindow(tokens, window),
-    prefix: `wappflow:rl:${tier}`,
+    prefix: `leapcreww:rl:${tier}`,
     analytics: false,
   });
   limiters.set(tier, limiter);

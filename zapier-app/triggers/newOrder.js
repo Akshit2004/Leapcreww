@@ -1,6 +1,6 @@
 "use strict";
 
-const BASE_URL = process.env.BASE_URL || "https://app.wappflow.com";
+const BASE_URL = process.env.BASE_URL || "https://app.leapcreww.com";
 
 const perform = async (z, bundle) => {
   const after = bundle.cursor || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -36,7 +36,7 @@ module.exports = {
   display: {
     label: "New Order",
     description:
-      "Triggers when a customer places a new order through your WappFlow WhatsApp store.",
+      "Triggers when a customer places a new order through your LeapCreww WhatsApp store.",
   },
 
   operation: {

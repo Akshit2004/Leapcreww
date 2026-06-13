@@ -3,7 +3,7 @@ import { sendWhatsAppMessage, formatPhoneNumber } from "./whatsapp";
 import { getRazorpayInstance } from "./razorpay";
 import { formatPrice, logBotMessage } from "./botMessaging";
 
-const SHOP_NAME = "WappFlow Store";
+const SHOP_NAME = "LeapCreww Store";
 
 export async function sendMainMenu(phone: string, contactId: string, orgId: string) {
   const text = `🛍️ Welcome to *${SHOP_NAME}*!

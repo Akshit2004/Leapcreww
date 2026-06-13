@@ -3,10 +3,10 @@ import type {
   INodeProperties,
 } from "n8n-workflow";
 
-export class WappFlowApi implements ICredentialType {
+export class LeapCrewwApi implements ICredentialType {
   name = "wappFlowApi";
-  displayName = "WappFlow API";
-  documentationUrl = "https://wappflow.com/docs/api";
+  displayName = "LeapCreww API";
+  documentationUrl = "https://leapcreww.com/docs/api";
 
   properties: INodeProperties[] = [
     {
@@ -17,15 +17,15 @@ export class WappFlowApi implements ICredentialType {
       default: "",
       required: true,
       placeholder: "wf_live_...",
-      description: "API key from WappFlow Settings → Developer → API Keys",
+      description: "API key from LeapCreww Settings → Developer → API Keys",
     },
     {
       displayName: "Base URL",
       name: "baseUrl",
       type: "string",
-      default: "https://app.wappflow.com",
+      default: "https://app.leapcreww.com",
       required: true,
-      description: "WappFlow instance URL. Change only for self-hosted installations.",
+      description: "LeapCreww instance URL. Change only for self-hosted installations.",
     },
   ];
 

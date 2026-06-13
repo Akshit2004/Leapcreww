@@ -1,8 +1,8 @@
 /**
- * WappFlow embeddable WhatsApp chat button.
+ * LeapCreww embeddable WhatsApp chat button.
  *
  * Usage (one line, anywhere in the page):
- *   <script src="https://<your-wappflow-host>/widget.js" data-wf="wfw_..." async></script>
+ *   <script src="https://<your-leapcreww-host>/widget.js" data-wf="wfw_..." async></script>
  *
  * The script derives the API base from its own src, fetches the org's public
  * widget config, renders a floating button (+ optional greeting bubble), and
@@ -19,7 +19,7 @@
   var base = new URL(script.src).origin;
 
   // Re-running (e.g. SPA re-injection) must not duplicate the button.
-  if (document.getElementById("wappflow-widget")) return;
+  if (document.getElementById("leapcreww-widget")) return;
 
   var WA_ICON =
     '<svg viewBox="0 0 24 24" width="28" height="28" fill="#fff" aria-hidden="true">' +
@@ -37,7 +37,7 @@
     if (!cfg || !cfg.enabled || !cfg.phoneNumber) return;
 
     var right = cfg.position !== "bottom-left";
-    var dismissKey = "wappflow-greeting-dismissed-" + key;
+    var dismissKey = "leapcreww-greeting-dismissed-" + key;
 
     var root = el("div", {
       position: "fixed",
@@ -50,7 +50,7 @@
       fontFamily:
         "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     });
-    root.id = "wappflow-widget";
+    root.id = "leapcreww-widget";
     root.style[right ? "right" : "left"] = "20px";
 
     function openChat() {

@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing conversational prompt" }, { status: 400 });
     }
 
-    const systemInstruction = `You are a visual AI Form Builder Architect for WappFlow, generating WhatsApp Flow JSON for Meta's API.
-Your task is to analyze the user's conversational description of a form or data collection flow and compile it into a valid JSON array of WappFlow Form Screens.
+    const systemInstruction = `You are a visual AI Form Builder Architect for LeapCreww, generating WhatsApp Flow JSON for Meta's API.
+Your task is to analyze the user's conversational description of a form or data collection flow and compile it into a valid JSON array of LeapCreww Form Screens.
 
 CRITICAL ID RULES (Meta will reject the flow if violated):
 - ALL 'id' and 'name' fields MUST ONLY contain lowercase letters and underscores. NO numbers, NO hyphens, NO spaces, NO special characters.

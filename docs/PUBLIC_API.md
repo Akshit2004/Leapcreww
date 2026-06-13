@@ -1,6 +1,6 @@
-# WappFlow Public API & Webhooks
+# LeapCreww Public API & Webhooks
 
-> Base URL: `https://<your-wappflow-host>/api`
+> Base URL: `https://<your-leapcreww-host>/api`
 > Authentication: `Authorization: Bearer wf_live_...` (create keys in Settings → Developer Quickstart)
 
 ## Authentication & conventions
@@ -88,8 +88,8 @@ Subscribe endpoints in **Settings → Outbound Webhooks**. Events:
 **Verify the signature.** Every delivery is signed with your subscription's `whsec_...` secret:
 
 ```
-x-wappflow-event: message.received
-x-wappflow-signature: sha256=<HMAC-SHA256(secret, raw request body)>
+x-leapcreww-event: message.received
+x-leapcreww-signature: sha256=<HMAC-SHA256(secret, raw request body)>
 ```
 
 ```js
