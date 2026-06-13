@@ -12,7 +12,6 @@ import * as crypto from "crypto";
 import type { Prisma } from "@prisma/client";
 import { ApiError } from "@/shared/lib/api";
 import { sign } from "../lib/signing";
-import { prisma } from "@/shared/lib/prisma";
 import * as repo from "../repositories/webhookSubscriptionRepo";
 import {
   isWebhookEvent,
@@ -104,7 +103,7 @@ export async function emitEvent(
 ): Promise<void> {
   try {
     // Write to append-only Event table first (source of truth for polling API)
-    await prisma.event.create({ data: { type: event, payload: data, organizationId } });
+    await repo.createEvent({ type: event, payload: data, organizationId });
 
     const subscriptions = await repo.findEnabledByEvent(organizationId, event);
     for (const sub of subscriptions) {

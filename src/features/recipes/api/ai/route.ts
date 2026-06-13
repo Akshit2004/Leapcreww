@@ -1,10 +1,10 @@
-import { requireOrg, ok, route, ApiError } from "@/shared/lib/api";
+import { requireOrg, ok, route, ApiError, body } from "@/shared/lib/api";
 import { generateAiRecipe } from "../../services/recipeService";
 
 export const POST = route(async (req, ctx) => {
   const orgId = ctx.params!.orgId;
   await requireOrg(orgId, "AGENT");
-  const { prompt } = await req.json() as { prompt?: string };
+  const { prompt } = await body<{ prompt?: string }>(req);
   if (!prompt?.trim()) throw new ApiError("prompt is required", 400);
 
   const result = await generateAiRecipe(orgId, prompt);

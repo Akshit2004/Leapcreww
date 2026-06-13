@@ -44,6 +44,34 @@ export function listContacts(
   });
 }
 
+// ─── Organizations ───────────────────────────────────────────────────────────
+
+export function findOrgName(organizationId: string) {
+  return prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, name: true },
+  });
+}
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+
+export function listEvents(
+  organizationId: string,
+  filters: { type?: string },
+  after: Date,
+  limit: number
+) {
+  return prisma.event.findMany({
+    where: {
+      organizationId,
+      createdAt: { gt: after },
+      ...(filters.type ? { type: filters.type } : {}),
+    },
+    orderBy: { createdAt: "asc" },
+    take: limit,
+  });
+}
+
 // ─── Templates ───────────────────────────────────────────────────────────────
 
 export function listTemplates(organizationId: string) {

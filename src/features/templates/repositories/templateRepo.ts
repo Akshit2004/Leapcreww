@@ -9,6 +9,28 @@ export function findOrgWaba(organizationId: string) {
   });
 }
 
+export function findWabaIdForOrg(organizationId: string) {
+  return prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { whatsappBusinessAccountId: true },
+  });
+}
+
+export function findTemplateById(id: string) {
+  return prisma.template.findUnique({ where: { id } });
+}
+
+export function findTemplateForShare(id: string) {
+  return prisma.template.findUnique({
+    where: { id },
+    select: { id: true, name: true, organizationId: true },
+  });
+}
+
+export function deleteTemplateById(id: string) {
+  return prisma.template.delete({ where: { id } });
+}
+
 export function createTemplate(data: Prisma.TemplateUncheckedCreateInput) {
   return prisma.template.create({ data });
 }

@@ -210,3 +210,43 @@ export function listV1Contacts(
 export function listV1Templates(organizationId: string) {
   return repo.listTemplates(organizationId);
 }
+
+// ─── Organizations ───────────────────────────────────────────────────────────
+
+/** Identity info for the /v1/me auth-test endpoint. */
+export async function getV1OrgInfo(organizationId: string) {
+  const org = await repo.findOrgName(organizationId);
+  return { organizationId, name: org?.name ?? "LeapCreww Workspace" };
+}
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+
+export const EVENT_TYPES = ["message.received", "message.status", "order.placed", "contact.created"] as const;
+export type EventType = (typeof EVENT_TYPES)[number];
+
+export interface ListEventsInput {
+  type?: EventType | null;
+  limit: number;
+  after: Date;
+}
+
+/** Returns events plus a cursor (`nextAfter`) for the next poll, or null if no events. */
+export async function listV1Events(organizationId: string, input: ListEventsInput) {
+  const rows = await repo.listEvents(
+    organizationId,
+    { type: input.type ?? undefined },
+    input.after,
+    Math.min(input.limit, 100)
+  );
+
+  const events = rows.map((r) => ({
+    id: r.id,
+    type: r.type as EventType,
+    data: r.payload,
+    createdAt: r.createdAt,
+  }));
+
+  const nextAfter = events.length > 0 ? events[events.length - 1].createdAt.toISOString() : null;
+
+  return { events, nextAfter };
+}

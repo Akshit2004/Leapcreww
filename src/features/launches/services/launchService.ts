@@ -10,7 +10,7 @@
  */
 import { ApiError } from "@/shared/lib/api";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
-import { prisma } from "@/shared/lib/prisma";
+import * as contactRepo from "@/features/contacts/repositories/contactRepo";
 import * as repo from "../repositories/launchRepo";
 import type { LaunchInput, LaunchUpdateInput } from "../types";
 
@@ -231,13 +231,7 @@ export async function processDueLaunchSteps(): Promise<{ processed: number }> {
     }
 
     // Resolve the contact list, optionally filtered by tag.
-    const contacts = await prisma.contact.findMany({
-      where: {
-        organizationId: orgId,
-        ...(launch.targetTag ? { tags: { has: launch.targetTag } } : {}),
-      },
-      select: { id: true, phone: true },
-    });
+    const contacts = await contactRepo.findByOrgAndTag(orgId, launch.targetTag);
 
     let sent = 0;
     for (const contact of contacts) {
@@ -266,10 +260,7 @@ export async function processDueLaunchSteps(): Promise<{ processed: number }> {
     const finished = await repo.allStepsFinished(launchId);
     if (finished) {
       // Retrieve organizationId without reloading the full steps list.
-      const launch = await prisma.launch.findUnique({
-        where: { id: launchId },
-        select: { id: true, organizationId: true, status: true },
-      });
+      const launch = await repo.findLaunchById(launchId);
       if (launch && launch.status !== "ended") {
         await repo.updateLaunch(launchId, launch.organizationId, {
           status: "ended",

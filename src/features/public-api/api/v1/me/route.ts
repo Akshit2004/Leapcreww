@@ -7,17 +7,10 @@
  */
 import { route, ok } from "@/shared/lib/api";
 import { authenticateApiKey } from "../../../services/apiKeyService";
-import { prisma } from "@/shared/lib/prisma";
+import { getV1OrgInfo } from "../../../services/v1Service";
 
 export const GET = route(async (req) => {
   const ctx = await authenticateApiKey(req);
-  const org = await prisma.organization.findUnique({
-    where: { id: ctx.organizationId },
-    select: { id: true, name: true },
-  });
-  return ok({
-    organizationId: ctx.organizationId,
-    name: org?.name ?? "LeapCreww Workspace",
-    scopes: ctx.scopes,
-  });
+  const info = await getV1OrgInfo(ctx.organizationId);
+  return ok({ ...info, scopes: ctx.scopes });
 });

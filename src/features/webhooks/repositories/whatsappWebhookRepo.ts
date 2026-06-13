@@ -149,3 +149,36 @@ export function updateLoginAttempt(id: string, data: Prisma.WhatsAppLoginAttempt
 export function findUserByPhone(phone: string) {
   return prisma.user.findUnique({ where: { phone } });
 }
+
+// ─── Native Flow replies (nfm_reply) ───────────────────────────────────────
+
+export function findFlowById(flowId: string, organizationId: string) {
+  return prisma.flow.findFirst({
+    where: { id: flowId, organizationId },
+  });
+}
+
+export function createFlowResponse(data: Prisma.FlowResponseUncheckedCreateInput) {
+  return prisma.flowResponse.create({ data });
+}
+
+// ─── Sandbox simulation (dev-only inbound message endpoint) ───────────────
+
+/** Dev sandbox: any org will do — there's only ever one in a local/dev DB. */
+export function findFirstOrg() {
+  return prisma.organization.findFirst();
+}
+
+/** Suffix match fallback for the sandbox simulator's loosely-formatted phone numbers. */
+export function findContactByPhoneSuffix(suffix: string, organizationId: string) {
+  return prisma.contact.findFirst({
+    where: { organizationId, phone: { contains: suffix } },
+  });
+}
+
+export function findOrgWorkingHours(organizationId: string) {
+  return prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { workingHours: true, whatsappPhoneNumberId: true, whatsappConnected: true },
+  });
+}

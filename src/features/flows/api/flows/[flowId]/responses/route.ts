@@ -1,33 +1,12 @@
-import { route, requireOrg, ok, ApiError } from "@/shared/lib/api";
-import { prisma } from "@/shared/lib/prisma";
+import { route, requireOrg, ok } from "@/shared/lib/api";
+import { getFlowResponses } from "@/features/flows/services/flowService";
 
-export const GET = route(async (req, { params }) => {
+export const GET = route(async (_req, { params }) => {
   const orgId = params!.orgId;
   await requireOrg(orgId, "AGENT");
   const flowId = params!.flowId;
 
-  // Verify that the flow exists and belongs to the org
-  const flow = await prisma.flow.findFirst({
-    where: { id: flowId, organizationId: orgId }
-  });
-  if (!flow) {
-    throw new ApiError("Flow not found", 404);
-  }
+  const result = await getFlowResponses(flowId, orgId);
 
-  // Fetch responses with contact details
-  const responses = await prisma.flowResponse.findMany({
-    where: { flowId, organizationId: orgId },
-    include: {
-      contact: {
-        select: {
-          name: true,
-          phone: true,
-          email: true,
-        }
-      }
-    },
-    orderBy: { createdAt: "desc" }
-  });
-
-  return ok({ responses });
+  return ok(result);
 });

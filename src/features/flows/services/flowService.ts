@@ -8,6 +8,29 @@ export function listFlows(organizationId: string) {
   return repo.listFlows(organizationId);
 }
 
+/** Fetch a flow's submitted responses, scoped to the org. */
+export async function getFlowResponses(flowId: string, organizationId: string) {
+  const flow = await repo.getFlowById(flowId, organizationId);
+  if (!flow) {
+    throw new ApiError("Flow not found", 404);
+  }
+
+  const responses = await repo.findFlowResponses(flowId, organizationId);
+  return { responses };
+}
+
+/** Assert a flow exists, belongs to the org, and is published before broadcasting against it. */
+export async function assertFlowPublished(flowId: string, organizationId: string) {
+  const flow = await repo.getFlowById(flowId, organizationId);
+  if (!flow) {
+    throw new ApiError("Flow not found", 404);
+  }
+  if (flow.status !== "published") {
+    throw new ApiError("Flow has unpublished changes. Publish it to Meta before broadcasting.", 400);
+  }
+  return flow;
+}
+
 /** List flows alongside whether Meta Flows encryption has been set up for this org. */
 export async function listFlowsWithEncryptionStatus(organizationId: string) {
   const [flows, org] = await Promise.all([

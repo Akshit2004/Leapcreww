@@ -1,5 +1,5 @@
 import * as contactRepo from "../../contacts/repositories/contactRepo";
-import { prisma } from "@/shared/lib/prisma";
+import * as repo from "../repositories/whatsappWebhookRepo";
 
 export async function handleNfmReply(
   contactId: string,
@@ -33,31 +33,25 @@ export async function handleNfmReply(
 
     let flowMatched = false;
     if (flowIdMatch) {
-      const flow = await prisma.flow.findFirst({
-        where: { id: flowIdMatch[1], organizationId: orgId },
-      });
+      const flow = await repo.findFlowById(flowIdMatch[1], orgId);
 
       if (flow) {
         flowMatched = true;
-        await prisma.flowResponse.create({
-          data: {
-            flowId: flow.id,
-            contactId,
-            submittedData: finalData,
-            organizationId: orgId,
-          },
+        await repo.createFlowResponse({
+          flowId: flow.id,
+          contactId,
+          submittedData: finalData,
+          organizationId: orgId,
         });
       }
     }
 
-    await prisma.systemLog.create({
-      data: {
-        type: "crm",
-        message: flowMatched
-          ? `📋 Form Submitted: Flow response recorded for contact.`
-          : `⚠️ Flow response received but could not be matched to a Flow (no flow_token in payload).`,
-        organizationId: orgId,
-      },
+    await repo.createSystemLog({
+      type: "crm",
+      message: flowMatched
+        ? `📋 Form Submitted: Flow response recorded for contact.`
+        : `⚠️ Flow response received but could not be matched to a Flow (no flow_token in payload).`,
+      organizationId: orgId,
     });
 
     return true;

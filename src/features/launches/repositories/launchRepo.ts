@@ -32,6 +32,18 @@ export function findDueLaunchSteps(now: Date) {
   });
 }
 
+/**
+ * Look up a launch by id without an organizationId filter. Used by the cron
+ * worker to resolve which org a finished launch belongs to before flipping
+ * its status — the id itself comes from a previously org-scoped query.
+ */
+export function findLaunchById(id: string) {
+  return prisma.launch.findUnique({
+    where: { id },
+    select: { id: true, organizationId: true, status: true },
+  });
+}
+
 // ─── Writes ──────────────────────────────────────────────────────────────────
 
 export function createLaunch(data: Prisma.LaunchUncheckedCreateInput) {

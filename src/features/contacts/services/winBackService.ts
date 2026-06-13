@@ -1,5 +1,5 @@
-import { prisma } from "@/shared/lib/prisma";
 import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
+import * as contactRepo from "../repositories/contactRepo";
 
 export async function bulkTagContacts(
   orgId: string,
@@ -14,20 +14,10 @@ export async function bulkTagContacts(
   let contacts: { id: string; tags: string[]; name: string }[];
 
   if (contactIds && contactIds.length > 0) {
-    contacts = await prisma.contact.findMany({
-      where: { id: { in: contactIds }, organizationId: orgId },
-      select: { id: true, tags: true, name: true },
-    });
+    contacts = await contactRepo.findByIds(orgId, contactIds);
   } else if (dormantDays !== undefined && dormantDays > 0) {
     const cutoff = new Date(Date.now() - dormantDays * 24 * 60 * 60 * 1000);
-    contacts = await prisma.contact.findMany({
-      where: {
-        organizationId: orgId,
-        NOT: { tags: { has: tag } },
-        OR: [{ lastActiveAt: { lt: cutoff } }, { lastActiveAt: null }],
-      },
-      select: { id: true, tags: true, name: true },
-    });
+    contacts = await contactRepo.findDormant(orgId, tag, cutoff);
   } else {
     return { tagged: 0, enrolled: 0 };
   }
@@ -38,10 +28,7 @@ export async function bulkTagContacts(
   for (const contact of contacts) {
     if (contact.tags.includes(tag)) continue;
 
-    await prisma.contact.update({
-      where: { id: contact.id },
-      data: { tags: { set: [...contact.tags, tag] } },
-    });
+    await contactRepo.setTags(contact.id, [...contact.tags, tag]);
     tagged++;
 
     try {
@@ -53,13 +40,10 @@ export async function bulkTagContacts(
   }
 
   if (tagged > 0) {
-    await prisma.systemLog.create({
-      data: {
-        type: "crm",
-        message: `Win-Back: tagged ${tagged} contact${tagged === 1 ? "" : "s"} as "${tag}"${dormantDays ? ` (inactive ${dormantDays}+ days)` : ""}. ${enrolled} enrolled in sequence.`,
-        organizationId: orgId,
-      },
-    });
+    await contactRepo.writeLog(
+      orgId,
+      `Win-Back: tagged ${tagged} contact${tagged === 1 ? "" : "s"} as "${tag}"${dormantDays ? ` (inactive ${dormantDays}+ days)` : ""}. ${enrolled} enrolled in sequence.`
+    );
   }
 
   return { tagged, enrolled };

@@ -9,7 +9,7 @@
  * Both helpers are best-effort: a failure here must never break a send or an
  * order, so callers can ignore rejections.
  */
-import { prisma } from "@/shared/lib/prisma";
+import * as attributionRepo from "../repositories/attributionRepo";
 
 export interface TouchInput {
   organizationId: string;
@@ -22,14 +22,12 @@ export interface TouchInput {
 /** Record a single marketing touch. Swallows errors (attribution is non-critical). */
 export async function recordTouch(input: TouchInput): Promise<void> {
   try {
-    await prisma.attributionTouch.create({
-      data: {
-        organizationId: input.organizationId,
-        contactId: input.contactId,
-        channel: input.channel,
-        campaignId: input.campaignId ?? null,
-        sequenceId: input.sequenceId ?? null,
-      },
+    await attributionRepo.createAttributionTouch({
+      organizationId: input.organizationId,
+      contactId: input.contactId,
+      channel: input.channel,
+      campaignId: input.campaignId ?? null,
+      sequenceId: input.sequenceId ?? null,
     });
   } catch (err) {
     console.error("[attribution] recordTouch failed:", err);
@@ -60,14 +58,7 @@ export async function resolveAttribution(
 
   try {
     const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000);
-    const latestTouch = await prisma.attributionTouch.findFirst({
-      where: {
-        organizationId,
-        contactId: contact.id,
-        createdAt: { gte: cutoff },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const latestTouch = await attributionRepo.findLatestTouch(organizationId, contact.id, cutoff);
 
     if (latestTouch) {
       if (latestTouch.channel === "campaign") {

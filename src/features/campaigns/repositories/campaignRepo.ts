@@ -155,6 +155,23 @@ export function recordOutboundMessage(params: {
   });
 }
 
+/** Latest "tag_added" sequence for a segment, used to resolve the follow-up drip's trigger tag. */
+export function findLatestTagAddedSequence(organizationId: string, segmentId: string) {
+  return prisma.sequence.findFirst({
+    where: { organizationId, segmentId, trigger: "tag_added" },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+/** Campaigns parked on a template verdict (resume/fail paths of the strategist activation flow). */
+export function findCampaignsAwaitingTemplate(
+  organizationId: string,
+  templateName: string,
+  status: string
+) {
+  return prisma.campaign.findMany({ where: { organizationId, templateName, status } });
+}
+
 /** Confirm the user (by email) is a member of the campaign's org. */
 export function userIsOrgMember(email: string, organizationId: string) {
   return prisma.membership

@@ -6,8 +6,9 @@
  * org-scoped, ADMIN-guarded route) supplies a verified `orgId`. Throws
  * ApiError so the route can translate failures into clean HTTP responses.
  */
-import { prisma } from "@/shared/lib/prisma";
 import { ApiError } from "@/shared/lib/api";
+import * as integrationsRepo from "../repositories/integrationsRepo";
+import * as shopifyProductRepo from "../repositories/shopifyProductRepo";
 
 // Minimal shape of the Shopify Admin API product payload we consume.
 interface ShopifyVariant {
@@ -32,9 +33,7 @@ const FALLBACK_IMAGE =
  */
 export async function syncShopifyCatalog(orgId: string): Promise<{ synced: number }> {
   // A. Fetch Shopify credentials for this org.
-  const integration = await prisma.integration.findUnique({
-    where: { id_organizationId: { id: "shopify", organizationId: orgId } },
-  });
+  const integration = await integrationsRepo.findById("shopify", orgId);
 
   if (!integration || !integration.apiKey || integration.status !== "connected") {
     throw new ApiError("Shopify is not connected for this organization. Please connect it first.", 400);
@@ -98,27 +97,22 @@ export async function syncShopifyCatalog(orgId: string): Promise<{ synced: numbe
       isActive: true,
     };
 
-    const existingProduct = await prisma.product.findFirst({
-      where: { name: sp.title, organizationId: orgId },
-    });
+    const existingProduct = await shopifyProductRepo.findByName(sp.title, orgId);
 
     if (existingProduct) {
-      await prisma.product.update({ where: { id: existingProduct.id }, data: productPayload });
+      await shopifyProductRepo.update(existingProduct.id, productPayload);
     } else {
-      await prisma.product.create({ data: { ...productPayload, organizationId: orgId } });
+      await shopifyProductRepo.create(orgId, productPayload);
     }
 
     syncedCount++;
   }
 
   // D. Record the sync in the activity stream.
-  await prisma.systemLog.create({
-    data: {
-      type: "integration",
-      message: `Catalog Sync Success: Imported and updated ${syncedCount} products from Shopify.`,
-      organizationId: orgId,
-    },
-  });
+  await integrationsRepo.writeLog(
+    orgId,
+    `Catalog Sync Success: Imported and updated ${syncedCount} products from Shopify.`
+  );
 
   return { synced: syncedCount };
 }

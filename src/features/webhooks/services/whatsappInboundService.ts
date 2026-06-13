@@ -425,6 +425,113 @@ export async function processInboundMessage(
   }
 }
 
+// ─── Sandbox simulation (dev-only inbound message endpoint) ────────────────
+
+/** Checks whether `now` falls within the org's configured working-hours schedule. */
+function isWithinWorkingHours(wh: import("@/features/inbox/types").WorkingHoursConfig): boolean {
+  const now = new Date();
+  // Use Intl to get hours/minutes in the configured timezone
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: wh.timezone,
+    weekday: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const dayName = parts.find((p) => p.type === "weekday")?.value?.toLowerCase() as keyof typeof wh.schedule;
+  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  const minute = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  const daySchedule = wh.schedule[dayName];
+  if (!daySchedule?.open) return false;
+  const [fromH, fromM] = daySchedule.from.split(":").map(Number);
+  const [toH, toM] = daySchedule.to.split(":").map(Number);
+  const currentMins = hour * 60 + minute;
+  return currentMins >= fromH * 60 + fromM && currentMins < toH * 60 + toM;
+}
+
+/**
+ * Dev-only sandbox simulator: pretends an inbound WhatsApp message arrived
+ * from `from` with body `text`, without going through Meta. Mirrors the
+ * contact-upsert / message-log / working-hours / autoresponder behavior of
+ * the real webhook for local testing.
+ */
+export async function simulateInboundMessage(from: string, text: string) {
+  const org = await repo.findFirstOrg();
+  if (!org) {
+    throw new Error("No organization found");
+  }
+
+  const normalizedPhone = `+${from.replace(/[^0-9]/g, "")}`;
+
+  let contact = await repo.findContactByPhone(normalizedPhone, org.id);
+
+  // Backward compatibility: try suffix match
+  if (!contact) {
+    contact = await repo.findContactByPhoneSuffix(from.slice(-10), org.id);
+  }
+
+  const activeOrgId = contact ? contact.organizationId : org.id;
+
+  const d = new Date();
+  const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+  if (!contact) {
+    const profileName = `Customer ${from.slice(-4)}`;
+    contact = await repo.createContact({
+      name: profileName,
+      phone: normalizedPhone,
+      source: "WhatsApp Inbound",
+      tags: ["WhatsApp", "Inbound"],
+      status: "Active",
+      lastMessage: text,
+      lastMessageTime: timeStr,
+      unreadCount: 1,
+      assignedAgent: "Bot",
+      organizationId: activeOrgId,
+    });
+  } else {
+    contact = await repo.updateContact(contact.id, {
+      lastMessage: text,
+      lastMessageTime: timeStr,
+      unreadCount: { increment: 1 },
+    });
+  }
+
+  await repo.createMessage({
+    sender: "user",
+    text,
+    contactId: contact.id,
+    organizationId: activeOrgId,
+  });
+
+  await repo.createSystemLog({
+    type: "chat",
+    message: `Received WhatsApp message from ${contact.name}: "${text.slice(0, 60)}"`,
+    organizationId: activeOrgId,
+  });
+
+  // Working hours auto-away
+  const orgWithHours = await repo.findOrgWorkingHours(activeOrgId);
+  if (orgWithHours?.workingHours) {
+    const wh = orgWithHours.workingHours as unknown as import("@/features/inbox/types").WorkingHoursConfig;
+    if (wh.enabled && !isWithinWorkingHours(wh)) {
+      // Send away message via WhatsApp API if connected
+      if (orgWithHours.whatsappConnected && orgWithHours.whatsappPhoneNumberId) {
+        await sendWhatsAppMessage({ to: normalizedPhone, text: wh.awayMessage }, activeOrgId).catch(() => {});
+      }
+      // Log it and skip autoresponder
+      return { contactId: contact.id, outsideHours: true };
+    }
+  }
+
+  if (contact.assignedAgent === "Bot") {
+    await handleAutoResponder(contact.id, activeOrgId);
+  }
+
+  return { contactId: contact.id, outsideHours: false };
+}
+
 // ─── System-level WhatsApp auth (login-code verification) ──────────────────
 
 /**

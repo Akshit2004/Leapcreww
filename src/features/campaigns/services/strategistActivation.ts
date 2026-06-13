@@ -11,9 +11,9 @@
  * Sits above broadcastService + sequenceService + segmentService; imported by the
  * strategist route, the WhatsApp webhook, and the template-status poll route.
  */
-import { prisma } from "@/shared/lib/prisma";
 import { processCampaignChunk } from "./broadcastService";
 import * as campaignRepo from "../repositories/campaignRepo";
+import * as contactRepo from "@/features/contacts/repositories/contactRepo";
 import { resolveSegmentContacts } from "@/features/segments/services/segmentService";
 import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
 
@@ -33,10 +33,7 @@ export async function enrollSegmentContacts(
   const matchedContacts = await resolveSegmentContacts(segmentId);
   for (const contact of matchedContacts) {
     if (!contact.tags.includes(triggerTag)) {
-      await prisma.contact.update({
-        where: { id: contact.id },
-        data: { tags: [...contact.tags, triggerTag] },
-      });
+      await contactRepo.setTags(contact.id, [...contact.tags, triggerTag]);
     }
     await enrollOnTrigger(organizationId, "tag_added", contact.id);
   }
@@ -50,10 +47,7 @@ async function resolveTriggerTagForSegment(
   fallback: string
 ): Promise<string> {
   if (!segmentId) return fallback;
-  const sequence = await prisma.sequence.findFirst({
-    where: { organizationId, segmentId, trigger: "tag_added" },
-    orderBy: { createdAt: "desc" },
-  });
+  const sequence = await campaignRepo.findLatestTagAddedSequence(organizationId, segmentId);
   const tag = (sequence?.triggerConfig as { tag?: string } | null)?.tag;
   return tag || fallback;
 }
@@ -66,9 +60,11 @@ export async function resumeCampaignsAwaitingTemplate(
   organizationId: string,
   templateName: string
 ): Promise<number> {
-  const parked = await prisma.campaign.findMany({
-    where: { organizationId, templateName, status: PENDING_TEMPLATE_STATUS },
-  });
+  const parked = await campaignRepo.findCampaignsAwaitingTemplate(
+    organizationId,
+    templateName,
+    PENDING_TEMPLATE_STATUS
+  );
 
   const now = new Date();
   for (const campaign of parked) {
@@ -117,10 +113,11 @@ export async function failCampaignsAwaitingTemplate(
   templateName: string,
   reason?: string | null
 ): Promise<number> {
-  const parked = await prisma.campaign.findMany({
-    where: { organizationId, templateName, status: PENDING_TEMPLATE_STATUS },
-    select: { id: true },
-  });
+  const parked = await campaignRepo.findCampaignsAwaitingTemplate(
+    organizationId,
+    templateName,
+    PENDING_TEMPLATE_STATUS
+  );
 
   for (const campaign of parked) {
     await campaignRepo.updateCampaign(campaign.id, { status: "Failed" });

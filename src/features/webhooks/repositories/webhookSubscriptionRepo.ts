@@ -52,3 +52,8 @@ export function recentDeliveryStats(organizationId: string) {
     _count: { _all: true },
   });
 }
+
+/** Append-only Event log entry — source of truth for the polling API (T-08). */
+export function createEvent(data: Prisma.EventUncheckedCreateInput) {
+  return prisma.event.create({ data });
+}

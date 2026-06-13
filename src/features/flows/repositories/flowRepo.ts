@@ -43,3 +43,20 @@ export function setFlowsEncryptionUploaded(organizationId: string, privateKey: s
     data: { flowsPrivateKey: privateKey, flowsPublicKeyUploaded: true },
   });
 }
+
+/** Find a flow's responses with the submitting contact's basic details. */
+export function findFlowResponses(flowId: string, organizationId: string) {
+  return prisma.flowResponse.findMany({
+    where: { flowId, organizationId },
+    include: {
+      contact: {
+        select: {
+          name: true,
+          phone: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
