@@ -2,9 +2,9 @@
 import { motion } from "framer-motion";
 
 const logos = [
-  "OAKLINE / Hospitality", "STRATA / SaaS", "BLOOM CO / Retail",
-  "AETHER LABS / Health", "NORTH+SOUTH / Logistics", "POLYHEDRON / Fintech",
-  "TANGRAM / Education", "FOLKE & CO / D2C",
+  "SHOPIFY / Storefront", "RAZORPAY / Payments", "SHIPROCKET / Logistics",
+  "META CLOUD API / Messaging", "WOOCOMMERCE / Storefront", "GOOGLE SHEETS / Data",
+  "GROQ AI / Intelligence", "REST API + MCP / Developers",
 ];
 
 function LogoRail({ items, reverse = false, duration = 38 }: { items: string[]; reverse?: boolean; duration?: number }) {
@@ -33,9 +33,9 @@ export default function TrustedBy() {
         transition={{ duration: 0.7 }}
         className="text-center mb-12 space-y-2 px-6"
       >
-        <span className="font-mono text-[10px] tracking-widest text-[#D05E3C] uppercase font-bold">Trusted by operators</span>
+        <span className="font-mono text-[10px] tracking-widest text-[#D05E3C] uppercase font-bold">Native Integrations</span>
         <h3 className="font-serif text-2xl md:text-3xl font-light tracking-tight text-[#1D211F]">
-          Powering conversational systems for teams in 28 countries.
+          Plugs into the stack you already run.
         </h3>
       </motion.div>
 

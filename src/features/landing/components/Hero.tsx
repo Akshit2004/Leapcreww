@@ -77,16 +77,19 @@ export default function Hero() {
           </h1>
 
           <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.6 }} className="text-[#1D211F]/70 text-sm sm:text-base leading-relaxed max-w-xl font-medium">
-            LeapCrew turns WhatsApp into your highest-converting channel — cart recovery, COD confirmation, and NDR rescue that cuts RTO losses. Every order is attributed to the rupee, to the exact campaign that sourced it. Competitors show you delivery rates; we show you revenue.
+            The complete WhatsApp stack — broadcasts, AI chatbots, shared team inbox, CRM, and one-click automations — with a revenue layer no one else has: rupee-level attribution, COD confirmation, and NDR rescue. Competitors show you delivery rates; we show you revenue.
           </motion.p>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.75 }} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4">
-            <Link href="/signup" className="group bg-[#1D211F] hover:bg-[#2E4A3F] text-[#FAF7F2] font-bold text-xs tracking-wider uppercase px-6 py-4 rounded-md shadow-sm transition-colors flex items-center justify-center gap-2">
-              <span>Register Workspace</span><ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <Link href="/login" className="bg-[#FAF7F2] border border-[#1D211F]/20 hover:border-[#1D211F]/60 text-[#1D211F] font-bold text-xs tracking-wider uppercase px-6 py-4 rounded-md transition-colors flex items-center justify-center gap-2">
-              <span>Access Dashboard</span><ExternalLink className="w-4 h-4 text-[#1D211F]/50" />
-            </Link>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 1.75 }} className="space-y-3 pt-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <Link href="/signup" className="group bg-[#1D211F] hover:bg-[#2E4A3F] text-[#FAF7F2] font-bold text-xs tracking-wider uppercase px-6 py-4 rounded-md shadow-sm transition-colors flex items-center justify-center gap-2">
+                <span>Start Free Trial</span><ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              <Link href="/login" className="bg-[#FAF7F2] border border-[#1D211F]/20 hover:border-[#1D211F]/60 text-[#1D211F] font-bold text-xs tracking-wider uppercase px-6 py-4 rounded-md transition-colors flex items-center justify-center gap-2">
+                <span>Access Dashboard</span><ExternalLink className="w-4 h-4 text-[#1D211F]/50" />
+              </Link>
+            </div>
+            <p className="font-mono text-[9px] tracking-widest text-[#1D211F]/45 uppercase">14-day free trial · No credit card · INR pricing</p>
           </motion.div>
 
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 2 }} className="pt-6 border-t border-[#1D211F]/8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[9px] tracking-widest text-[#1D211F]/40 uppercase">

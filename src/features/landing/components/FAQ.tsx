@@ -5,10 +5,10 @@ import { Plus } from "lucide-react";
 
 const faqs = [
   { q: "Do I need my own WhatsApp Business API approval first?", a: "No. LeapCrew AI connects via Meta's Embedded Signup flow, which provisions a WhatsApp Business Account, phone number, and template surface from inside your workspace. If you already have a WABA, you can authorize it in the same wizard." },
-  { q: "Which database powers the broadcast engine?", a: "Every tenant runs on isolated PostgreSQL schemas with row-level multi-tenancy. Outbound sends, attribution touches, and usage events are all auditable from your own admin console — no shared opaque storage." },
+  { q: "What happens after the 14-day free trial?", a: "You pick a plan (from ₹1,499/month) or your workspace pauses — no auto-charge, because we never took a card. Everything you built during the trial (flows, templates, contacts, automations) is kept and reactivates the moment you subscribe." },
   { q: "How does the chatbot builder handle dynamic intent?", a: "You can wire deterministic node flows (trigger → filter → action) or flip on Pure AI Mode, which routes every inbound message to an LLM with your brand profile, fallback rules, and per-org safety configuration." },
-  { q: "What integrations ship out of the box?", a: "Shopify, WooCommerce, Google Sheets, Razorpay, and a generic webhook connector are available immediately. The connector registry is open — any vendor that publishes a webhook can be normalized into the inbound lead pipeline." },
-  { q: "How is messaging cost calculated?", a: "Each outbound send is metered against Meta's per-country, per-category pricing table and logged as a UsageEvent. Partners can apply a markup multiplier, and the canAfford() guard prevents overdraft sends." },
+  { q: "What integrations ship out of the box?", a: "Shopify, WooCommerce, Razorpay, Shiprocket, Google Sheets, and a generic webhook connector are available immediately. Shiprocket powers the delivery-side automations — shipping notifications, NDR rescue, and post-delivery review collection — with zero custom code." },
+  { q: "How do Meta's conversation charges work?", a: "Meta charges per 24-hour conversation window — roughly ₹0.30 for utility, ₹0.80+ for marketing. These are billed through a prepaid wallet on every platform, including ours. Each send shows its cost before it goes out, the wallet never overdrafts, and your dashboard shows exactly where every paisa went." },
   { q: "Can agencies white-label the platform?", a: "Yes. Partners get custom domain mapping, branded login, pricing markup, and an isolated client-org dashboard. The branding resolver returns logo, color, and partner copy dynamically based on host." },
 ];
 
