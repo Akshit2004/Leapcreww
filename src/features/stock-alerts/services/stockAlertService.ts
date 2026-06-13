@@ -1,5 +1,13 @@
-import { prisma } from "@/shared/lib/prisma";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
+import {
+  findExistingAlert,
+  reactivateAlert,
+  findContactByPhone,
+  createAlert,
+  findUnnotifiedAlerts,
+  markAlertNotified,
+  createStockAlertSystemLog,
+} from "../repositories/stockAlertRepo";
 
 export interface RegisterAlertInput {
   orgId: string;
@@ -15,36 +23,26 @@ export async function registerStockAlert(input: RegisterAlertInput) {
   const normalized = normalizePhone(phone);
 
   // Re-register if a previously-notified alert exists for the same phone + product
-  const existing = await prisma.stockAlert.findFirst({
-    where: {
-      organizationId: orgId,
-      phone: normalized,
-      ...(shopifyInventoryItemId ? { shopifyInventoryItemId } : sku ? { sku } : {}),
-    },
-  });
+  const existing = await findExistingAlert(orgId, normalized, shopifyInventoryItemId, sku);
 
   if (existing) {
     if (!existing.isNotified) return existing; // already waiting, no-op
-    return prisma.stockAlert.update({
-      where: { id: existing.id },
-      data: { isNotified: false, notifiedAt: null, productTitle, productUrl: productUrl ?? existing.productUrl },
+    return reactivateAlert(existing.id, {
+      productTitle,
+      productUrl: productUrl ?? existing.productUrl,
     });
   }
 
-  const contact = await prisma.contact.findFirst({
-    where: { phone: normalized, organizationId: orgId },
-  });
+  const contact = await findContactByPhone(orgId, normalized);
 
-  return prisma.stockAlert.create({
-    data: {
-      organizationId: orgId,
-      phone: normalized,
-      contactId: contact?.id ?? null,
-      productTitle,
-      shopifyInventoryItemId: shopifyInventoryItemId ?? null,
-      sku: sku ?? null,
-      productUrl: productUrl ?? null,
-    },
+  return createAlert({
+    organizationId: orgId,
+    phone: normalized,
+    contactId: contact?.id ?? null,
+    productTitle,
+    shopifyInventoryItemId: shopifyInventoryItemId ?? null,
+    sku: sku ?? null,
+    productUrl: productUrl ?? null,
   });
 }
 
@@ -59,17 +57,7 @@ export interface NotifyInput {
 export async function notifyStockWatchers(input: NotifyInput): Promise<{ notified: number }> {
   const { orgId, shopifyInventoryItemId, sku, productTitle, productUrl } = input;
 
-  const alerts = await prisma.stockAlert.findMany({
-    where: {
-      organizationId: orgId,
-      isNotified: false,
-      ...(shopifyInventoryItemId
-        ? { shopifyInventoryItemId }
-        : sku
-        ? { sku }
-        : {}),
-    },
-  });
+  const alerts = await findUnnotifiedAlerts(orgId, shopifyInventoryItemId, sku);
 
   if (alerts.length === 0) return { notified: 0 };
 
@@ -89,10 +77,7 @@ export async function notifyStockWatchers(input: NotifyInput): Promise<{ notifie
         orgId
       );
 
-      await prisma.stockAlert.update({
-        where: { id: alert.id },
-        data: { isNotified: true, notifiedAt: new Date() },
-      });
+      await markAlertNotified(alert.id);
 
       notified++;
     } catch (err) {
@@ -102,13 +87,10 @@ export async function notifyStockWatchers(input: NotifyInput): Promise<{ notifie
 
   if (notified > 0) {
     const title = productTitle || alerts[0]?.productTitle || "product";
-    await prisma.systemLog.create({
-      data: {
-        type: "integration",
-        message: `Back-in-stock: notified ${notified} customer(s) about "${title}".`,
-        organizationId: orgId,
-      },
-    });
+    await createStockAlertSystemLog(
+      orgId,
+      `Back-in-stock: notified ${notified} customer(s) about "${title}".`
+    );
   }
 
   return { notified };

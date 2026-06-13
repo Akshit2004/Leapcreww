@@ -1,21 +1,13 @@
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
 import type { Contact } from "@prisma/client";
-import { prisma } from "@/shared/lib/prisma";
+import { clearReplenishmentPromptedFlag } from "../repositories/replenishmentRepo";
 
 async function send(contact: Contact, orgId: string, text: string) {
   await sendWhatsAppMessage({ to: formatPhoneNumber(contact.phone), text }, orgId);
 }
 
 async function clearFlag(contactId: string, attrs: Record<string, any>) {
-  await prisma.contact.update({
-    where: { id: contactId },
-    data: {
-      attributes: {
-        ...attrs,
-        replenishment_prompted: false,
-      },
-    },
-  });
+  await clearReplenishmentPromptedFlag(contactId, attrs);
 }
 
 export async function handleReplenishmentReply(

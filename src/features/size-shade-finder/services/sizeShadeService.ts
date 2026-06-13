@@ -1,6 +1,6 @@
-import { prisma } from "@/shared/lib/prisma";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
 import type { Contact } from "@prisma/client";
+import { getContactAttributes, updateContactAttributes } from "../repositories/sizeShadeRepo";
 
 // ── Size recommendation ──────────────────────────────────────────────────────
 
@@ -72,16 +72,12 @@ function recommendShade(skinTone: string, undertone: string): string {
 // ── Attribute helpers ────────────────────────────────────────────────────────
 
 async function getAttrs(contactId: string): Promise<Record<string, any>> {
-  const c = await prisma.contact.findUnique({ where: { id: contactId }, select: { attributes: true } });
-  return (c?.attributes as Record<string, any>) ?? {};
+  return getContactAttributes(contactId);
 }
 
 async function setAttrs(contactId: string, patch: Record<string, unknown>) {
   const attrs = await getAttrs(contactId);
-  await prisma.contact.update({
-    where: { id: contactId },
-    data: { attributes: { ...attrs, ...patch } },
-  });
+  await updateContactAttributes(contactId, { ...attrs, ...patch });
 }
 
 async function send(contact: Contact, orgId: string, text: string) {

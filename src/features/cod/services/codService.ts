@@ -5,9 +5,17 @@
  * Returns true when it consumed the message as a COD reply so the caller
  * can skip further routing.
  */
-import { prisma } from "@/shared/lib/prisma";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
 import type { Contact } from "@prisma/client";
+import {
+  updateContactCodStatus,
+  updateOrderCodStatus,
+  setOrderRazorpayLink,
+  recordAgentMessage,
+  createCodSystemLog,
+  findActiveCodSequenceEnrollments,
+  completeSequenceEnrollment,
+} from "../repositories/codRepo";
 
 const YES_TOKENS = new Set(["YES", "Y", "1", "CONFIRM", "OK", "HA", "HAN"]);
 const NO_TOKENS = new Set(["NO", "N", "2", "CANCEL", "NAHI", "NA"]);
@@ -44,19 +52,14 @@ async function confirmCod(
   const orderId: string = attrs.pending_cod_order_id || "";
   const total: string = attrs.pending_cod_order_total || "0";
 
-  await prisma.contact.update({
-    where: { id: contact.id },
-    data: {
-      attributes: { ...attrs, cod_status: "confirmed" },
-      tags: { set: Array.from(new Set([...contact.tags, "cod-confirmed"])) },
-    },
-  });
+  await updateContactCodStatus(
+    contact.id,
+    { ...attrs, cod_status: "confirmed" },
+    Array.from(new Set([...contact.tags, "cod-confirmed"]))
+  );
 
   if (orderId) {
-    await prisma.order.updateMany({
-      where: { orderId, organizationId: orgId },
-      data: { codStatus: "confirmed" },
-    });
+    await updateOrderCodStatus(orderId, orgId, "confirmed");
   }
 
   await stopCodSequences(contact.id, orgId);
@@ -66,23 +69,9 @@ async function confirmCod(
 
   await sendWhatsAppMessage({ to: formatPhoneNumber(contact.phone), text: reply }, orgId);
 
-  const d = new Date();
-  const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  await prisma.message.create({
-    data: { sender: "agent", text: reply, contactId: contact.id, organizationId: orgId },
-  });
-  await prisma.contact.update({
-    where: { id: contact.id },
-    data: { lastMessage: reply.slice(0, 60), lastMessageTime: timeStr },
-  });
+  await recordAgentMessage(contact.id, orgId, reply);
 
-  await prisma.systemLog.create({
-    data: {
-      type: "integration",
-      message: `COD order #${orderId} confirmed by ${contact.name} via WhatsApp.`,
-      organizationId: orgId,
-    },
-  });
+  await createCodSystemLog(orgId, `COD order #${orderId} confirmed by ${contact.name} via WhatsApp.`);
 
   // Best-effort: offer prepaid conversion with a discount. Never throws.
   try {
@@ -99,19 +88,14 @@ async function cancelCod(
 ) {
   const orderId: string = attrs.pending_cod_order_id || "";
 
-  await prisma.contact.update({
-    where: { id: contact.id },
-    data: {
-      attributes: { ...attrs, cod_status: "cancelled" },
-      tags: { set: Array.from(new Set([...contact.tags, "cod-cancelled"])) },
-    },
-  });
+  await updateContactCodStatus(
+    contact.id,
+    { ...attrs, cod_status: "cancelled" },
+    Array.from(new Set([...contact.tags, "cod-cancelled"]))
+  );
 
   if (orderId) {
-    await prisma.order.updateMany({
-      where: { orderId, organizationId: orgId },
-      data: { codStatus: "cancelled" },
-    });
+    await updateOrderCodStatus(orderId, orgId, "cancelled");
   }
 
   await stopCodSequences(contact.id, orgId);
@@ -121,23 +105,9 @@ async function cancelCod(
 
   await sendWhatsAppMessage({ to: formatPhoneNumber(contact.phone), text: reply }, orgId);
 
-  const d = new Date();
-  const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  await prisma.message.create({
-    data: { sender: "agent", text: reply, contactId: contact.id, organizationId: orgId },
-  });
-  await prisma.contact.update({
-    where: { id: contact.id },
-    data: { lastMessage: reply.slice(0, 60), lastMessageTime: timeStr },
-  });
+  await recordAgentMessage(contact.id, orgId, reply);
 
-  await prisma.systemLog.create({
-    data: {
-      type: "integration",
-      message: `COD order #${orderId} cancelled by ${contact.name} via WhatsApp.`,
-      organizationId: orgId,
-    },
-  });
+  await createCodSystemLog(orgId, `COD order #${orderId} cancelled by ${contact.name} via WhatsApp.`);
 }
 
 const COD_PREPAID_DISCOUNT = 50; // ₹50 flat discount for converting COD → prepaid
@@ -162,10 +132,7 @@ async function offerPrepaidConversion(
   );
 
   // Wire the payment link ID into the order so the Razorpay webhook can resolve it.
-  await prisma.order.updateMany({
-    where: { orderId, organizationId: orgId },
-    data: { razorpayOrderId: link.id },
-  });
+  await setOrderRazorpayLink(orderId, orgId, link.id);
 
   const discounted = (originalTotal - COD_PREPAID_DISCOUNT).toFixed(0);
   const original = originalTotal.toFixed(0);
@@ -177,30 +144,12 @@ async function offerPrepaidConversion(
 
   await sendWhatsAppMessage({ to: formatPhoneNumber(contact.phone), text: offerText }, orgId);
 
-  const d = new Date();
-  const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  await prisma.message.create({
-    data: { sender: "agent", text: offerText, contactId: contact.id, organizationId: orgId },
-  });
-  await prisma.contact.update({
-    where: { id: contact.id },
-    data: { lastMessage: offerText.slice(0, 60), lastMessageTime: timeStr },
-  });
+  await recordAgentMessage(contact.id, orgId, offerText);
 }
 
 async function stopCodSequences(contactId: string, orgId: string) {
-  const active = await prisma.sequenceEnrollment.findMany({
-    where: {
-      contactId,
-      organizationId: orgId,
-      status: "active",
-      sequence: { trigger: "cod_order_placed" },
-    },
-  });
+  const active = await findActiveCodSequenceEnrollments(contactId, orgId);
   for (const e of active) {
-    await prisma.sequenceEnrollment.update({
-      where: { id: e.id },
-      data: { status: "completed", nextRunAt: null },
-    });
+    await completeSequenceEnrollment(e.id);
   }
 }
