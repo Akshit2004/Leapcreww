@@ -30,8 +30,9 @@ export async function GET(request: NextRequest) {
     let dbStatus = template.metaStatus;
     let metaData = null;
 
-    // Sandbox Mock Template Auto-Approval Simulator (for local testing)
-    if (template.metaId.startsWith("mock-meta-")) {
+    // Sandbox Mock Template Auto-Approval Simulator (for local testing only —
+    // never auto-approve in production, even for legacy mock-meta- rows).
+    if (process.env.NODE_ENV !== "production" && template.metaId.startsWith("mock-meta-")) {
       const ageMs = Date.now() - new Date(template.createdAt).getTime();
       if (ageMs > 12000) {
         dbStatus = "approved";

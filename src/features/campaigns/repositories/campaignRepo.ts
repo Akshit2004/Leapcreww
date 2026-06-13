@@ -44,6 +44,22 @@ export async function findTargetContactsPaged(
   return excludeTag ? contacts.filter((c) => !c.tags.includes(excludeTag)) : contacts;
 }
 
+/** Load contacts by id, preserving organization scoping. Used by the queue engine for session broadcasts. */
+export function findContactsByIds(organizationId: string, ids: string[]) {
+  return prisma.contact.findMany({ where: { organizationId, id: { in: ids } } });
+}
+
+/** Of the given contacts, return the ids that sent a message within `since`. */
+export async function findRecentlyActiveContactIds(contactIds: string[], since: Date): Promise<string[]> {
+  if (contactIds.length === 0) return [];
+  const recentMessages = await prisma.message.groupBy({
+    by: ["contactId"],
+    where: { contactId: { in: contactIds }, sender: "user", createdAt: { gte: since } },
+    _max: { createdAt: true },
+  });
+  return recentMessages.map((r) => r.contactId);
+}
+
 export function countTargetContacts(
   organizationId: string,
   targetTag: string,

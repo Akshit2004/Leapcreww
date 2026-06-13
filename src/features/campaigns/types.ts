@@ -6,6 +6,24 @@ export interface CampaignVariable {
   value: string;
 }
 
+/** Sentinel `templateName` marking a free-form 24h session broadcast (no Meta template). */
+export const SESSION_BROADCAST_TEMPLATE = "__session_broadcast__";
+
+/** Shape of `Campaign.variables` for session broadcasts: free text + resolved recipient ids. */
+export interface SessionBroadcastVariables {
+  sessionText: string;
+  contactIds: string[];
+}
+
+export interface LaunchSessionBroadcastInput {
+  name: string;
+  targetTag: string;
+  text: string;
+  organizationId: string;
+  delay?: number;
+  scheduledAt?: string;
+}
+
 export interface LaunchCampaignInput {
   name: string;
   targetTag: string;

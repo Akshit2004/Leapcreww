@@ -1,3 +1,5 @@
+import type { Dispatch, SetStateAction } from "react";
+
 export interface BrandProfile {
   name: string;
   industry: string;
@@ -126,6 +128,7 @@ export interface Member {
 export interface AppContextType {
   organization: Organization | null;
   contacts: Contact[];
+  setContacts: Dispatch<SetStateAction<Contact[]>>;
   campaigns: Campaign[];
   templates: Template[];
   chatHistory: ChatHistory;

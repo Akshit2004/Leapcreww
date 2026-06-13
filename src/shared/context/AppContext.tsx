@@ -178,6 +178,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       value={{
         organization,
         contacts,
+        setContacts,
         campaigns,
         templates,
         chatHistory,

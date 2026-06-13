@@ -12,7 +12,7 @@ import { Contact } from "@/shared/context/types";
 import { SegmentRule, SegmentRules, evaluateSegmentRules } from "@/shared/lib/segmentMatch";
 
 export const CustomersTab: React.FC = () => {
-  const { contacts, updateContact, addContact } = useApp();
+  const { contacts, updateContact, addContact, setContacts } = useApp();
   const confirm = useConfirm();
   const params = useParams();
   const orgId = params.orgId as string;
@@ -147,16 +147,17 @@ export const CustomersTab: React.FC = () => {
         throw new Error(data?.error || "Failed to add tag to contacts");
       }
 
-      // Single bulk request already made above; reflect the new tag in
-      // client-side state for the affected contacts.
-      contactIds.forEach((id) => {
-        const contact = contacts.find((c) => c.id === id);
-        if (!contact) return;
-        const currentTags = contact.tags || [];
-        if (!currentTags.includes(cleanTag)) {
-          updateContact(id, { tags: [...currentTags, cleanTag] });
-        }
-      });
+      // Bulk request already persisted the tag for all contacts; reflect it
+      // in local state without re-issuing a PATCH per contact.
+      const idSet = new Set(contactIds);
+      setContacts((prev) =>
+        prev.map((c) => {
+          if (!idSet.has(c.id)) return c;
+          const currentTags = c.tags || [];
+          if (currentTags.includes(cleanTag)) return c;
+          return { ...c, tags: [...currentTags, cleanTag] };
+        })
+      );
 
       notify.success(`Added tag "${cleanTag}" to ${contactIds.length} customer${contactIds.length !== 1 ? "s" : ""}`);
       setSelectedIds(new Set()); // clear selection after action

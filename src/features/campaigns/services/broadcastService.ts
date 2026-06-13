@@ -15,11 +15,15 @@ import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
 import { recordTouch } from "@/features/analytics/services/attribution";
 import { canAfford, recordUsage } from "@/features/billing/services/billingService";
 import * as repo from "../repositories/campaignRepo";
-import type {
-  CampaignVariable,
-  LaunchCampaignInput,
-  WhatsAppTemplateParameter,
-  WhatsAppTemplatePayload,
+import { ApiError } from "@/shared/lib/api";
+import {
+  SESSION_BROADCAST_TEMPLATE,
+  type CampaignVariable,
+  type LaunchCampaignInput,
+  type LaunchSessionBroadcastInput,
+  type SessionBroadcastVariables,
+  type WhatsAppTemplateParameter,
+  type WhatsAppTemplatePayload,
 } from "../types";
 
 /** Max contacts to send per cron tick per campaign. 50 × 1s delay = 50s worst-case. */
@@ -65,7 +69,11 @@ async function sendToContact(campaign: Campaign, contact: Contact, flow: any, sc
   let result;
   let preview = "";
 
-  if (flowId && flow) {
+  if (templateName === SESSION_BROADCAST_TEMPLATE) {
+    const { sessionText } = (campaign.variables as unknown as SessionBroadcastVariables) || { sessionText: "" };
+    result = await sendWhatsAppMessage({ to: phone, text: sessionText }, organizationId);
+    preview = sessionText.length > 50 ? sessionText.substring(0, 47) + "..." : sessionText;
+  } else if (flowId && flow) {
     const flowVars = (campaign.variables as any) || {};
     result = await sendWhatsAppMessage(
       {
@@ -181,14 +189,23 @@ export async function processCampaignChunk(campaign: Campaign): Promise<void> {
   }
 
   // Load the next slice of contacts with a stable order
-  const contacts = await repo.findTargetContactsPaged(
-    organizationId,
-    campaign.targetTag,
-    campaign.excludeTag ?? undefined,
-    campaign.segmentId,
-    startOffset,
-    CHUNK_SIZE
-  );
+  const contacts =
+    campaign.templateName === SESSION_BROADCAST_TEMPLATE
+      ? await repo.findContactsByIds(
+          organizationId,
+          ((campaign.variables as unknown as SessionBroadcastVariables)?.contactIds || []).slice(
+            startOffset,
+            startOffset + CHUNK_SIZE
+          )
+        )
+      : await repo.findTargetContactsPaged(
+          organizationId,
+          campaign.targetTag,
+          campaign.excludeTag ?? undefined,
+          campaign.segmentId,
+          startOffset,
+          CHUNK_SIZE
+        );
 
   if (!contacts.length) {
     // All contacts processed — close the campaign
@@ -268,6 +285,63 @@ export async function launchCampaign(input: LaunchCampaignInput): Promise<Campai
     scheduledAt: isScheduled ? new Date(input.scheduledAt as string) : null,
     organizationId: input.organizationId,
   });
+}
+
+/**
+ * Launch a free-form 24h-session broadcast. Eligibility (tag + customer-initiated
+ * message within the last 24h) is resolved once at launch time and the resulting
+ * contact ids are stored on the campaign; the queue engine (processAllCampaigns)
+ * then sends to them CHUNK_SIZE at a time, same as template broadcasts.
+ */
+export async function launchSessionBroadcast(input: LaunchSessionBroadcastInput): Promise<{
+  campaign: Campaign;
+  eligibleCount: number;
+  totalTagged: number;
+  skippedInactive: number;
+}> {
+  const taggedContacts = await repo.findTargetContactsPaged(input.organizationId, input.targetTag);
+  if (taggedContacts.length === 0) {
+    throw new ApiError("No contacts match the selected tag", 400);
+  }
+
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const contactIds = taggedContacts.map((c) => c.id);
+  const recentIds = new Set(await repo.findRecentlyActiveContactIds(contactIds, twentyFourHoursAgo));
+  const eligibleIds = contactIds.filter((id) => recentIds.has(id));
+
+  if (eligibleIds.length === 0) {
+    throw new ApiError(
+      "No contacts with messages in the last 24 hours. Free-form session messaging only works within the customer-initiated window.",
+      400
+    );
+  }
+
+  const isScheduled = !!input.scheduledAt;
+  const variables: SessionBroadcastVariables = { sessionText: input.text, contactIds: eligibleIds };
+
+  const campaign = await repo.createCampaign({
+    name: input.name,
+    targetTag: input.targetTag,
+    templateName: SESSION_BROADCAST_TEMPLATE,
+    variables: variables as unknown as object,
+    delay: input.delay || 1,
+    sent: eligibleIds.length,
+    delivered: 0,
+    read: 0,
+    clicked: 0,
+    currentOffset: 0,
+    status: isScheduled ? "Scheduled" : "Sending",
+    date: new Date().toISOString().split("T")[0],
+    scheduledAt: isScheduled ? new Date(input.scheduledAt as string) : null,
+    organizationId: input.organizationId,
+  });
+
+  return {
+    campaign,
+    eligibleCount: eligibleIds.length,
+    totalTagged: taggedContacts.length,
+    skippedInactive: taggedContacts.length - eligibleIds.length,
+  };
 }
 
 /**
