@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import { Contact } from "@/shared/context/types";
 import { TagBadge } from "./TagBadge";
 import { Check, Plus, Mail, Phone, Clock, User } from "lucide-react";
+import { dispatchQuickAction } from "@/shared/components/ui/QuickActionFAB";
 
 interface CustomersTableProps {
   contacts: Contact[];
+  totalContacts?: number;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
@@ -14,6 +16,7 @@ interface CustomersTableProps {
 
 export const CustomersTable: React.FC<CustomersTableProps> = ({
   contacts,
+  totalContacts = 0,
   selectedIds,
   onToggleSelect,
   onToggleSelectAll,
@@ -57,13 +60,30 @@ export const CustomersTable: React.FC<CustomersTableProps> = ({
   };
 
   if (contacts.length === 0) {
+    const isZeroTotal = totalContacts === 0;
     return (
-      <div className="flex flex-col items-center justify-center h-64 bg-white rounded-2xl border border-stone-200/60 shadow-sm animate-fade-in">
-        <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center text-stone-400 mb-4">
-          <User className="w-8 h-8" />
-        </div>
-        <h3 className="text-stone-900 font-bold text-lg">No customers found</h3>
-        <p className="text-stone-500 text-sm mt-1">Try adjusting your filters or search query.</p>
+      <div className="flex flex-col items-center justify-center h-64 bg-white border-stone-200 space-y-4 p-12 text-center">
+        <User className="w-10 h-10 text-stone-300 mx-auto" />
+        {isZeroTotal ? (
+          <>
+            <div>
+              <h3 className="font-black text-stone-900 uppercase text-xs mb-1">No contacts yet</h3>
+              <p className="text-xs text-stone-500 max-w-xs mx-auto">Import a CSV or add your first contact to start managing your CRM.</p>
+            </div>
+            <button
+              onClick={() => dispatchQuickAction("customers")}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-stone-950 text-white text-xs font-bold uppercase tracking-wider hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add First Contact
+            </button>
+          </>
+        ) : (
+          <>
+            <h3 className="font-bold text-stone-700 uppercase text-xs">No contacts match your search</h3>
+            <p className="text-xs text-stone-500">Try a different search term, tag, or segment.</p>
+          </>
+        )}
       </div>
     );
   }

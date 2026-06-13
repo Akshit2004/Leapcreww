@@ -44,6 +44,13 @@ export const CampaignsTab: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
+
+  // Quick Action FAB
+  useEffect(() => {
+    const handler = () => setIsModalOpen(true);
+    window.addEventListener("leapcreww:quickaction", handler);
+    return () => window.removeEventListener("leapcreww:quickaction", handler);
+  }, []);
   const [isStrategistOpen, setIsStrategistOpen] = useState(false);
   const [strategistPrompt, setStrategistPrompt] = useState("");
   const [isGeneratingStrategy, setIsGeneratingStrategy] = useState(false);
@@ -541,10 +548,28 @@ export const CampaignsTab: React.FC = () => {
         <h3 className="font-bold text-xs uppercase tracking-wider text-stone-900">Recent Broadcast Activity</h3>
 
         {filteredCampaigns.length === 0 ? (
-          <div className="p-12 text-center rounded-none space-y-3 bg-white border border-stone-200">
-            <Send className="w-10 h-10 text-stone-400 mx-auto" />
-            <h4 className="font-bold text-stone-700 uppercase text-xs">No campaigns match this filter</h4>
-            <p className="text-xs text-stone-500 max-w-sm mx-auto">Create a template and fire your first marketing broadcast to observe live metric counters and system webhook outputs!</p>
+          <div className="p-12 text-center rounded-none space-y-4 bg-white border border-stone-200">
+            <Send className="w-10 h-10 text-stone-300 mx-auto" />
+            {campaigns.length === 0 ? (
+              <>
+                <div>
+                  <h4 className="font-black text-stone-900 uppercase text-xs mb-1">No campaigns yet</h4>
+                  <p className="text-xs text-stone-500 max-w-xs mx-auto">Send your first broadcast to see live delivery metrics and ROI tracking here.</p>
+                </div>
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-stone-950 text-white text-xs font-bold uppercase tracking-wider hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Create First Campaign
+                </button>
+              </>
+            ) : (
+              <>
+                <h4 className="font-bold text-stone-700 uppercase text-xs">No campaigns match this filter</h4>
+                <p className="text-xs text-stone-500">Try a different status filter or clear the search.</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

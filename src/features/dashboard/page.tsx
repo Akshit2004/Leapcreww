@@ -19,11 +19,14 @@ import { AnalyticsTab } from "@/features/analytics/components/AnalyticsTab";
 import { AdsTab } from "@/features/ads/components/AdsTab";
 import { LaunchesTab } from "@/features/launches/components/LaunchesTab";
 import { NdrTab } from "@/features/ndr/components/NdrTab";
+import { MarketplaceTab } from "@/features/marketplace/components/MarketplaceTab";
 import { AICopilotSidebar } from "@/features/ai/components/AICopilotSidebar";
 import { CommandPalette } from "@/shared/components/CommandPalette";
 import { DashboardSkeleton } from "@/shared/components/ui/Skeleton";
-import { isValidTab } from "@/shared/config/navigation";
-import { Loader, AlertCircle, Bot } from "lucide-react";
+import { WalletWarningBanner } from "@/shared/components/ui/WalletWarningBanner";
+import { QuickActionFAB } from "@/shared/components/ui/QuickActionFAB";
+import { isValidTab, NAV_ITEMS } from "@/shared/config/navigation";
+import { Loader, AlertCircle } from "lucide-react";
 
 const MAX_RETRIES = 4;
 
@@ -148,6 +151,8 @@ function TenantDashboardInner() {
         return <NdrTab />;
       case "launches":
         return <LaunchesTab />;
+      case "marketplace":
+        return <MarketplaceTab />;
       case "settings":
         return <SettingsTab />;
       default:
@@ -224,18 +229,32 @@ function TenantDashboardInner() {
         className="flex-1 flex flex-col h-full overflow-hidden bg-[#f4f6f5] relative max-lg:pb-20 lg:pb-0"
       >
         {/* Mobile Top Navigation Header */}
-        <header className="h-14 px-4 bg-white/80 backdrop-blur-md border-b border-slate-200/50 items-center justify-between shrink-0 max-lg:flex lg:hidden select-none z-30">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-wa-green flex items-center justify-center shadow-md shadow-wa-green/20">
-                <Bot className="w-4 h-4 text-white" />
+        <header className="h-14 px-4 bg-white border-b border-stone-200 items-center justify-between shrink-0 max-lg:flex lg:hidden select-none z-30">
+          {(() => {
+            const navItem = NAV_ITEMS.find((i) => i.id === activeTab);
+            const Icon = navItem?.icon;
+            return (
+              <div className="flex items-center gap-2.5">
+                {Icon && <Icon className="w-4 h-4 text-stone-700" />}
+                <span className="font-extrabold text-sm tracking-tight text-stone-900 uppercase">
+                  {navItem?.label ?? "LeapCreww"}
+                </span>
               </div>
-              <span className="font-extrabold text-sm tracking-tight text-slate-900">LeapCreww</span>
-            </div>
-          </div>
+            );
+          })()}
+          <button
+            onClick={() => setIsCopilotOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            AI
+          </button>
         </header>
 
+        <WalletWarningBanner onNavigate={handleTabChange} />
+
         {loading ? <DashboardSkeleton /> : renderActiveTab()}
+        <QuickActionFAB activeTab={activeTab} />
       </main>
 
       <AICopilotSidebar
