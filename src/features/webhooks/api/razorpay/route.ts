@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
-import { sendWhatsAppMessage } from "@/shared/lib/whatsapp";
-
 import crypto from "crypto";
+import { handlePaymentSuccess, handlePaymentFailure } from "../../services/razorpayPaymentService";
 
 // ─── Razorpay webhook payload (only the fields this handler reads) ────────
 interface RazorpayEntity {
@@ -55,81 +53,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "No order identifier in payload" }, { status: 400 });
       }
 
-      // Check if this is a Wallet Topup order
-      const { findTopupByRazorpayOrderId, creditWalletForTopup } = await import("@/features/wallet/repositories/walletRepo");
-      const topup = await findTopupByRazorpayOrderId(razorpayOrderId);
-      if (topup) {
-        if (topup.status === "pending") {
-          await creditWalletForTopup(topup.id, topup.organizationId, topup.amount);
-        }
-        return NextResponse.json({ status: "wallet_topup_credited" });
-      }
-
-      // Appointments are collected offline (no Razorpay), so payment events
-      // only ever resolve to marketplace Order rows.
-      const order = await prisma.order.findFirst({
-        where: { razorpayOrderId },
-        include: { contact: true },
-      });
-
-      if (!order) {
-        console.warn(`Razorpay webhook: order ${razorpayOrderId} not found in DB`);
-        return NextResponse.json({ status: "order_not_found" });
-      }
-
       const paymentId = payload.payload?.payment?.entity?.id;
-
-      const wasCodConversion = order.codStatus === "confirmed";
-
-      await prisma.order.update({
-        where: { id: order.id },
-        data: {
-          paymentStatus: "paid",
-          status: "confirmed",
-          codStatus: wasCodConversion ? null : order.codStatus,
-          ...(paymentId ? { razorpayPaymentId: paymentId } : {}),
-        },
-      });
-
-      // Cart paid → mark recovered and stop any active abandoned-cart drip.
-      const { markCartRecovered } = await import("@/features/sequences/services/sequenceService");
-      await markCartRecovered(order.organizationId, order.contactId);
-
-      const cleanPhone = order.contact.phone.replace(/[^0-9]/g, "");
-
-      if (wasCodConversion) {
-        // Customer took the prepaid conversion offer — send a celebratory message.
-        await prisma.contact.update({
-          where: { id: order.contactId },
-          data: {
-            tags: {
-              set: Array.from(
-                new Set([
-                  ...order.contact.tags.filter((t) => t !== "cod-confirmed"),
-                  "cod-converted-prepaid",
-                ])
-              ),
-            },
-          },
-        });
-
-        await prisma.systemLog.create({
-          data: {
-            type: "integration",
-            message: `COD order #${order.orderId} converted to prepaid by ${order.contact.name}. Saved ₹50.`,
-            organizationId: order.organizationId,
-          },
-        });
-
-        await sendWhatsAppMessage({
-          to: cleanPhone,
-          text:
-            `🎊 *You saved ₹50!*\n\nPayment received for order #${order.orderId}. ` +
-            `Great choice paying online — we'll get it packed and shipped right away. 🚀`,
-        }, order.organizationId);
-      } else {
-        const text = `✅ *Payment Received!* 🎉\n\nThank you for your order *${order.orderId}*!\n\n📦 *Status:* Confirmed\n💳 *Payment:* Paid — ₹${(order.total / 100).toFixed(2)}\n\nWe'll notify you when it ships. Reply *ORDERS* to check status anytime.`;
-        await sendWhatsAppMessage({ to: cleanPhone, text }, order.organizationId);
+      const result = await handlePaymentSuccess(razorpayOrderId, paymentId);
+      if (result.status === "wallet_topup_credited" || result.status === "order_not_found") {
+        return NextResponse.json({ status: result.status });
       }
     }
 
@@ -139,30 +66,9 @@ export async function POST(req: NextRequest) {
         razorpayOrderId = payload.payload?.payment_link?.entity?.id;
       }
       if (razorpayOrderId) {
-        // Check if this is a Wallet Topup order
-        const { findTopupByRazorpayOrderId, markTopupFailed } = await import("@/features/wallet/repositories/walletRepo");
-        const topup = await findTopupByRazorpayOrderId(razorpayOrderId);
-        if (topup) {
-          if (topup.status === "pending") {
-            await markTopupFailed(topup.id);
-          }
-          return NextResponse.json({ status: "wallet_topup_failed" });
-        }
-
-        const order = await prisma.order.findFirst({
-          where: { razorpayOrderId },
-          include: { contact: true },
-        });
-        if (order) {
-          await prisma.order.update({
-            where: { id: order.id },
-            data: { paymentStatus: "failed" },
-          });
-          const cleanPhone = order.contact.phone.replace(/[^0-9]/g, "");
-          await sendWhatsAppMessage({
-            to: cleanPhone,
-            text: "❌ *Payment Failed*\n\nYour payment didn't go through. Please try again or use a different payment method.\n\nReply *CHECKOUT* to retry.",
-          }, order.organizationId);
+        const result = await handlePaymentFailure(razorpayOrderId);
+        if (result.status === "wallet_topup_failed") {
+          return NextResponse.json({ status: result.status });
         }
       }
     }
