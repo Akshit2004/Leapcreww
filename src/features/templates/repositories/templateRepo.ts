@@ -24,3 +24,31 @@ export function updateTemplate(id: string, data: Prisma.TemplateUncheckedUpdateI
 export function createLog(data: Prisma.SystemLogUncheckedCreateInput) {
   return prisma.systemLog.create({ data });
 }
+
+/** Delete local templates for an org whose metaId is not in `keepMetaIds` (or has no metaId at all). */
+export function deleteUnsyncedTemplates(organizationId: string, keepMetaIds: string[]) {
+  return prisma.template.deleteMany({
+    where: {
+      organizationId,
+      OR: [
+        { metaId: { notIn: keepMetaIds.length > 0 ? keepMetaIds : ["dummy_to_prevent_error"] } },
+        { metaId: null },
+      ],
+    },
+  });
+}
+
+/** Find existing templates for an org matching either by name or by Meta template id. */
+export function findByNameOrMetaId(organizationId: string, name: string, metaId: string) {
+  return prisma.template.findMany({
+    where: {
+      organizationId,
+      OR: [{ name }, { metaId }],
+    },
+  });
+}
+
+export function deleteTemplatesByIds(ids: string[]) {
+  if (ids.length === 0) return Promise.resolve();
+  return prisma.template.deleteMany({ where: { id: { in: ids } } });
+}
