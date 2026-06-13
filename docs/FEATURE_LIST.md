@@ -1,7 +1,7 @@
 # LeapCreww — Feature List & Testing Guide
 
-> Updated: 2026-06-13
-> Branch: `feat/embeddable-widget`
+> Updated: 2026-06-14
+> Branch: `master`
 > Source: `src/features/`, `src/app/api/`, `prisma/schema.prisma`
 
 Features are ordered **most rich → least** for testing priority.
@@ -34,6 +34,7 @@ Features are ordered **most rich → least** for testing priority.
 22. [Authentication & Accounts](#22-authentication--accounts)
 23. [Partner / White-Label](#23-partner--white-label)
 24. [AI Copilot & Content Generation](#24-ai-copilot--content-generation)
+25. [Platform Super Admin](#25-platform-super-admin)
 
 ---
 
@@ -53,6 +54,8 @@ Features are ordered **most rich → least** for testing priority.
 | Delivery funnel analytics | Sent → Delivered → Read → Clicked per campaign |
 | Campaign report drawer | Visual funnel chart per campaign |
 | Conversion attribution | Outbound sends stamped in AttributionTouch |
+| **AI Campaign Strategist** | Natural-language prompt → full strategy (template + segment + schedule + 3-step drip) persisted to DB in one shot |
+| **Strategist result screen** | After apply, modal shows rich "Campaign Built" card: template status badge, enrolled contact count, broadcast time, drip timeline, message preview. User can "Build Another" or "View Campaigns →" |
 
 **Test checklist:**
 - [ ] Create template broadcast → select tag audience → send now
@@ -62,6 +65,8 @@ Features are ordered **most rich → least** for testing priority.
 - [ ] Open campaign report drawer → check funnel numbers
 - [ ] Create recurring daily campaign → verify `nextRunAt` is set
 - [ ] Variable interpolation: `{{name}}` replaced with contact name
+- [ ] AI Strategist: enter brief → strategy generated → review each section → Approve & Launch → result screen shows enrolled count, template status, drip steps
+- [ ] Strategist with no approved template → status shows "Pending Meta Review" on result screen
 
 **Routes:** `GET/POST /api/whatsapp/campaign` · `GET/PUT/DELETE /api/whatsapp/campaign/[campaignId]` · `POST /api/cron/process-broadcasts` · `POST /api/whatsapp/session-broadcast`
 
@@ -76,18 +81,24 @@ Features are ordered **most rich → least** for testing priority.
 | Node connections | Wire nodes to define conversation paths |
 | Dynamic routing | Branch on user response keywords |
 | AI Flow Architect | Generate node layout from natural-language prompt (Groq) |
-| Pure AI Mode (Autoresponder) | LLM responds to every message dynamically |
-| Autoresponder config | AI personality, context, fallback messages |
+| **AI Autoresponder (Live Webhook)** | Groq handles every inbound WhatsApp message in real time with three tools: `show_catalog`, `check_order_status`, `escalate_to_human` |
+| **Autoresponder hero overlay** | When AI Autoresponder mode is active, the canvas shows a full-screen dark panel: pulsing Live indicator, capability cards for each tool, AI persona config strip, link to Settings |
+| Mode toggle label | Header toggle now reads "Visual Builder" vs "AI Autoresponder" (was "Pure AI Mode") |
+| Autoresponder config | `aiPersona` field in Settings sets AI brand voice; shown inline in the overlay with a Configure link |
 | Mobile bottom-sheet inspector | Node inspector slides up on mobile |
 | Chatbot analytics | Impressions, response rate, drop-off per node |
-| Toggle chatbot on/off | `chatbotBuilderEnabled` per org |
+| Toggle mode | `chatbotBuilderEnabled` per org; toggling from the overlay switches back to Visual Builder |
 | Agent takeover detection | Chatbot yields when takeover flag set on contact |
 
 **Test checklist:**
 - [ ] Create trigger → message → question → delay chain; save and verify in DB
 - [ ] Add routing node with keyword branches → test keyword match
 - [ ] AI Flow Architect: enter brief → generate nodes → canvas renders
-- [ ] Toggle Pure AI Mode → send incoming message → verify Groq response
+- [ ] Toggle to AI Autoresponder → canvas shows dark hero overlay with 3 capability cards
+- [ ] With `aiPersona` set in Settings → persona text shows in overlay config strip
+- [ ] Without `aiPersona` → overlay shows "Not configured — AI will respond generically."
+- [ ] Click "Switch to Visual Builder" in overlay → builder toggles on, overlay hides
+- [ ] Send incoming message in AI Autoresponder mode → verify Groq response
 - [ ] Mobile: open canvas → tap node → inspector slides up as sheet
 - [ ] View chatbot analytics per node
 - [ ] Set agent takeover on contact → verify chatbot stops responding
@@ -569,16 +580,22 @@ Features are ordered **most rich → least** for testing priority.
 | Feature | Details |
 |---|---|
 | KPI overview cards | Contacts, campaigns sent, messages delivered, wallet balance |
+| **Copilot-first zero-state layout** | Before the first campaign is sent (`isZeroState = !campaignSent`), the overview shows a dark AI Copilot hero + dependency strip (Connect WhatsApp, Create Template, Build Audience) + Recipes section |
+| **AI Copilot textarea** | Multiline textarea with animated gradient border on focus (`from-emerald-400 via-wa-green to-teal-400`), ⌘ Enter to submit, example chips below |
 | Onboarding checklist | Connect WhatsApp → create template → send first campaign |
 | Activity / event stream | Chronological system log (FlowJournalStream) |
 | Brand profile | Org name, industry, tone-of-voice for AI Copilot |
 | Sandbox mode | Reset sandbox data; view sandbox-only metrics |
-| Done-For-You Copilot | AI-guided setup wizard |
+| Done-For-You Copilot | Full-width AI copilot shown in active-state dashboard; also the zero-state hero |
 | System logs | View all system log entries |
 
 **Test checklist:**
+- [ ] New org with 0 campaigns → overview shows dark Copilot hero + dependency strip (not KPI cards)
+- [ ] Org with ≥1 campaign sent → overview shows full active-state dashboard with KPI cards
+- [ ] Click Copilot textarea → animated green gradient border animates
+- [ ] Type prompt → ⌘ Enter → routes to Campaigns tab with `?goal=` param
+- [ ] Click example chip → auto-launches strategist with that prompt
 - [ ] New org → onboarding checklist shows → complete each step
-- [ ] Complete onboarding → checklist disappears
 - [ ] Activity stream updates after any action (send, import, etc.)
 - [ ] Set brand profile → AI Copilot uses it for generation
 - [ ] Reset sandbox → sandbox metrics clear
@@ -643,7 +660,9 @@ Features are ordered **most rich → least** for testing priority.
 | WhatsApp Form generation | Generate Meta Flow JSON from requirements |
 | Ad creative generation | Generate headline + copy + image prompt |
 | Analytics narrator | Plain-English performance summary |
-| Campaign strategist | Recommends next campaigns from past data |
+| **Campaign Strategist (deep persistence)** | Prompt → Groq generates full strategy JSON (template, segment, schedule, 3-step drip) → "Approve & Launch" persists everything to DB in one transaction → rich result screen confirms what was built |
+| **Strategist result visibility** | After apply: template name + approval badge, enrolled contact count, broadcast datetime, step-by-step drip timeline, dark message preview panel |
+| **Live Webhook Autoresponder (Groq engine)** | Handles inbound WhatsApp 24/7; tools: `show_catalog`, `check_order_status`, `escalate_to_human`; configured via `aiPersona` in Settings |
 | Reply suggestions | 3 suggested quick-replies per inbox conversation |
 
 **Test checklist:**
@@ -652,6 +671,11 @@ Features are ordered **most rich → least** for testing priority.
 - [ ] Template generation: enter brief → complete template body generated
 - [ ] Compliance audit: submit a policy-violating template → Groq flags it
 - [ ] Analytics narrator: view analytics tab → AI summary renders
+- [ ] Campaign Strategist: describe a campaign goal → review all 4 sections → approve → result screen shows counts and drip steps
+- [ ] Strategist with existing approved template → result badge shows "Approved & Live"
+- [ ] Strategist with new template → result badge shows "Pending Meta Review"
+- [ ] AI Autoresponder: set `aiPersona` → send a WhatsApp message → Groq replies in brand voice
+- [ ] Autoresponder tool use: ask "where is my order?" → `check_order_status` tool fires
 
 **Routes:** `POST /api/ai/copilot` · `POST /api/ai/generate-template` · `POST /api/whatsapp/optimize-template` · `POST /api/ai/generate-flow` · `POST /api/ai/generate-wa-flow` · `POST /api/ai/generate-ad` · `POST /api/ai/analytics-narrator` · `POST /api/ai/campaign-strategist` · `POST /api/ai/reply-suggestions`
 
@@ -698,6 +722,41 @@ Features are ordered **most rich → least** for testing priority.
 | `Widget` | Embeddable chat widget config |
 | `CannedReply` | Pre-saved message response |
 | `Note` | Per-contact private note |
+| `WalletTopup` | Razorpay top-up record (used in admin billing stats) |
+
+---
+
+## 25. Platform Super Admin
+
+> Access: `/admin` — restricted to emails in `PLATFORM_ADMIN_EMAILS` env var.
+> All API routes guarded by `requirePlatformAdmin()`. No org-scoped data leakage.
+
+| Feature | Details |
+|---|---|
+| **Overview stats** | Platform-wide counters: total orgs, users, contacts, campaigns, messages sent, WA-connected orgs, shared templates, new orgs this month, revenue and topups this month |
+| **WA connection health** | Progress bar: connected orgs / total orgs |
+| **Organizations list** | Paginated, searchable table: name, slug, member count, contact count, campaign count, wallet balance, WA status, chatbot status, created date |
+| **Org detail drawer** | Right-side 480px panel: feature toggles (`chatbotBuilderEnabled`, `whatsappConnected`), wallet credit/debit, recent 20 system logs, "Open Org Dashboard →" link |
+| **Users list** | Paginated, searchable; table with name, email, org count, role pills; accordion expands per-user membership list |
+| **Billing & Revenue** | 30d/60d/90d period tabs; revenue card, topup card, avg/org card; pure SVG bar chart (no charting lib); per-org breakdown table ranked by spend |
+| **Shared Templates** | All `isShared=true` templates across all orgs; category pill filters; Unshare action; Delete action (with confirm dialog) |
+| **System Logs** | Cross-org log stream with search, type filter (`campaign/chat/integration/crm`), period pills (`1d/7d/30d`); color-coded type badges; pagination; refresh button |
+| **Admin sidebar** | 220px desktop sidebar; 6 nav items; red `ADMIN` badge; `wa-green` active indicator; footer shows admin email + Platform Admin badge + Sign Out |
+| **Mobile admin nav** | Sticky top bar + hamburger → bottom drawer grid on mobile |
+| **Access gate** | Non-admin users hitting `/admin` see "Platform Admin Only" error card with ShieldOff icon and Sign Out button |
+
+**Test checklist:**
+- [ ] Login as `smritix.ai.1@gmail.com` (pass: `Noida@9025`) → redirects to `/admin`
+- [ ] `/admin` Overview → all 8 stat cards load; WA health bar shows ratio
+- [ ] Organizations → search by name → results filter; click "View Details" → drawer opens
+- [ ] Org drawer: toggle `chatbotBuilderEnabled` → toggle state persists; adjust wallet +₹500 → balance updates
+- [ ] Users → search by email → row expands → membership table shows correct orgs and roles
+- [ ] Billing → switch period 30d → 60d → 90d → stats and chart update
+- [ ] Templates → filter by category → Unshare a template → row disappears; Delete → confirm → gone
+- [ ] System Logs → filter by type `campaign` → only campaign logs shown; Refresh → new logs appear
+- [ ] Non-admin account visiting `/admin` → sees "Platform Admin Only" error card
+
+**Routes:** `GET /api/admin/stats` · `GET /api/admin/orgs` · `GET/PATCH /api/admin/orgs/[orgId]` · `GET /api/admin/users` · `GET /api/admin/billing` · `GET /api/admin/templates` · `PATCH/DELETE /api/admin/templates/[templateId]` · `GET /api/admin/logs`
 
 ---
 
