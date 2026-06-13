@@ -3,10 +3,61 @@ import type { FlowInput } from "../types";
 import { ApiError } from "@/shared/lib/api";
 import { getWhatsAppConfig } from "@/shared/lib/whatsapp";
 import * as crypto from "crypto";
-import { prisma } from "@/shared/lib/prisma";
 
 export function listFlows(organizationId: string) {
   return repo.listFlows(organizationId);
+}
+
+/** List flows alongside whether Meta Flows encryption has been set up for this org. */
+export async function listFlowsWithEncryptionStatus(organizationId: string) {
+  const [flows, org] = await Promise.all([
+    repo.listFlows(organizationId),
+    repo.getFlowsEncryptionStatus(organizationId),
+  ]);
+
+  return {
+    flows,
+    encryptionSetup: org?.flowsPublicKeyUploaded || false,
+  };
+}
+
+/**
+ * Update a flow's definition. Editing the flow invalidates whatever was last
+ * published to Meta — the live asset on Meta's side won't reflect these
+ * changes (e.g. screen ids/names) until the flow is republished. Drop status
+ * back to "draft" so the UI flags it and broadcasts/tests can't run against a
+ * stale Meta asset (which fails with errors like #131009 "Specified screen
+ * ... is not allowed as first screen of this flow").
+ */
+export async function updateFlow(flowId: string, organizationId: string, input: Partial<FlowInput>) {
+  const existing = await repo.getFlowById(flowId, organizationId);
+  if (!existing) {
+    throw new ApiError("Flow not found", 404);
+  }
+
+  const flowJsonChanged = input.flowJson !== undefined &&
+    JSON.stringify(input.flowJson) !== JSON.stringify(existing.flowJson);
+
+  const result = await repo.updateFlow(flowId, organizationId, {
+    flowJson: input.flowJson as object,
+    name: input.name,
+    category: input.category,
+    ...(flowJsonChanged && existing.status === "published" ? { status: "draft" } : {}),
+  });
+
+  if (result.count === 0) {
+    throw new ApiError("Flow not found", 404);
+  }
+
+  return { success: true };
+}
+
+export async function deleteFlow(flowId: string, organizationId: string) {
+  const result = await repo.deleteFlow(flowId, organizationId);
+  if (result.count === 0) {
+    throw new ApiError("Flow not found", 404);
+  }
+  return { success: true };
 }
 
 export function createFlow(input: FlowInput) {
@@ -56,10 +107,7 @@ export async function publishToMeta(flowId: string, orgId: string) {
     metaFlowId = createData.id;
     
     // Save it immediately so if upload/publish fails, we don't try to recreate it
-    await prisma.flow.update({
-      where: { id: flowId },
-      data: { metaFlowId }
-    });
+    await repo.setMetaFlowId(flowId, metaFlowId as string);
   }
 
   // 2. Upload Flow JSON as an asset
@@ -172,13 +220,7 @@ export async function setupFlowsEncryption(orgId: string) {
   }
 
   // 3. Save Private Key securely to our DB and set flag
-  await prisma.organization.update({
-    where: { id: orgId },
-    data: {
-      flowsPrivateKey: privateKey,
-      flowsPublicKeyUploaded: true,
-    },
-  });
+  await repo.setFlowsEncryptionUploaded(orgId, privateKey);
 
   return { success: true };
 }

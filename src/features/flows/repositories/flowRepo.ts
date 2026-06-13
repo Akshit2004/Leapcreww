@@ -14,6 +14,32 @@ export function setPublished(id: string, metaFlowId: string) {
   return prisma.flow.update({ where: { id }, data: { status: "published", metaFlowId } });
 }
 
+export function setMetaFlowId(id: string, metaFlowId: string) {
+  return prisma.flow.update({ where: { id }, data: { metaFlowId } });
+}
+
 export function getFlowById(id: string, organizationId: string) {
   return prisma.flow.findUnique({ where: { id, organizationId } });
+}
+
+export function getFlowsEncryptionStatus(organizationId: string) {
+  return prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { flowsPublicKeyUploaded: true },
+  });
+}
+
+export function updateFlow(id: string, organizationId: string, data: Prisma.FlowUpdateInput) {
+  return prisma.flow.updateMany({ where: { id, organizationId }, data });
+}
+
+export function deleteFlow(id: string, organizationId: string) {
+  return prisma.flow.deleteMany({ where: { id, organizationId } });
+}
+
+export function setFlowsEncryptionUploaded(organizationId: string, privateKey: string) {
+  return prisma.organization.update({
+    where: { id: organizationId },
+    data: { flowsPrivateKey: privateKey, flowsPublicKeyUploaded: true },
+  });
 }

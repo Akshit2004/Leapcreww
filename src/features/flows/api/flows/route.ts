@@ -1,11 +1,11 @@
 import { route, ok, requireOrg, requireFields, body } from "@/shared/lib/api";
-import { listFlows, createFlow } from "../../services/flowService";
+import { listFlowsWithEncryptionStatus, createFlow } from "../../services/flowService";
 import type { FlowInput } from "../../types";
 
 export const GET = route(async (_req, { params }) => {
   const orgId = params?.orgId as string;
   await requireOrg(orgId);
-  return ok({ flows: await listFlows(orgId) });
+  return ok(await listFlowsWithEncryptionStatus(orgId));
 });
 
 export const POST = route(async (req, { params }) => {
