@@ -26,6 +26,13 @@ export const CustomersTab: React.FC = () => {
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
   const [isWinBackModalOpen, setIsWinBackModalOpen] = useState(false);
 
+  // Quick Action FAB
+  useEffect(() => {
+    const handler = () => setIsAddCustomerModalOpen(true);
+    window.addEventListener("leapcreww:quickaction", handler);
+    return () => window.removeEventListener("leapcreww:quickaction", handler);
+  }, []);
+
   // Saved Segments states
   const [segments, setSegments] = useState<any[]>([]);
   const [loadingSegments, setLoadingSegments] = useState(false);
@@ -466,6 +473,7 @@ export const CustomersTab: React.FC = () => {
           <div className="flex-1 overflow-hidden min-h-0 bg-white border border-stone-200">
             <CustomersTable
               contacts={filteredContacts}
+              totalContacts={contacts.length}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
               onToggleSelectAll={handleToggleSelectAll}

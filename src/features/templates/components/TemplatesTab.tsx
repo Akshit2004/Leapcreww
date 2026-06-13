@@ -33,6 +33,13 @@ export const TemplatesTab: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Quick Action FAB
+  useEffect(() => {
+    const handler = () => setIsModalOpen(true);
+    window.addEventListener("leapcreww:quickaction", handler);
+    return () => window.removeEventListener("leapcreww:quickaction", handler);
+  }, []);
+
   // Sync templates from Meta into the local database
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -228,6 +235,28 @@ export const TemplatesTab: React.FC = () => {
 
       {/* Templates Grid listing */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredTemplates.length === 0 && (
+          <div className="col-span-full p-12 text-center bg-white border border-stone-200 space-y-4">
+            <FileText className="w-10 h-10 text-stone-300 mx-auto" />
+            {templates.length === 0 ? (
+              <>
+                <div>
+                  <h4 className="font-black text-stone-900 uppercase text-xs mb-1">No templates yet</h4>
+                  <p className="text-xs text-stone-500 max-w-xs mx-auto">Templates are required to send campaigns. Create a Meta-approved template to get started.</p>
+                </div>
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-stone-950 text-white text-xs font-bold uppercase tracking-wider hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Create First Template
+                </button>
+              </>
+            ) : (
+              <p className="text-xs text-stone-500">No templates match your search or filter.</p>
+            )}
+          </div>
+        )}
         {filteredTemplates.map((t) => (
           <div
             key={t.id}
