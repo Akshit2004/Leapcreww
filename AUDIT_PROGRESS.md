@@ -46,44 +46,80 @@ agents that might run `git stash` / `checkout` / `reset` until everything is com
   `DELETE /api/org/:orgId/api-keys/:keyId`, and added revoke UI to
   `DevQuickstartCard.tsx`.
 
+- **#5 — Persist "Add Customer" to DB** — verified: `useContactState.ts`, `contactRepo.ts`,
+  `inboxService.ts`, `inbox/api/contacts/route.ts` are correctly layered and persisted. No
+  changes needed.
+
+- **#6 — Analytics endpoints & UI alignment** — verified/aligned.
+
+- **#7 — AdsTab fake metrics, consolidate ad campaign CRUD** — added `getCampaignInsights` to
+  `meta-ads.ts`, new `adCampaignService`, `src/features/ads/api/campaigns/**` (GET/POST/DELETE),
+  `AdsTab.tsx` now shows real Meta metrics (or a "not live" note) plus local `leads` count.
+
+- **#8 — Gate inbox "Simulate inbound message" button to dev-only** — verified:
+  `InboxTab.tsx` already gates on `process.env.NODE_ENV !== "production"`.
+
+- **#9 — Fix session-broadcast unawaited async send loop** — rewritten
+  `campaigns/api/session-broadcast/route.ts` to enqueue via the existing chunked cron queue
+  (`processAllCampaigns`) using a `SESSION_BROADCAST_TEMPLATE` sentinel + `Campaign.variables`.
+
+- **#10 — Guard mock template auto-approval with `NODE_ENV` check** — added
+  `process.env.NODE_ENV !== "production"` guard in `check-template-status/route.ts`.
+
+- **#11 — Migrate chatbot api routes to services/repositories layering** — moved
+  `chatbot/analytics` (previously **unauthenticated** — fixed, now `requireOrg(... "AGENT")`)
+  into `chatbotAnalyticsRepo`/`chatbotAnalyticsService`; reconciled
+  `org/[orgId]/flows/route.ts` + `[flowId]/route.ts` with `src/features/flows/**`
+  (`listFlowsWithEncryptionStatus`, `updateFlow`, `deleteFlow`); app routes now shims.
+
+- **#12 — Migrate AI feature routes to services/repositories layering** — new
+  `src/features/ai/{repositories,services,api}` for analytics-narrator, campaign-strategist,
+  reply-suggestions (all now `requireOrg(... "AGENT")` instead of manual membership checks);
+  `templates/sync` moved to `templates/services/templateSyncService.ts` +
+  `templates/api/sync/route.ts`. Also fixed `recipes/api/ai/route.ts` (was importing `prisma`
+  directly) — logic moved to `recipeService.generateAiRecipe` +
+  `recipeRepo.createAiGeneratedSequence`.
+
+- **#13 — Migrate webhooks/whatsapp and razorpay routes to layering** — new
+  `webhooks/repositories/{whatsappWebhookRepo,razorpayWebhookRepo}.ts` and
+  `webhooks/services/{whatsappInboundService,razorpayPaymentService}.ts`; route files now thin
+  (signature verification + dispatch only). Wallet-topup webhook routing (#3) preserved.
+
+- **#14 — Migrate dashboard routes to services/repositories layering** — new
+  `dashboard/repositories/dashboardRepo.ts` + `dashboard/services/dashboardService.ts` for
+  `data`, `brand-profile` (ADMIN), `onboarding` (AGENT), `reset-sandbox` (OWNER — destructive),
+  `sandbox-metrics` (AGENT).
+
+- **#15 — Fix remaining layering violations** (`cod`, `replenishment`, `size-shade-finder`,
+  `stock-alerts`) — added `repositories/` to each (`codRepo`, `replenishmentRepo`,
+  `sizeShadeRepo`, `stockAlertRepo`); services no longer import `prisma` directly.
+  `stock-alerts` public POST route converted to `route()`/`ok()`/`ApiError` pattern
+  (`features/stock-alerts/api/route.ts`), still unauthenticated by design (third-party
+  storefront webhook, orgId from URL).
+
+- **#16 — Fix CustomersTab bulk-tag to use existing bulk endpoint** — verified bulk-tag
+  endpoint is correctly layered; `CustomersTab.tsx` now reflects the bulk result via a new
+  `setContacts` context setter instead of N per-contact PATCH calls.
+
+- **#18 — Final verification pass** — `npx prisma validate`, `npx tsc --noEmit`, and
+  `SKIP_ENV_VALIDATION=1 npx next build` all pass with **zero errors**.
+
 ## 🚧 In progress
 
 ## ⏳ Not started
 
-- **#5 — Persist "Add Customer" to DB** — reported done by a prior agent
-  (`useContactState.ts`, `contactRepo.ts`, `inboxService.ts`, `AppContext.tsx`, `types.ts`,
-  new `inbox/api/contacts/route.ts`). These showed as modified in `git status` so likely
-  survived the stash incident, but **re-verify** in the final `tsc`/build pass.
+(none — all 18 tracked tasks complete)
 
-- **#6 — Implement missing analytics endpoints or remove dead UI** — not started.
+## 📝 Additional findings (out of scope for #11–15, not yet remediated)
 
-- **#7 — Fix AdsTab fake metrics, consolidate ad campaign CRUD** — not started.
-
-- **#8 — Gate inbox "Simulate inbound message" button to dev-only** — reported done
-  (`InboxTab.tsx` modified in git status, likely survived) — **re-verify**.
-
-- **#9 — Fix session-broadcast unawaited async send loop** — not started.
-
-- **#10 — Guard mock template auto-approval with `NODE_ENV` check** — not started.
-
-- **#11 — Migrate chatbot api routes to services/repositories layering** — not started.
-
-- **#12 — Migrate AI feature routes to services/repositories layering** — not started.
-
-- **#13 — Migrate webhooks/whatsapp and razorpay routes to layering** — blocked by #3
-  (needs the wallet-topup webhook logic decided first) — not started.
-
-- **#14 — Migrate dashboard routes to services/repositories layering** — not started.
-
-- **#15 — Fix remaining layering violations** (`recipes/ai`, `flows/[flowId]`, `cod`,
-  `replenishment`, `size-shade-finder`, `stock-alerts`) — not started.
-
-- **#16 — Fix CustomersTab bulk-tag to use existing bulk endpoint** — reported done
-  (`CustomersTab.tsx` / `BulkAddTagModal.tsx` modified in git status, likely survived) —
-  **re-verify**.
-
-- **#18 — Final verification pass** (`prisma validate`, `tsc --noEmit`, `next build`) —
-  blocked by all of the above.
+While migrating #11–15, several **other** routes were found that still import `prisma`
+directly inside `api/` (violating the same layering rule) but were not part of the named
+#11–15 scope: `ai/api/generate-template`, `chatbot/api/{nodes,settings,ai-agent-settings}`,
+`flows/api/flows/[flowId]/{broadcast,responses}`, `inbox/api/working-hours`,
+`public-api/api/v1/{events,me}`, `templates/api/{bulk-create-library,check-template-status,
+delete-template/[templateId],toggle-share}`, `webhooks/api/whatsapp/process`. None of these
+caused `tsc`/`build` failures (Prisma client is available everywhere), so they don't block
+#18, but they're worth a follow-up pass for full CONSTITUTION.md compliance.
 
 ---
 

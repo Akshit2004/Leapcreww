@@ -41,3 +41,31 @@ export function logRecipeEvent(organizationId: string, message: string) {
     data: { type: "campaign", message, organizationId },
   });
 }
+
+/** Persist an AI-generated sequence recipe (manual trigger, send_message steps). */
+export function createAiGeneratedSequence(
+  organizationId: string,
+  recipe: {
+    name: string;
+    prompt: string;
+    steps: Array<{ order: number; delayMinutes: number; message: string }>;
+  }
+) {
+  return prisma.sequence.create({
+    data: {
+      name: recipe.name,
+      trigger: "manual",
+      triggerConfig: { aiGenerated: true, prompt: recipe.prompt.slice(0, 200) },
+      organizationId,
+      steps: {
+        create: recipe.steps.map((s) => ({
+          order: s.order,
+          delayMinutes: Math.max(0, Math.min(s.delayMinutes ?? 1, 10080)),
+          actionType: "send_message",
+          message: s.message ?? "",
+          organizationId,
+        })),
+      },
+    },
+  });
+}
