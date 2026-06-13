@@ -5,11 +5,12 @@ import { ArrowRight, Menu, X } from "lucide-react";
 import Link from "next/link";
 
 const navItems = [
-  { label: "Features", href: "#features" },
-  { label: "How it works", href: "#how" },
-  { label: "Developers", href: "#developers" },
-  { label: "Pricing", href: "#pricing" },
-  { label: "FAQ", href: "#faq" },
+  { label: "Features", href: "/#features" },
+  { label: "How it works", href: "/#how" },
+  { label: "Calculator", href: "/calculator" },
+  { label: "Developers", href: "/#developers" },
+  { label: "Pricing", href: "/#pricing" },
+  { label: "FAQ", href: "/#faq" },
 ];
 
 export default function Header() {

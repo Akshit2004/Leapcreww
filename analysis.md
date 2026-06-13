@@ -4,7 +4,24 @@
 > **North star:** A business goes from "found LeapCreww" to "WhatsApp working with their system" in **minutes, with clicks, not code.**
 > **Companion docs:** [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md) · [`docs/FEATURE_LIST.md`](docs/FEATURE_LIST.md) · [`CONSTITUTION.md`](CONSTITUTION.md)
 
----
+## ✅ What's genuinely good
+
+  1. Engineering discipline most startups don't have. CONSTITUTION.md with enforced layering (api/ → services/ → 
+  repositories/), verification gates, and a no-vibe-coding rule. The code I sampled actually follows it — thin routes,
+  services throwing ApiError, prisma confined to repositories.
+
+  2. Security posture is well above average. A real audit happened (SECURITY_REMEDIATION_PLAN.md) and 12/13 findings
+  are fixed: mandatory HMAC on all webhooks with timingSafeEqual, SHA-256 hashed API keys shown once, tiered edge rate
+  limiting (ai/publicApi/standard), OTP lockouts, role-gated multi-tenancy (OWNER/ADMIN/AGENT) on every route.
+
+  3. Feature breadth matches the market leader. Campaigns, templates with AI compliance audit, visual chatbot builder,
+  WhatsApp Flows, drip sequences, segments, CTWA ads, attribution/ROI ledger, white-label partners, wallet billing —
+  that's the full AiSensy surface.
+
+  4. AI is integrated properly. All LLM calls through one shared/lib/groq, graceful degradation when the key is
+  missing, and the AI features are practical (template auditor, flow architect, reply suggestions) not gimmicks.
+
+  5. The docs are excellent — FEATURE_LIST.md, ARCHITECTURE.md, deployment and troubleshooting guides.
 
 ## 1. Where LeapCreww stands vs the market
 
@@ -33,34 +50,24 @@
 | OpenAPI spec + generated SDKs | ❌ gap | ❌ | ⚠️ | ❌ |
 | MCP server (AI agents as integrators) | ❌ opportunity | ❌ | ❌ | ❌ |
 
-**Position:** feature breadth now matches or beats every competitor; AI depth and commerce are ahead of all three. The remaining gaps are **inbox depth**, **no-code connectors (Zapier)**, and **reliability hardening** — plus two open differentiators nobody has (SDKs, MCP).
-
 ---
+❌ What's missing — and this is where it hurts, because your stated goal is "easy to integrate"
 
-## 2. The "one-click integration" surface — STATUS
+🔴 The integration story is the weakest part of the product
 
-The five-layer plan, and where each stands:
+  1. The public API is one endpoint. POST /v1/messages — and it's shallow: hardcoded en_US template language, no
+  template variables/components, no media, no buttons (src/features/public-api/api/v1/messages/route.ts:25). There is
+  no API for contacts (upsert/tag/attributes), templates, campaign triggering, sequence enrollment, or conversations.
+  AiSensy/WATI/Interakt customers integrate primarily through contact + campaign APIs — you can't replace them with
+  this.
 
-### ✅ 2.1 Embeddable WhatsApp Button Widget — SHIPPED
-One line on any website:
-```html
-<script src="https://<host>/widget.js" data-wf="wfw_..." async></script>
-```
-- No-code configurator in Settings: color, position, greeting, prefilled message, **live preview**, copy-snippet, click counter
-- Public key only (org id never exposed) · CORS endpoints · SPA-safe · zero dependencies
-- Files: `public/widget.js`, `src/features/widget/`
+  2. Outbound webhooks don't exist. WebhookSubscription is in the schema and FEATURE_LIST.md claims "HMAC-signed
+  deliveries with event filtering" — but zero code references the model. No event emission, no delivery worker, no
+  retries. For "other systems integrate with us," outbound webhooks are the feature. Right now an external system has
+  no way to know a message arrived or an order was placed.
 
-### ✅ 2.2 One-Click Use-Case Recipes — SHIPPED (unique in market)
-Dashboard → "One-Click Automations": **Enable** installs templates (auto-submitted to Meta, local draft fallback) + a sequence wired to a live trigger.
-- 🛒 **Abandoned Cart Recovery** — `cart_abandoned` (Shopify webhook + marketplace sweep)
-- 👋 **Instant Welcome** — `signup` (trigger was dead; now wired into the inbound webhook)
-- 🎯 **Ad Lead Follow-up** — `ad_click` (also newly wired)
-- Install state derived from data (`triggerConfig.recipeId`) · idempotent · one-click disable
-- Files: `src/features/recipes/`
-
-### ✅ 2.3 Developer Quickstart — SHIPPED (unique in market)
-Settings → Developer Quickstart: ① Generate key (shown once, injected into snippets) ② curl/Node/Python with real host+key ③ **"Send test to my phone"** running the actual /v1 path, billing included.
-- Files: `src/features/public-api/components/DevQuickstartCard.tsx`, `api/test-message/`
+  3. No OpenAPI spec, no developer docs, no SDKs, no Postman collection. "Easy to integrate" is measured in
+  time-to-first-call. Today a developer would have to read your source code.
 
 ### ✅ 2.4 Outbound Webhooks + Test Button — SHIPPED
 Paste URL → pick events → Subscribe → `whsec_` secret shown once → **Send test** → `✓ 200 OK — 142ms`.
@@ -68,42 +75,35 @@ Paste URL → pick events → Subscribe → `whsec_` secret shown once → **Sen
 - HMAC-SHA256 signed (`x-leapcreww-signature`) · 5s timeout · 5 retries, exponential backoff (1m→4m→16m→1h) via `/api/cron/process-webhooks`
 - Files: `src/features/webhooks/` (deliveryService, subscriptionRepo, WebhooksCard)
 
-### ⚠️ 2.5 Platform connect buttons — PARTIAL
-Shopify OAuth ✅ · WooCommerce/Sheets webhook-based ✅ · **Zapier/Make/n8n missing** (see P1 below).
+  4. No idempotency keys → retried requests double-send messages (and would double-charge once billing is wired). No
+  request IDs, no documented error envelope, no wf_test_ sandbox keys, no API changelog/versioning policy.
 
-### Also shipped round 1
-- **/v1 API expansion:** `POST /v1/messages` (template language/variables/media, 402 wallet guard, Inbox logging), `GET/POST /v1/contacts` (upsert by phone, tag/attr merge), `GET /v1/templates` — all scoped, all rate-limited
-- **Idempotency-Key** support (replay-safe sends) — no competitor has this
-- **Billing wired on API path:** every /v1 send debits the wallet (`canAfford` → 402, `recordUsage` on success)
-- **CI fixed:** verify job (prisma validate · tsc · build) gates every push/PR; `db push` runs only after verify, never on PRs
-- **API docs:** `docs/PUBLIC_API.md` (auth, endpoints, signature verification, retries, cron setup)
+  5. The public API isn't billed. canAfford() and recordUsage() are exported from billingService.ts but never called
+  from any send path — API sends are free and unmetered. FEATURE_LIST.md claims a pre-send balance guard that doesn't
+  exist in code. Docs over-claiming vs. reality is a pattern worth fixing.
 
-### ✅ Shipped round 2
-- **Billing now gates campaign broadcasts** (`broadcastService.ts`): pre-flight `canAfford` → fail campaign with clear log if wallet empty; `recordUsage` on every successful send. P0-4 closed for broadcast path.
-- **Billing now gates sequence sends** (`sequenceService.ts`): `recordUsage` called after each step send (marketing for templates, service for free-form). P0-4 fully closed.
-- **Inbound message dedup** (`processInboundMessage`): `waMessageId` checked against `Message` table before processing — Meta retries are silently skipped. P0-5 closed.
-- **`order_placed` sequence trigger**: added to `SequenceTrigger` type; wired in Shopify `orders/create`, WhatsApp catalog orders, and marketplace cart checkout.
-- **`tag_added` tag-filter support**: `enrollOnTrigger` now accepts `triggerMeta.tag`; sequences with `triggerConfig.tag` only enroll when the matching tag is added (used by win_back recipe).
-- **3 new one-click recipes**: Order Confirmation (send template 1 min after order), Review Collector (3 days after order), Win-Back Campaign (fires when "win-back" tag added).
-- **Widget → CRM attribution**: `widget.js` appends `[ref:wfw_key]` to prefilled text; server strips it, tags new contact with `source:widget` + `widget` tag, stores `widget_key` attribute. P1-10 closed.
-- **OpenAPI 3.1 spec** at `GET /api/v1/openapi` — full spec for all /v1 endpoints. P1-8 partial (spec live; Mintlify/Scalar docs page and SDK generation pending).
-- **`GET /api/v1/events`** — paginated polling endpoint for `message.received`, `message.status`, `order.placed`. This is the Zapier/n8n trigger source: poll with `after` cursor, get structured events. P1-7 partial (trigger source exists; Zapier app publication pending).
+🔴 Reliability foundations
 
----
+  6. Zero tests. 35k LOC, money movement (wallet, Razorpay), security-critical webhook verification, segment
+  resolution logic — no test file anywhere. Your constitution gates (tsc/build) catch type errors, not logic bugs.
 
-## 3. TO-DO — the path to god-level
+  7. CI is actively dangerous. .github/workflows/deploy.yml does nothing but prisma db push against the production
+  database on every push to main — no tsc, no build, no lint gate, and db push (not migrations) can silently drop
+  columns. There's no prisma/migrations/ directory at all → no migration history, no rollback path. This contradicts
+  Constitution Article V.
 
-### P0 — Trust & reliability (do before scale marketing)
+  8. The broadcast engine won't scale. Cron-route + in-process delay loops on serverless = timeout death on a
+  10k-contact campaign, and a crash mid-send loses position. It needs a real queue (QStash/Vercel Queues/BullMQ) with
+  per-message jobs and an outbox pattern.
 
-| # | Task | Why it matters | Size | Status |
-|---|------|----------------|------|--------|
-| 1 | **Tests for money + security paths** — vitest on: billing math/wallet debit, webhook HMAC verify (in + out), idempotency replay, segment resolution, OTP lockout, recipe install idempotency | 35k LOC, zero tests; these are the paths that destroy trust when they break | M | ⏳ |
-| 2 | **Queue-based broadcast engine** — replace in-process delay loops with per-message jobs (QStash/Vercel Queues/pg-boss); resumable position, no serverless timeout death on 10k-contact sends | Current engine caps campaign size; a crash mid-send loses position | L | ⏳ |
-| 3 | **Prisma migrations baseline** — `prisma migrate dev` baseline, switch CI deploy to `migrate deploy` | `db push` has no history/rollback; one bad push can drop prod columns | S | ⏳ |
-| 4 | ~~**Wire billing into campaign + sequence sends**~~ | ~~Closed: broadcast + sequence paths now metered~~ | S | ✅ |
-| 5 | ~~**Idempotent webhook event dedup**~~ | ~~Closed: `waMessageId` dedup in processInboundMessage~~ | S | ✅ |
+🟡 Product & polish gaps
 
-### P1 — Match competitors where they're ahead
+  9. Inbox is shallow vs competitors — RoutingRule model exists but no UI; no canned replies, internal notes, working
+  hours, SLAs, or conversation assignment workflow. This is where teams live daily.
+
+  10. Identity confusion in the codebase: features/contacts (repos only) vs features/customers (components only) —
+  same domain, split weirdly. usecase/* appointment-booking and marketplace/* routes look like a bolted-on vertical
+  demo inside the horizontal platform — decide if that's a product pillar or demo cruft.
 
 | # | Task | Why | Size | Status |
 |---|------|-----|------|--------|
@@ -114,36 +114,88 @@ Shopify OAuth ✅ · WooCommerce/Sheets webhook-based ✅ · **Zapier/Make/n8n m
 | 10 | ~~**Widget → chatbot bridge**~~ — ~~widget-sourced contacts auto-tagged (`source:widget`, `widget` tag, `widget_key` attr)~~ | ~~Closes the loop: paste snippet → visitor chats → CRM + automation, all attributed~~ | S | ✅ |
 | 11 | **Multi-number support** — N phone numbers per org, number picker on campaigns/inbox | Agencies and multi-brand businesses require it | L | ⏳ |
 
-### P2 — Differentiators nobody in the market has
+  11. Repo hygiene: README.md is still default create-next-app boilerplate (terrible first impression), a video/
+  directory and .antigravitycli checked in, SystemLog.timestamp stored as an "HH:MM" string (webhookService.ts:54) —
+  unsortable, timezone-blind.
 
-| # | Task | Why | Size |
-|---|------|-----|------|
-| 12 | **MCP server** — expose send-message, upsert-contact, trigger-campaign, query-analytics as MCP tools | In 2026 "easy to integrate" includes AI agents as integrators; first-mover in WhatsApp-marketing MCP | M |
-| 13 | **Recipe marketplace** — community/partner-authored recipes, install counts, categories; partners publish industry packs (clinic, restaurant, D2C) | Turns the unique recipes feature into an ecosystem moat | L |
-| 14 | **AI recipe composer** — "describe your business" → AI assembles a custom recipe (templates + sequence + segments) from the brief, one click to install | Combines two unique strengths (AI depth + recipes); pure wow | M |
-| 15 | **Embedded signup for partners** — white-label partners onboard their clients via hosted flow (connect WhatsApp + install recipe pack in one wizard) | Multiplies the one-click story through the agency channel | L |
-| 16 | **`wf_test_` sandbox keys + test mode** — simulated sends, no wallet debit, webhook test events | Standard for serious API platforms (Stripe pattern) | M |
-
-### Hygiene backlog (do opportunistically)
-
-- Replace boilerplate `README.md` with a real product readme (positioning, screenshots, quickstart, API link)
-- Clear the 123 pre-existing eslint errors, then enable `eslint .` in CI (slot is commented in the workflow)
-- Fold `features/contacts` + `features/customers` into one feature; decide marketplace/appointment verticals are product pillars or extract them
-- `SystemLog.timestamp` is an `"HH:MM"` string — unsortable, timezone-blind; migrate to DateTime
-- Remove `video/`, `.antigravitycli` from the repo
-- Data export (GDPR), 2FA/SSO for enterprise deals
-- Legacy `/api/webhooks/whatsapp/process` route trusts `{from, text}` with the first org in the DB — sandbox-only; gate or remove before production
+  12. Enterprise readiness: no data export, no 2FA/SSO, single phone number per org, Flow encryption "model ready,
+  Meta TBD."
 
 ---
+🎯 Roadmap to "god-level" (priority order)
 
-## 4. Definition of "god-level" (acceptance criteria)
+┌─────┬──────────────────────────────────────────────────────┬──────────────────────────────────────────────────┐
+│  P  │                         Move                         │                       Why                        │
+├─────┼──────────────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│     │ Ship outbound webhooks for real — event emitter in   │ The #1 "integrate with us" feature; schema is    │
+│ P0  │ services, delivery worker with retries + HMAC +      │ already there                                    │
+│     │ dead-letter                                          │                                                  │
+├─────┼──────────────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│ P0  │ Expand /v1: contacts upsert, template send with      │ Without this, no one can migrate from            │
+│     │ variables/media, campaign trigger, conversation read │ AiSensy/WATI                                     │
+├─────┼──────────────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│ P0  │ Wire billing into every send path + idempotency keys │ You're currently giving away unmetered sends     │
+├─────┼──────────────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│ P0  │ Fix CI: tsc + build + lint gates, switch db push →   │ One bad push can corrupt prod today              │
+│     │ prisma migrate deploy                                │                                                  │
+├─────┼──────────────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│ P1  │ OpenAPI spec → hosted docs (Mintlify/Scalar) →       │ Time-to-first-call is the real "easy to          │
+│     │ generated SDKs (Node, Python)                        │ integrate" metric                                │
+├─────┼──────────────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│ P1  │ Tests for money + security paths (billing math, HMAC │ These are the paths that destroy trust when they │
+│     │  verify, segment resolution, OTP lockout)            │  break                                           │
+├─────┼──────────────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│ P1  │ Queue-based broadcast engine                         │ Current design caps you at small sends           │
+├─────┼──────────────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│     │ Zapier/Make/n8n connectors + an MCP server so AI     │ In 2026, "easy to integrate" includes agents as  │
+│ P2  │ agents can use WappFlow as a tool                    │ integrators — this would genuinely differentiate │
+│     │                                                      │  you                                             │
+├─────┼──────────────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│ P2  │ Inbox depth (assignment UI, canned replies, notes),  │                                                  │
+│     │ real README + landing for developers                 │                                                  │
+└─────┴──────────────────────────────────────────────────────┴──────────────────────────────────────────────────┘
 
-1. **Zero-code business:** paste one line → widget live; click Enable → automation running. *(✅ shipped)*
-2. **Developer:** first successful API call < 2 minutes from signup, without reading source. *(✅ shipped; SDKs pending)*
-3. **System-to-system:** any platform can push (REST + idempotency ✅) and receive (signed webhooks + retries ✅); no-code via Zapier *(pending P1-7)*
-4. **Nothing silently breaks:** money and security paths under test *(pending P0-1)*, migrations with rollback *(pending P0-3)*, sends survive crashes *(pending P0-2)*
-5. **A reason nobody else can copy fast:** recipes ecosystem + AI composer + MCP *(P2 — the moat)*
+Bottom line: the application is impressively complete and disciplined — top-decile for a clone-stage product. But
+the platform (API + webhooks + docs + reliability) is ~15% built, and that's exactly the part your goal statement
+depends on. The good news: the architecture makes all of the P0 items straightforward to add.
 
-**Scorecard: integration layer ~95% · reliability ~60% · inbox parity ~30% · moat features 0% (designed, not built).**
+the north star is: a business should go from "found WappFlow" to "WhatsApp working with their system" in 
+minutes, with clicks, not code. Here's how that maps concretely onto what you have, in order of leverage:
+
+The "few clicks" integration architecture
+
+1. Embeddable WhatsApp Button Widget — literally one line
+  The classic killer feature (AiSensy/WATI both sell this hard). A business pastes one script tag and gets a floating
+  WhatsApp chat button on their site:
+  `<script src="https://wappflow.com/widget.js" data-wf="org_abc123"></script>`
+  Every click becomes a Contact in your CRM with source tracking, fires the welcome chatbot flow, and feeds
+  attribution. You give it a no-code configurator in Settings (color, position, prefilled message, live preview) and a
+  "Copy snippet" button. This is the purest "just a button" integration — works on Shopify, WordPress, Wix, anything,
+  with zero developer involvement.
+  
+2. One-click Use-Case Recipes
+  You already have `useCasePresets.ts` and all the primitives (templates, sequences, triggers). Bundle them into
+  installable recipes:
+  - "🛒 Abandoned cart recovery" → [Enable] → auto-creates the template, submits to Meta, creates the sequence with
+  `cart_abandoned` trigger, wires the Shopify webhook
+  - "📦 Order confirmations", "👋 Welcome flow", "⭐ Review collector" — same pattern
+  One click installs the whole working automation. This converts your feature breadth into instant time-to-value
+  instead of a learning curve.
+  
+3. Instant Developer Quickstart (2-minute first API call)
+  A "Developers" tab where one button does everything: generates the API key, and renders ready-to-paste curl / Node /
+  Python snippets with their actual key, org, and a real template name pre-filled — plus a "Send test message to my
+  own phone" button right there in the UI so they see it work before writing any code.
+
+4. Webhook Connect with a Test button
+  Paste endpoint URL → click Subscribe → secret shown → [Send test event] button → green checkmark when their server
+  responds 200. (This requires building the outbound delivery system underneath, which doesn't exist yet — but the UX
+  is what sells it.)
+
+5. Platform connect buttons — Shopify OAuth already works; same one-click pattern for WooCommerce/Wix, and
+  eventually Zapier/Make for non-developers.
+
+  The widget (#1) and recipes (#2) need zero code from the customer. The quickstart (#3) reduces developer integration
+  to copy-paste. That covers both audiences.
 
 The honest summary: LeapCreww now *integrates* like a god-level product. To *be* one, P0 (trust) and P1-6/7 (inbox, Zapier) are the gap between "demo that wows" and "platform businesses bet on."
