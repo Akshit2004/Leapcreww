@@ -205,11 +205,8 @@ export const LeadQualifierWizard: React.FC<LeadQualifierWizardProps> = ({
       {/* Question cards */}
       {config.questions.length > 0 && (
         <div className="px-4 space-y-2">
-          {config.questions.map((q, idx) => (
-            <div
-              key={q.id}
-              className="bg-white border border-stone-100 p-3 space-y-1.5 relative"
-            >
+          {config.questions.map((q, qIdx) => (
+            <div key={q.id} className="bg-white border border-stone-100 p-3 space-y-1.5 relative">
               {/* Delete button */}
               <button
                 type="button"
@@ -220,37 +217,93 @@ export const LeadQualifierWizard: React.FC<LeadQualifierWizardProps> = ({
                 <X className="w-3.5 h-3.5" />
               </button>
 
-              {/* Question header */}
+              {/* Editable question text */}
               <div className="flex items-start gap-2 pr-6">
                 <span className="bg-stone-950 text-white text-[9px] font-black w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
-                  {idx + 1}
+                  {qIdx + 1}
                 </span>
-                <p className="text-xs font-bold text-stone-950 leading-snug">
-                  {q.text}
-                </p>
+                <input
+                  type="text"
+                  value={q.text}
+                  onChange={(e) => {
+                    if (!config) return;
+                    const updated: LeadQualifierConfig = {
+                      ...config,
+                      questions: config.questions.map((qq, i) =>
+                        i === qIdx ? { ...qq, text: e.target.value } : qq
+                      ),
+                    };
+                    setConfig(updated);
+                    onChange(updated);
+                  }}
+                  className="flex-1 text-xs font-bold text-stone-950 bg-transparent border-b border-transparent hover:border-stone-200 focus:border-stone-400 focus:outline-none py-0.5 transition-colors"
+                />
               </div>
 
-              {/* Options */}
-              <div className="flex flex-wrap gap-1 pl-7">
-                {q.options.map((opt) => (
-                  <span
-                    key={opt}
-                    className="text-[10px] bg-stone-50 border border-stone-200 px-2 py-0.5 text-stone-600"
-                  >
-                    {opt}
-                  </span>
-                ))}
+              {/* Editable options — amber if disqualifying, click × to toggle */}
+              <div className="flex flex-wrap gap-1.5 pl-7">
+                {q.options.map((opt, oIdx) => {
+                  const isDisq = q.disqualifyOn?.includes(opt) ?? false;
+                  return (
+                    <div key={oIdx} className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={opt}
+                        onChange={(e) => {
+                          if (!config) return;
+                          const newVal = e.target.value;
+                          const updated: LeadQualifierConfig = {
+                            ...config,
+                            questions: config.questions.map((qq, i) => {
+                              if (i !== qIdx) return qq;
+                              const newOptions = qq.options.map((o, j) => j === oIdx ? newVal : o);
+                              const newDisq = (qq.disqualifyOn || []).map((d) => d === opt ? newVal : d);
+                              return { ...qq, options: newOptions, disqualifyOn: newDisq };
+                            }),
+                          };
+                          setConfig(updated);
+                          onChange(updated);
+                        }}
+                        className={`text-[10px] px-2 py-0.5 border w-24 focus:outline-none focus:w-32 transition-all ${
+                          isDisq
+                            ? "bg-amber-50 border-amber-300 text-amber-700"
+                            : "bg-stone-50 border-stone-200 text-stone-600"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        title={isDisq ? "Remove disqualify" : "Mark as disqualifying"}
+                        onClick={() => {
+                          if (!config) return;
+                          const updated: LeadQualifierConfig = {
+                            ...config,
+                            questions: config.questions.map((qq, i) => {
+                              if (i !== qIdx) return qq;
+                              const cur = qq.disqualifyOn || [];
+                              const newDisq = isDisq ? cur.filter((d) => d !== opt) : [...cur, opt];
+                              return { ...qq, disqualifyOn: newDisq };
+                            }),
+                          };
+                          setConfig(updated);
+                          onChange(updated);
+                        }}
+                        className={`text-[9px] font-black px-1.5 py-0.5 border transition-colors cursor-pointer ${
+                          isDisq
+                            ? "bg-amber-100 border-amber-300 text-amber-700 hover:bg-stone-50 hover:border-stone-200 hover:text-stone-400"
+                            : "bg-stone-50 border-stone-200 text-stone-300 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-600"
+                        }`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Disqualify row */}
               {q.disqualifyOn && q.disqualifyOn.length > 0 && (
-                <div className="flex items-center gap-1.5 pl-7">
-                  <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
-                  <span className="text-[10px] text-amber-600 font-bold">
-                    Disqualify if:{" "}
-                    {q.disqualifyOn.join(", ")}
-                  </span>
-                </div>
+                <p className="text-[9px] text-amber-600 font-bold pl-7">
+                  Disqualify if: {q.disqualifyOn.join(", ")}
+                </p>
               )}
             </div>
           ))}

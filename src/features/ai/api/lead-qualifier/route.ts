@@ -53,7 +53,7 @@ export const POST = route(async (req) => {
   const input = await body<LeadQualifierInput>(req);
   requireFields(input, ["templateBody", "templateName", "orgId"]);
 
-  await requireOrg(input.orgId, "ADMIN");
+  await requireOrg(input.orgId, "AGENT");
 
   const userPrompt = `Campaign template name: "${input.templateName}"\n\nTemplate body:\n${input.templateBody}`;
 
@@ -64,14 +64,14 @@ export const POST = route(async (req) => {
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      undefined,
-      { temperature: 0.4, maxTokens: 1024 }
+      "llama-3.1-8b-instant",
+      { temperature: 0.4, maxTokens: 1024, jsonMode: true }
     );
-    config = JSON.parse(raw.trim()) as LeadQualifierConfig;
-  } catch {
-    // Degrade gracefully: return a sensible default so the caller isn't blocked
-    // when GROQ_API_KEY is absent or the model returns malformed JSON.
-    throw new ApiError("AI generation failed — please try again or build the qualifier manually.", 503);
+    config = JSON.parse(raw) as LeadQualifierConfig;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[lead-qualifier] AI generation failed:", msg);
+    throw new ApiError(`AI generation failed: ${msg}`, 503);
   }
 
   return ok({ config });

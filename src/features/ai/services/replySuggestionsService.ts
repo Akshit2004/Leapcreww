@@ -65,7 +65,7 @@ Rules for response:
     const response = await getGroqChatCompletion([
       { role: "system", content: systemPrompt },
       { role: "user", content: `Recent chat logs:\n${chatHistoryText}` },
-    ], "llama-3.3-70b-versatile");
+    ], "llama-3.1-8b-instant");
 
     const cleanJson = response.replace(/```json/g, "").replace(/```/g, "").trim();
     const suggestions = JSON.parse(cleanJson);

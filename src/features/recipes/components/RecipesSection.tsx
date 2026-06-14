@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useApp } from "@/shared/context/AppContext";
 import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
-import { Loader, Zap, CheckCircle2, XCircle, Sparkles, ChevronRight } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
+import { Loader, Zap, CheckCircle2, XCircle, Sparkles, ChevronRight, Send } from "lucide-react";
 import type { RecipeWithStatus } from "../types";
 
 const ALL = "All";
@@ -15,10 +16,13 @@ interface RecipesSectionProps {
 export const RecipesSection: React.FC<RecipesSectionProps> = ({ hideHeader = false }) => {
   const { organization } = useApp();
   const orgId = organization?.id;
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [recipes, setRecipes] = useState<RecipeWithStatus[] | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>(ALL);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [campaignBusyId, setCampaignBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // AI Composer state
@@ -77,6 +81,29 @@ export const RecipesSection: React.FC<RecipesSectionProps> = ({ hideHeader = fal
       await fetchRecipes();
     } catch { setError("Network error. Please try again."); }
     finally { setBusyId(null); }
+  };
+
+  const handleLaunchCampaign = async (recipe: RecipeWithStatus) => {
+    if (!orgId || !recipe.firstTemplateName) return;
+    setCampaignBusyId(recipe.id);
+    setError(null);
+    try {
+      // Auto-install the automation if not already active
+      if (!recipe.installed) {
+        const installRes = await fetch(`/api/org/${orgId}/recipes/${recipe.id}`, { method: "POST" });
+        if (!installRes.ok) {
+          const d = await installRes.json();
+          setError(d.error || "Failed to enable automation.");
+          return;
+        }
+      }
+      // Navigate to Campaigns tab and open the launch modal with template pre-selected
+      router.push(`${pathname}?tab=campaigns&launchTemplate=${encodeURIComponent(recipe.firstTemplateName)}`);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setCampaignBusyId(null);
+    }
   };
 
   const handleCompose = async () => {
@@ -176,28 +203,44 @@ export const RecipesSection: React.FC<RecipesSectionProps> = ({ hideHeader = fal
                 </p>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-stone-100">
-                <span className="text-[10px] text-stone-400 font-medium">
-                  {recipe.stepCount} step{recipe.stepCount === 1 ? "" : "s"}
-                  {recipe.templateCount > 0 && ` · ${recipe.templateCount} template`}
-                </span>
-                {recipe.installed ? (
+              <div className="pt-1 border-t border-stone-100 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-stone-400 font-medium">
+                    {recipe.stepCount} step{recipe.stepCount === 1 ? "" : "s"}
+                    {recipe.templateCount > 0 && ` · ${recipe.templateCount} template`}
+                  </span>
+                  {recipe.installed ? (
+                    <button
+                      onClick={() => handleUninstall(recipe)}
+                      disabled={busy}
+                      className="flex items-center gap-1 text-[10px] font-bold text-stone-400 hover:text-red-500 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {busy ? <Loader className="w-3 h-3 animate-spin" /> : null}
+                      Disable
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleInstall(recipe)}
+                      disabled={busy}
+                      className="flex items-center gap-1 text-[10px] font-bold text-stone-500 hover:text-stone-900 border border-stone-200 px-2 py-1 transition-colors cursor-pointer disabled:opacity-50 bg-white hover:bg-stone-50"
+                    >
+                      {busy ? <Loader className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                      {busy ? "Enabling..." : "Enable Automation"}
+                    </button>
+                  )}
+                </div>
+
+                {/* Launch Campaign CTA */}
+                {recipe.firstTemplateName && (
                   <button
-                    onClick={() => handleUninstall(recipe)}
-                    disabled={busy}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-stone-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
+                    onClick={() => handleLaunchCampaign(recipe)}
+                    disabled={campaignBusyId === recipe.id}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-stone-950 hover:bg-stone-800 text-white text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    {busy ? <Loader className="w-3 h-3 animate-spin" /> : null}
-                    Disable
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleInstall(recipe)}
-                    disabled={busy}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    {busy ? <Loader className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
-                    {busy ? "Enabling..." : "Enable"}
+                    {campaignBusyId === recipe.id
+                      ? <><Loader className="w-3 h-3 animate-spin" /> Opening...</>
+                      : <><Send className="w-3 h-3" /> Launch Campaign →</>
+                    }
                   </button>
                 )}
               </div>

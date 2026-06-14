@@ -7,7 +7,8 @@
  * compensating cleanup if any step after the segment fails.
  */
 import { ApiError } from "@/shared/lib/api";
-import { getGroqChatCompletion } from "@/shared/lib/groq";
+import { getGroqChatCompletion, getGroqChatCompletionWithFallback } from "@/shared/lib/groq";
+import { generateTemplateBody, generateSequenceStepMessages } from "./templateGenerationService";
 import * as repo from "../repositories/aiRepo";
 import { createTemplate } from "@/features/templates/services/metaTemplateService";
 import { createSegment } from "@/features/segments/services/segmentService";
@@ -21,6 +22,7 @@ import {
 import type { SegmentRules } from "@/features/segments/types";
 import type { CampaignVariable } from "@/features/campaigns/types";
 import type { StepAction } from "@/features/sequences/types";
+import type { LeadQualifierConfig } from "@/features/campaigns/lib/leadQualifier";
 
 interface BrandProfile {
   name?: string;
@@ -129,117 +131,96 @@ export async function generateCampaignStrategy(organizationId: string, prompt: s
   const industry = brand.industry || "general";
   const tone = brand.toneOfVoice || "professional";
 
-  // Query contacts to check for existing tags or active list
-  const contacts = await repo.findContactsForStrategist(organizationId, 20);
+  // Query contacts — extract unique tags only (compact)
+  const contacts = await repo.findContactsForStrategist(organizationId, 50);
+  const uniqueTags = [...new Set(contacts.flatMap((c) => c.tags))].slice(0, 30);
 
-  // Query already approved templates for this organization (local or shared)
-  const approvedTemplates = await repo.findApprovedTemplates(organizationId);
+  // Query approved templates — truncate body to keep prompt small
+  const approvedTemplates = (await repo.findApprovedTemplates(organizationId))
+    .slice(0, 5)
+    .map((t) => ({
+      name: t.name,
+      category: t.category,
+      body: t.body.slice(0, 120) + (t.body.length > 120 ? "…" : ""),
+      buttons: t.buttons,
+      mediaType: t.mediaType,
+    }));
 
-  const systemPrompt = `You are LeapCreww AI Campaign Strategist. Your job is to draft a comprehensive WhatsApp campaign strategy based on the user's objective (e.g. "It's Diwali, I sell sarees").
-Your response MUST be a single, valid JSON object containing a template selection/draft, a target segment, a campaign schedule, and a 3-step sequence.
+  const systemPrompt = `You are a WhatsApp campaign strategist. Output ONLY a raw JSON object — no markdown, no backticks, no explanation.
+Brand: ${brandName} | Industry: ${industry} | Tone: ${tone}
+CRM tags in use: ${uniqueTags.join(", ") || "none"}
+Approved templates: ${JSON.stringify(approvedTemplates)}
 
-Current Date/Time (UTC): ${new Date().toISOString()}
+RULES:
+1. templateExists: true ONLY if an approved template above fits perfectly; false = draft new.
+2. Template name: snake_case, 3-4 words max. Leave body as "PLACEHOLDER" — it will be replaced.
+3. variables: [{"key":"1","type":"contact_field","value":"name"}] always.
+4. buttons: always exactly ["Interested", "Not Interested"].
+5. segment.rules: {"all":[{"field":"tags","op":"in","value":"TAG_NAME"}]} — pick the most relevant tag from CRM tags.
+6. sequence steps: 3 DISTINCT follow-up messages that each reference the SPECIFIC offer (reward amount, product name, action required). Use {{contact.name}}. NEVER write generic openers like "Thanks for your interest", "Just checking in", "Don't miss out", "Hope you're doing well". Each step angle:
+   - order 0 (+5min): quick nudge — name the exact reward and what action to take
+   - order 1 (+1440min): new angle — how easy/quick it is to claim, or a secondary benefit
+   - order 2 (+2880min): urgency — deadline or "last chance" framing referencing the exact offer
 
-Organization profile:
-- Brand Name: ${brandName}
-- Industry: ${industry}
-- Tone of Voice: ${tone}
+EXAMPLE — prompt: "sell commercial vehicle, get ₹100 extra"
+{"templateExists":false,"template":{"name":"commercial_bonus","category":"Marketing","mediaType":"none","body":"PLACEHOLDER","variables":[{"key":"1","type":"contact_field","value":"name"}],"buttons":["Interested","Not Interested"]},"segment":{"name":"all_agents","rules":{"all":[{"field":"tags","op":"in","value":"agents"}]}},"schedule":{"reasoning":"immediate","delay":1,"scheduledAt":""},"sequence":{"name":"commercial_bonus_seq","trigger":"tag_added","triggerConfig":{"tag":"commercial_bonus_trigger"},"steps":[{"order":0,"delayMinutes":5,"actionType":"send_message","message":"{{contact.name}}, your ₹100 commercial vehicle bonus is unclaimed — tag the vehicle as 'Commercial' now to grab it!"},{"order":1,"delayMinutes":1440,"actionType":"send_message","message":"{{contact.name}}, it only takes 30 seconds to tag a commercial vehicle and pocket ₹100 extra. Go do it now!"},{"order":2,"delayMinutes":2880,"actionType":"send_message","message":"Last call {{contact.name}} — the ₹100 commercial vehicle bonus window is closing. Tag it as 'Commercial' before it's gone!"}]}}
 
-Available CRM taxonomy tags/fields:
-${JSON.stringify(contacts.slice(0, 10), null, 2)}
+OUTPUT JSON:`;
 
-List of ALREADY APPROVED WhatsApp message templates for this organization:
-${JSON.stringify(approvedTemplates, null, 2)}
-
-You MUST decide and generate:
-1. "templateExists": Set to true IF AND ONLY IF one of the ALREADY APPROVED templates listed above is a perfect fit or a very good match for the user's campaign objective. If no approved template is a good fit, set this to false.
-2. "template": The WhatsApp template.
-   - If "templateExists" is true: You MUST select the best-matching template from the ALREADY APPROVED list above. The "name", "category", "body", "buttons", "mediaType", and "mediaUrl" MUST match the selected approved template EXACTLY.
-   - If "templateExists" is false: You MUST draft a new template that would be ideal for this campaign:
-     - "name": lowercase, alphanumeric, underscore only (e.g., "diwali_saree_promo_1").
-     - "category": "Marketing"
-     - "mediaType": MUST be "none". (Media-header templates need a sample asset the strategist cannot supply, so always use "none".)
-     - "body": Text message under 1024 characters. Use bold *text* to highlight offers. To personalize with the recipient's name, put a single Meta placeholder "{{1}}" exactly where the name goes (e.g., "Hi {{1}}, ..."). Do NOT use square-bracket placeholders like [Lead Name].
-     - "variables": An ordered array describing each {{n}} placeholder used in the body. For the contact's name use {"type":"contact_field","value":"name"}. If the body uses no placeholders, return an empty array [].
-     - "buttons": Array of up to 3 string button text labels (e.g., ["Shop Collection", "Talk to Us"]).
-3. "segment": A target segment to select matching contacts.
-   - "name": Concise name (e.g., "Saree Buyers & Leads").
-   - "rules": Rules to resolve contacts. Must match LeapCreww's SegmentRules schema:
-     {
-       "all": [
-         { "field": "tags" | "status" | "source", "op": "in" | "eq", "value": "diwali_promo" | "Active" }
-       ]
-     }
-     Prefer targeting active tags or using a tag matching the campaign category. You can also generate a new tag (e.g. "saree_interest") that matching contacts will be tagged with.
-4. "schedule":
-   - "reasoning": A brief explanation of the timing choice.
-   - "delay": spacing delay between messages in seconds (1 to 3).
-   - "scheduledAt": Suggested ISO timestamp for launch (recommend a logical upcoming date/time).
-5. "sequence": A 3-step drip sequence to enroll leads into for follow-ups.
-   - "name": Sequence name (e.g., "Diwali Saree Drip D-3").
-   - "trigger": "tag_added"
-   - "triggerConfig": { "tag": "diwali_promo_drip" }
-   - "steps": 3 steps:
-     - For "send_message" steps, personalize the copy with "{{contact.name}}" (this exact token is resolved at send time). Do NOT use [Lead Name] or {{1}}.
-     - Step 1 (Immediate follow-up): delayMinutes = 5. actionType = "send_message" or "send_template". If send_message, include "message" field. If send_template, include "templateName".
-     - Step 2 (Day 1 follow-up): delayMinutes = 1440. actionType = "send_message" with a copy text message reminding them.
-     - Step 3 (Day 2 follow-up): delayMinutes = 2880. actionType = "send_message" with a final promo/urgency message.
-
-Return ONLY a valid JSON object matching the schema below. Do not wrap in markdown or backticks.
-Schema:
-{
-  "templateExists": true,
-  "template": {
-    "name": "...",
-    "category": "Marketing",
-    "mediaType": "none",
-    "body": "...",
-    "variables": [ { "type": "contact_field", "value": "name" } ],
-    "buttons": ["..."]
-  },
-  "segment": {
-    "name": "...",
-    "rules": { "all": [ { "field": "...", "op": "...", "value": "..." } ] }
-  },
-  "schedule": {
-    "reasoning": "...",
-    "delay": 1,
-    "scheduledAt": "..."
-  },
-  "sequence": {
-    "name": "...",
-    "trigger": "tag_added",
-    "triggerConfig": { "tag": "..." },
-    "steps": [
-      { "order": 0, "delayMinutes": 5, "actionType": "send_message", "message": "..." },
-      { "order": 1, "delayMinutes": 1440, "actionType": "send_message", "message": "..." },
-      { "order": 2, "delayMinutes": 2880, "actionType": "send_message", "message": "..." }
-    ]
-  }
-}`;
+  const messages = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: `Prompt: ${prompt}` },
+  ];
 
   let aiResponse: string;
   try {
-    aiResponse = await getGroqChatCompletion([
-      { role: "system", content: systemPrompt },
-      { role: "user", content: `Prompt: ${prompt}` },
-    ]);
+    // 70b preferred for quality; falls back to 8b if daily quota is exhausted
+    aiResponse = await getGroqChatCompletionWithFallback(messages, "llama-3.3-70b-versatile", "llama-3.1-8b-instant", { maxTokens: 1024, temperature: 0.2, jsonMode: true });
   } catch (err) {
-    console.error("[ai] Campaign strategist Groq call failed:", err);
-    throw new ApiError("AI strategist is currently unavailable. Please try again later.", 502);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[ai] Campaign strategist Groq call failed:", msg);
+    throw new ApiError(`AI strategist unavailable: ${msg}`, 502);
   }
-
-  const cleanJson = aiResponse.replace(/```json/g, "").replace(/```/g, "").trim();
 
   let strategy: CampaignStrategy;
   try {
-    strategy = JSON.parse(cleanJson);
-  } catch {
-    console.error("Failed to parse strategist strategy:", cleanJson);
+    strategy = JSON.parse(aiResponse);
+  } catch (parseErr) {
+    console.error("[ai] Failed to parse strategist JSON:", parseErr, "\nRaw:", aiResponse.slice(0, 800));
     throw new ApiError("AI returned an invalid JSON schema. Please try again.", 502);
   }
 
   sanitizeStrategyPlaceholders(strategy);
+
+  // ── Replace template body AND sequence step messages using focused services ──
+  // Same "Generate with AI" approach as the Templates tab — dedicated prompts
+  // per piece of copy instead of one big JSON blob. Run in parallel for speed.
+  const [generatedBody, generatedStepMessages] = await Promise.allSettled([
+    generateTemplateBody(organizationId, prompt),
+    generateSequenceStepMessages(organizationId, prompt),
+  ]);
+
+  if (generatedBody.status === "fulfilled") {
+    strategy.template.body = generatedBody.value;
+  }
+
+  // Ensure variables always has the {{1}} name entry
+  if (!Array.isArray(strategy.template.variables)) strategy.template.variables = [];
+  const hasNameVar = strategy.template.variables.some((v) => v.type === "contact_field" && v.value === "name");
+  if (!hasNameVar) strategy.template.variables.unshift({ key: "1", type: "contact_field", value: "name" });
+
+  // Replace sequence step messages with focused AI-generated ones
+  if (generatedStepMessages.status === "fulfilled") {
+    const [msg0, msg1, msg2] = generatedStepMessages.value;
+    if (!strategy.sequence) {
+      strategy.sequence = { name: `${strategy.template.name}_seq`, trigger: "tag_added", triggerConfig: { tag: `${strategy.template.name}_trigger` }, steps: [] };
+    }
+    strategy.sequence.steps = [
+      { order: 0, delayMinutes: 5,    actionType: "send_message", message: msg0 },
+      { order: 1, delayMinutes: 1440, actionType: "send_message", message: msg1 },
+      { order: 2, delayMinutes: 2880, actionType: "send_message", message: msg2 },
+    ];
+  }
 
   // ── Server-side guards on the AI's template decision ──────────────
   // The model can hallucinate a reuse (templateExists:true with a name
@@ -259,6 +240,10 @@ Schema:
       if (!Array.isArray(strategy.template.variables)) {
         strategy.template.variables = [];
       }
+      // Always ensure Interested/Not Interested buttons exist on new templates
+      if (!Array.isArray(strategy.template.buttons) || strategy.template.buttons.length === 0) {
+        strategy.template.buttons = ["Interested", "Not Interested"];
+      }
     }
   }
 
@@ -269,7 +254,8 @@ export interface ApplyStrategyInput {
   template: StrategyTemplate;
   segment: StrategySegment;
   schedule: StrategySchedule;
-  sequence: StrategySequence;
+  sequence: StrategySequence | null;
+  leadQualifier?: LeadQualifierConfig | null;
 }
 
 export type ApplyStrategyResult =
@@ -279,7 +265,7 @@ export type ApplyStrategyResult =
       template: unknown;
       segment: { id: string };
       campaign: unknown;
-      sequence: { id: string };
+      sequence: { id: string } | null;
       enrolledCount: number;
     }
   | {
@@ -288,7 +274,7 @@ export type ApplyStrategyResult =
       template: unknown;
       segment: { id: string };
       campaign: unknown;
-      sequence: { id: string };
+      sequence: { id: string } | null;
       pendingCount: number;
     };
 
@@ -304,9 +290,9 @@ export async function applyCampaignStrategy(
   input: ApplyStrategyInput
 ): Promise<ApplyStrategyResult> {
   sanitizeStrategyPlaceholders(input as Partial<CampaignStrategy>);
-  const { template, segment, schedule, sequence } = input;
+  const { template, segment, schedule, sequence, leadQualifier } = input;
 
-  if (!template || !segment || !schedule || !sequence) {
+  if (!template || !segment || !schedule) {
     throw new ApiError("Missing strategy parts", 400);
   }
 
@@ -354,24 +340,25 @@ export async function applyCampaignStrategy(
       organizationId,
     });
 
-    // 3. Create the follow-up Sequence (definition only; enrollment happens
-    //    when the campaign actually broadcasts and opens a 24h session).
-    const triggerTag = sequence.triggerConfig?.tag || `${template.name}_trigger`;
-    savedSequence = await createSequence({
-      name: sequence.name,
-      trigger: "tag_added",
-      triggerConfig: { tag: triggerTag },
-      organizationId,
-      segmentId: savedSegment.id,
-      steps: sequence.steps.map((s, idx) => ({
-        order: idx,
-        delayMinutes: s.delayMinutes || 0,
-        actionType: (s.actionType as StepAction) || "send_message",
-        templateName: s.templateName,
-        message: s.message,
-        conditions: s.conditions,
-      })),
-    });
+    // 3. Create the follow-up Sequence (optional — skipped when user disabled it).
+    const triggerTag = sequence?.triggerConfig?.tag || `${template.name}_trigger`;
+    if (sequence) {
+      savedSequence = await createSequence({
+        name: sequence.name,
+        trigger: "tag_added",
+        triggerConfig: { tag: triggerTag },
+        organizationId,
+        segmentId: savedSegment.id,
+        steps: sequence.steps.map((s, idx) => ({
+          order: idx,
+          delayMinutes: s.delayMinutes || 0,
+          actionType: (s.actionType as StepAction) || "send_message",
+          templateName: s.templateName,
+          message: s.message,
+          conditions: s.conditions,
+        })),
+      });
+    }
 
     if (templateApproved) {
       // 4a. Template is ready — launch (or schedule) and enroll immediately.
@@ -386,9 +373,12 @@ export async function applyCampaignStrategy(
         mediaType: savedTemplate.mediaType,
         mediaUrl: savedTemplate.mediaUrl || undefined,
         variables,
+        leadQualifier: leadQualifier ?? null,
       });
 
-      const enrolledCount = await enrollSegmentContacts(organizationId, savedSegment.id, triggerTag);
+      const enrolledCount = sequence
+        ? await enrollSegmentContacts(organizationId, savedSegment.id, triggerTag)
+        : 0;
 
       return {
         success: true,
@@ -422,6 +412,7 @@ export async function applyCampaignStrategy(
       date: new Date().toISOString().split("T")[0],
       scheduledAt: schedule.scheduledAt ? new Date(schedule.scheduledAt) : null,
       organizationId,
+      leadQualifier: (leadQualifier as unknown as object) ?? null,
     });
 
     return {

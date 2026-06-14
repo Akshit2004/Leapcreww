@@ -56,6 +56,7 @@ export interface RecipeWithStatus {
   stepCount: number;
   installed: boolean;
   sequenceId: string | null;
+  firstTemplateName: string | null;
 }
 
 /** Result of a one-click install. */
