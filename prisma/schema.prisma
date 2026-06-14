@@ -211,6 +211,7 @@ model Campaign {
   segment        Segment?     @relation(fields: [segmentId], references: [id], onDelete: SetNull)
   timezone       String?      // IANA tz for timezone-aware scheduling (T-11)
   recurrence     String?      // null | "daily" | "weekly" | "monthly" (T-11)
+  leadQualifier  Json?        // LeadQualifierConfig — intercept handler config for post-CTA qualification flows
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())

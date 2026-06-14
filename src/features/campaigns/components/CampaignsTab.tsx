@@ -32,6 +32,8 @@ import { CampaignReportDrawer } from "./CampaignReportDrawer";
 import { CreateTemplateModal } from "@/features/templates/components/CreateTemplateModal";
 import { UploadButton } from "@/shared/lib/uploadthing";
 import { SegmentRules, evaluateSegmentRules } from "@/shared/lib/segmentMatch";
+import { LeadQualifierWizard } from "./LeadQualifierWizard";
+import type { LeadQualifierConfig } from "@/features/campaigns/lib/leadQualifier";
 
 export const CampaignsTab: React.FC = () => {
   const { organization, campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign, addSystemLog, refreshWorkspace } = useApp();
@@ -180,6 +182,7 @@ export const CampaignsTab: React.FC = () => {
   const [excludeTag, setExcludeTag] = useState("None");
   const [templateName, setTemplateName] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
+  const [qualifierConfig, setQualifierConfig] = useState<LeadQualifierConfig | null>(null);
   const [broadcastMode, setBroadcastMode] = useState<"template" | "session">("template");
   const [sessionText, setSessionText] = useState("");
 
@@ -405,6 +408,7 @@ export const CampaignsTab: React.FC = () => {
         excludeTag: excludeTag === "None" ? undefined : excludeTag,
         mediaType: activeTemplate?.mediaType,
         mediaUrl: mediaUrl.trim() || undefined,
+        leadQualifier: qualifierConfig ?? undefined,
       });
     }
 
@@ -416,6 +420,7 @@ export const CampaignsTab: React.FC = () => {
     setSessionText("");
     setMediaUrl("");
     setSelectedSegmentId("all_contacts");
+    setQualifierConfig(null);
     setIsModalOpen(false);
   };
 
@@ -1083,6 +1088,16 @@ export const CampaignsTab: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Lead Qualifier Wizard — template mode only */}
+              {broadcastMode === "template" && activeTemplate && (
+                <LeadQualifierWizard
+                  templateBody={activeTemplate.body}
+                  templateName={templateName}
+                  orgId={orgId}
+                  onChange={setQualifierConfig}
+                />
+              )}
 
               {/* Footer CTA */}
               <div className="flex justify-end gap-2.5 pt-4 border-t border-stone-200">

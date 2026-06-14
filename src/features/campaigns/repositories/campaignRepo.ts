@@ -3,7 +3,7 @@
  * Services call these; routes never touch prisma directly.
  */
 import { prisma } from "@/shared/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 export async function findTargetContacts(
   organizationId: string,
@@ -177,4 +177,53 @@ export function userIsOrgMember(email: string, organizationId: string) {
   return prisma.membership
     .findFirst({ where: { user: { email }, organizationId } })
     .then((m) => !!m);
+}
+
+// ─── Lead qualifier support ────────────────────────────────────────────────
+
+/**
+ * Return all campaigns for an org that carry a non-null leadQualifier blob.
+ * Used by the webhook intercept to find which campaign triggered the contact's
+ * button-reply keyword.
+ */
+export function findCampaignsWithLeadQualifier(organizationId: string) {
+  // Filter campaigns that have a non-null leadQualifier JSON blob.
+  // Prisma nullable-JSON "not null" filter uses the JsonNullValueFilter enum.
+  return prisma.campaign.findMany({
+    where: {
+      organizationId,
+      leadQualifier: { not: Prisma.JsonNullValueFilter.DbNull },
+    },
+    select: { id: true, leadQualifier: true },
+  });
+}
+
+/**
+ * Return the leadQualifier field for a single campaign (used when a contact
+ * is already mid-session and we need to reload the config).
+ */
+export function findCampaignLeadQualifier(campaignId: string, organizationId: string) {
+  return prisma.campaign.findFirst({
+    where: { id: campaignId, organizationId },
+    select: { leadQualifier: true },
+  });
+}
+
+/** Persist updated contact attributes (qualifier state + captured answers). */
+export function updateContactAttributes(
+  contactId: string,
+  attributes: Record<string, unknown>
+) {
+  return prisma.contact.update({
+    where: { id: contactId },
+    data: { attributes: attributes as Prisma.InputJsonValue },
+  });
+}
+
+/** Persist updated contact tags (deduped). */
+export function updateContactTags(contactId: string, tags: string[]) {
+  return prisma.contact.update({
+    where: { id: contactId },
+    data: { tags },
+  });
 }

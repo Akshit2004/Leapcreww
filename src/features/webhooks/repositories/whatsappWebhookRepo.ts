@@ -109,6 +109,24 @@ export function findContactByPhone(phone: string, organizationId: string) {
   });
 }
 
+/**
+ * Fetch a contact with its attributes field for use by the lead qualifier intercept.
+ * Scoped by organizationId to prevent cross-tenant leakage.
+ */
+export function findContactWithAttributes(id: string, organizationId: string) {
+  return prisma.contact.findFirst({
+    where: { id, organizationId },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      tags: true,
+      attributes: true,
+      organizationId: true,
+    },
+  });
+}
+
 export function updateContact(contactId: string, data: Prisma.ContactUpdateInput) {
   return prisma.contact.update({ where: { id: contactId }, data });
 }

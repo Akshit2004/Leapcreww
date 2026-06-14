@@ -37,6 +37,7 @@ export interface LaunchCampaignInput {
   mediaType?: string;
   mediaUrl?: string;
   segmentId?: string; // T-04: target a saved segment instead of a single tag
+  leadQualifier?: import("./lib/leadQualifier").LeadQualifierConfig | null; // post-CTA qualification config
 }
 
 // ─── Meta template payload shapes ─────────────────────────────────────────────

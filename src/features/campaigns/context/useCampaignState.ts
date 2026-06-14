@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Campaign, SystemLog } from "@/shared/context/types";
+import type { LeadQualifierConfig } from "@/features/campaigns/lib/leadQualifier";
 
 interface UseCampaignStateProps {
   addSystemLog: (type: SystemLog["type"], message: string) => void;
@@ -16,10 +17,10 @@ export const useCampaignState = ({
 }: UseCampaignStateProps) => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
 
-  const sendBroadcast = useCallback(async (campaignData: { 
-    name: string; 
-    targetTag: string; 
-    templateName: string; 
+  const sendBroadcast = useCallback(async (campaignData: {
+    name: string;
+    targetTag: string;
+    templateName: string;
     organizationId: string;
     variables?: Array<{ key: string; type: "contact_field" | "static"; value: string }>;
     delay?: number;
@@ -28,6 +29,7 @@ export const useCampaignState = ({
     mediaType?: string;
     mediaUrl?: string;
     segmentId?: string;
+    leadQualifier?: LeadQualifierConfig;
   }) => {
     try {
       const isScheduled = !!campaignData.scheduledAt;
