@@ -13,6 +13,7 @@ import { TemplatesTab } from "@/features/templates/components/TemplatesTab";
 import { FlowsTab } from "@/features/flows/components/FlowsTab";
 import { ChatbotTab } from "@/features/chatbot/components/ChatbotTab";
 import { UseCasesTab } from "@/features/usecases/components/UseCasesTab";
+import { BookingCustomersTab } from "@/features/usecases/components/BookingCustomersTab";
 import { SettingsTab } from "@/features/settings/components/SettingsTab";
 import { IntegrationsTab } from "@/features/integrations/components/IntegrationsTab";
 import { AnalyticsTab } from "@/features/analytics/components/AnalyticsTab";
@@ -145,6 +146,8 @@ function TenantDashboardInner() {
         return <ChatbotTab />;
       case "usecases":
         return <UseCasesTab />;
+      case "bookingcustomers":
+        return <BookingCustomersTab onNavigate={handleTabChange} />;
       case "integrations":
         return <IntegrationsTab />;
       case "ndr":

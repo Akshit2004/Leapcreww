@@ -14,6 +14,7 @@ import {
   Rocket,
   Truck,
   ShoppingBag,
+  CalendarCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -71,6 +72,13 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Insights",
     items: [
       { id: "analytics", label: "Analytics", icon: BarChart3, keywords: ["reports", "stats", "metrics", "roi"] },
+    ],
+  },
+  {
+    id: "bookings",
+    label: "Bookings",
+    items: [
+      { id: "bookingcustomers", label: "Customers", icon: CalendarCheck, keywords: ["slot booking", "appointment", "clients", "patients", "guests", "attendees", "directory"] },
     ],
   },
   {

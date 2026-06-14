@@ -497,12 +497,19 @@ Features are ordered **most rich → least** for testing priority.
 | Slot management | View, update, delete individual slots |
 | Booking management | View all bookings; update status |
 | Use case settings | Configure business hours, slot duration, buffer time |
+| Slot booking customers | Dedicated "Bookings → Customers" tab: one row per customer aggregating all their slot bookings (totals, upcoming, no-shows, last visit, next appointment, fees collected) |
+| Customer drill-down | Expand a customer to view their full booking history with status badges |
+| Customer actions | Manage booking status (completed / no-show / cancel), message on WhatsApp (jumps to Inbox), export the directory to CSV |
 
 **Test checklist:**
 - [ ] Configure use-case settings (working hours, duration) → slots generated
 - [ ] Book a slot → booking appears in console
 - [ ] Update booking status → confirmed/cancelled
 - [ ] Delete a slot → no longer bookable
+- [ ] Open Bookings → Customers → customers aggregated one row each
+- [ ] Expand a customer → full booking history shown
+- [ ] Message on WhatsApp → opens that contact in Inbox
+- [ ] Export CSV → downloads customer directory
 
 **Routes:** `GET/PUT /api/usecase/settings` · `GET/POST /api/usecase/slots` · `POST /api/usecase/slots/generate` · `GET/PUT/DELETE /api/usecase/slots/[id]` · `GET/POST /api/usecase/bookings` · `GET/PUT /api/usecase/bookings/[id]`
 
