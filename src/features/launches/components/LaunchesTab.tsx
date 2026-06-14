@@ -5,8 +5,6 @@ import {
   Rocket,
   Plus,
   X,
-  ChevronDown,
-  ChevronUp,
   Trash2,
   PlayCircle,
   Clock,
@@ -67,6 +65,19 @@ function fmtOffset(minutes: number): string {
   return `${Math.round(abs / 1440)} day${Math.round(abs / 1440) !== 1 ? "s" : ""} ${dir}`;
 }
 
+/** Relative countdown for the launch moment, e.g. "in 3 days" / "live" / "ended". */
+function fmtRelative(iso: string, status: Launch["status"]): string {
+  if (status === "ended") return "Ended";
+  const diffMs = new Date(iso).getTime() - Date.now();
+  if (diffMs <= 0) return "Live now";
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 60) return `in ${mins} min`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `in ${hrs} hr`;
+  const days = Math.round(hrs / 24);
+  return `in ${days} day${days !== 1 ? "s" : ""}`;
+}
+
 // ─── Status badge ──────────────────────────────────────────────────────────────
 
 function LaunchStatusBadge({ status }: { status: Launch["status"] }) {
@@ -99,6 +110,169 @@ function StepStatusIcon({ status }: { status: LaunchStep["status"] }) {
   return <Clock className="w-3.5 h-3.5 text-[#1D211F]/30" />;
 }
 
+// ─── Stat chip (overview strip) ─────────────────────────────────────────────────
+
+function StatChip({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <div className="bg-white border border-[#1D211F]/10 px-4 py-3">
+      <div className={`text-2xl font-bold tracking-tight tabular-nums ${accent ? "text-[#D05E3C]" : "text-[#1D211F]"}`}>
+        {value.toLocaleString()}
+      </div>
+      <div className="font-mono text-[10px] tracking-widest uppercase text-[#1D211F]/40 mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+// ─── Launch detail (right pane / mobile inline) ─────────────────────────────────
+
+interface LaunchDetailProps {
+  launch: Launch;
+  editSteps: Record<string, string>;
+  setEditSteps: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  onSaveSteps: (l: Launch) => void;
+  savingSteps: boolean;
+  onActivate: (l: Launch) => void;
+  onDelete: (l: Launch) => void;
+  activatingId: string | null;
+  deletingId: string | null;
+}
+
+function LaunchDetail({
+  launch, editSteps, setEditSteps, onSaveSteps, savingSteps,
+  onActivate, onDelete, activatingId, deletingId,
+}: LaunchDetailProps) {
+  const isDraft = launch.status === "draft";
+  const sentCount = launch.steps.filter((s) => s.status === "sent").length;
+
+  return (
+    <div className="bg-white border border-[#1D211F]/10">
+      {/* Detail header */}
+      <div className="p-5 sm:p-6 border-b border-[#1D211F]/8">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-bold text-lg text-[#1D211F] leading-tight font-serif">{launch.name}</h3>
+              <LaunchStatusBadge status={launch.status} />
+            </div>
+            {launch.description && (
+              <p className="text-xs text-[#1D211F]/50 leading-relaxed max-w-2xl">{launch.description}</p>
+            )}
+          </div>
+          {isDraft && (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => onActivate(launch)}
+                disabled={activatingId === launch.id}
+                className="flex items-center gap-1.5 text-[10px] font-bold uppercase px-3 py-2 bg-[#D05E3C] text-white hover:bg-[#D05E3C]/90 transition-colors cursor-pointer rounded-none disabled:opacity-40"
+              >
+                {activatingId === launch.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlayCircle className="w-3.5 h-3.5" />}
+                Activate
+              </button>
+              <button
+                onClick={() => onDelete(launch)}
+                disabled={deletingId === launch.id}
+                className="p-2 text-[#1D211F]/30 hover:text-red-500 hover:bg-red-50 border border-[#1D211F]/10 hover:border-red-100 transition-colors cursor-pointer rounded-none disabled:opacity-40"
+              >
+                {deletingId === launch.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Meta strip */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-[11px] text-[#1D211F]/60">
+          <span className="flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-[#1D211F]/35" />
+            {fmtDate(launch.launchAt)}
+            <span className="text-[#D05E3C] font-bold">· {fmtRelative(launch.launchAt, launch.status)}</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Tag className="w-3.5 h-3.5 text-[#1D211F]/35" />
+            {launch.targetTag || "All contacts"}
+          </span>
+          {launch.productUrl && (
+            <a href={launch.productUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-[#D05E3C] transition-colors">
+              <ExternalLink className="w-3.5 h-3.5" />
+              Product link
+            </a>
+          )}
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-[#1D211F]/35" />
+            {sentCount}/{launch.steps.length} steps sent
+          </span>
+        </div>
+      </div>
+
+      {/* Steps timeline */}
+      <div className="p-5 sm:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <span className="font-mono text-[10px] tracking-widest uppercase text-[#1D211F]/40">
+            Sequence · {launch.steps.length} steps
+          </span>
+          <button
+            onClick={() => onSaveSteps(launch)}
+            disabled={savingSteps}
+            className="flex items-center gap-1.5 text-[10px] font-bold uppercase px-3 py-1.5 bg-[#1D211F] text-white hover:bg-[#1D211F]/80 transition-colors cursor-pointer rounded-none disabled:opacity-40"
+          >
+            {savingSteps ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+            Save messages
+          </button>
+        </div>
+
+        {/* Vertical timeline */}
+        <div className="relative pl-6">
+          {/* the line */}
+          <div className="absolute left-[7px] top-1 bottom-1 w-px bg-[#1D211F]/12" />
+          <div className="space-y-3">
+            {launch.steps.map((step, idx) => {
+              const isLaunchMoment = step.offsetMinutes === 0;
+              const nodeColor =
+                step.status === "sent" ? "bg-[#D05E3C] border-[#D05E3C]" :
+                isLaunchMoment ? "bg-[#1D211F] border-[#1D211F]" :
+                "bg-white border-[#1D211F]/25";
+              return (
+                <div key={step.id} className="relative">
+                  {/* node */}
+                  <span className={`absolute -left-[22px] top-3 w-[15px] h-[15px] rounded-full border-2 ${nodeColor} flex items-center justify-center`}>
+                    {isLaunchMoment && <Rocket className="w-2 h-2 text-white" />}
+                  </span>
+
+                  <div className="bg-[#fafaf9] border border-[#1D211F]/8 p-3 sm:p-4 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-[9px] tracking-widest uppercase text-[#1D211F]/30 bg-[#1D211F]/5 px-1.5 py-0.5 border border-[#1D211F]/8 shrink-0">
+                          {String(idx + 1).padStart(2, "0")}
+                        </span>
+                        <span className="text-xs font-bold text-[#1D211F] truncate">{step.label}</span>
+                        <span className={`text-[10px] shrink-0 ${isLaunchMoment ? "text-[#D05E3C] font-bold" : "text-[#1D211F]/40"}`}>
+                          {fmtOffset(step.offsetMinutes)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <StepStatusIcon status={step.status} />
+                        <span className="font-mono text-[10px] tracking-widest uppercase text-[#1D211F]/40">
+                          {step.status === "sent" ? `${step.sentCount} sent` : step.status === "skipped" ? "skipped" : fmtDate(step.sendAt)}
+                        </span>
+                      </div>
+                    </div>
+                    <textarea
+                      rows={2}
+                      value={editSteps[step.id] ?? step.message}
+                      onChange={(e) => setEditSteps((prev) => ({ ...prev, [step.id]: e.target.value }))}
+                      className="w-full bg-white border border-[#1D211F]/10 text-[#1D211F] text-xs leading-relaxed p-2.5 resize-none focus:outline-none focus:border-[#1D211F]/40 font-medium rounded-none placeholder:text-[#1D211F]/30"
+                      placeholder="Enter WhatsApp message for this step…"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function LaunchesTab() {
@@ -109,7 +283,7 @@ export function LaunchesTab() {
 
   const [launches, setLaunches] = useState<Launch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editSteps, setEditSteps] = useState<Record<string, string>>({});
   const [savingSteps, setSavingSteps] = useState(false);
   const [activatingId, setActivatingId] = useState<string | null>(null);
@@ -227,7 +401,7 @@ export function LaunchesTab() {
         throw new Error(d.error ?? "Delete failed");
       }
       setLaunches((prev) => prev.filter((l) => l.id !== launch.id));
-      if (expandedId === launch.id) setExpandedId(null);
+      if (selectedId === launch.id) setSelectedId(null);
       notify.success("Launch deleted", `"${launch.name}" has been removed.`);
     } catch (err: unknown) {
       notify.error("Delete failed", err instanceof Error ? err.message : "Something went wrong.");
@@ -238,17 +412,31 @@ export function LaunchesTab() {
 
   // ── Step editor ────────────────────────────────────────────────────────────
 
-  const toggleExpand = (launch: Launch) => {
-    if (expandedId === launch.id) {
-      setExpandedId(null);
+  const initEditSteps = (launch: Launch) => {
+    const init: Record<string, string> = {};
+    launch.steps.forEach((s) => { init[s.id] = s.message; });
+    setEditSteps(init);
+  };
+
+  // On mobile a second tap collapses; on desktop selection drives the detail pane.
+  const selectLaunch = (launch: Launch) => {
+    if (selectedId === launch.id) {
+      setSelectedId(null);
       setEditSteps({});
     } else {
-      setExpandedId(launch.id);
-      const init: Record<string, string> = {};
-      launch.steps.forEach((s) => { init[s.id] = s.message; });
-      setEditSteps(init);
+      setSelectedId(launch.id);
+      initEditSteps(launch);
     }
   };
+
+  // Auto-select the first launch on desktop so the detail pane is never empty.
+  useEffect(() => {
+    if (!loading && !selectedId && launches.length > 0) {
+      setSelectedId(launches[0].id);
+      initEditSteps(launches[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, launches]);
 
   const handleSaveSteps = async (launch: Launch) => {
     setSavingSteps(true);
@@ -280,6 +468,26 @@ export function LaunchesTab() {
     return () => { document.body.style.overflow = ""; };
   }, [showCreate]);
 
+  // ─── Derived ─────────────────────────────────────────────────────────────────
+
+  const selected = launches.find((l) => l.id === selectedId) ?? null;
+  const stats = {
+    total: launches.length,
+    scheduled: launches.filter((l) => l.status === "scheduled").length,
+    drafts: launches.filter((l) => l.status === "draft").length,
+    messagesSent: launches.reduce(
+      (sum, l) => sum + l.steps.filter((s) => s.status === "sent").reduce((a, s) => a + (s.sentCount || 0), 0),
+      0,
+    ),
+  };
+
+  const detailProps = {
+    editSteps, setEditSteps,
+    onSaveSteps: handleSaveSteps, savingSteps,
+    onActivate: handleActivate, onDelete: handleDelete,
+    activatingId, deletingId,
+  };
+
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
@@ -304,7 +512,17 @@ export function LaunchesTab() {
         </button>
       </div>
 
-      {/* List */}
+      {/* Stats overview */}
+      {!loading && launches.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatChip label="Launches" value={stats.total} />
+          <StatChip label="Scheduled" value={stats.scheduled} accent />
+          <StatChip label="Drafts" value={stats.drafts} />
+          <StatChip label="Messages sent" value={stats.messagesSent} />
+        </div>
+      )}
+
+      {/* Body */}
       {loading ? (
         <div className="flex items-center justify-center py-24 text-[#1D211F]/30">
           <Loader2 className="w-6 h-6 animate-spin" />
@@ -330,153 +548,60 @@ export function LaunchesTab() {
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
-          {launches.map((launch) => {
-            const isExpanded = expandedId === launch.id;
-            const isDraft = launch.status === "draft";
+        /* Master–detail: launch list (left) + sequence detail (right) on desktop */
+        <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
 
-            return (
-              <div
-                key={launch.id}
-                className="bg-white border border-[#1D211F]/10 hover:border-[#1D211F]/30 transition-colors"
-              >
-                {/* Card header row */}
-                <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-
-                  {/* Left: name + meta */}
-                  <div className="flex-1 min-w-0 space-y-1.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-bold text-sm text-[#1D211F] leading-none">{launch.name}</span>
+          {/* Left: launch list */}
+          <div className="lg:col-span-5 xl:col-span-4 space-y-2 lg:sticky lg:top-4">
+            {launches.map((launch) => {
+              const isSelected = selectedId === launch.id;
+              return (
+                <div key={launch.id}>
+                  <button
+                    onClick={() => selectLaunch(launch)}
+                    className={`w-full text-left bg-white border p-4 transition-colors cursor-pointer ${
+                      isSelected
+                        ? "border-[#D05E3C] shadow-[inset_3px_0_0_0_#D05E3C]"
+                        : "border-[#1D211F]/10 hover:border-[#1D211F]/30"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-sm text-[#1D211F] truncate">{launch.name}</span>
                       <LaunchStatusBadge status={launch.status} />
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#1D211F]/50">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {fmtDate(launch.launchAt)}
+                    <div className="flex items-center justify-between gap-2 mt-2 text-[11px] text-[#1D211F]/50">
+                      <span className="flex items-center gap-1 min-w-0">
+                        <Calendar className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{fmtDate(launch.launchAt)}</span>
                       </span>
-                      <span className="flex items-center gap-1">
-                        <Tag className="w-3 h-3" />
-                        {launch.targetTag ? launch.targetTag : "All contacts"}
-                      </span>
-                      {launch.productUrl && (
-                        <a
-                          href={launch.productUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 hover:text-[#D05E3C] transition-colors"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          Product link
-                        </a>
-                      )}
-                    </div>
-                    {launch.description && (
-                      <p className="text-[11px] text-[#1D211F]/40 leading-relaxed">{launch.description}</p>
-                    )}
-                  </div>
-
-                  {/* Right: actions */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    {isDraft && (
-                      <>
-                        <button
-                          onClick={() => handleActivate(launch)}
-                          disabled={activatingId === launch.id}
-                          className="flex items-center gap-1.5 text-[10px] font-bold uppercase px-3 py-1.5 border border-[#D05E3C] text-[#D05E3C] hover:bg-[#D05E3C] hover:text-white transition-colors cursor-pointer rounded-none disabled:opacity-40"
-                        >
-                          {activatingId === launch.id
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : <PlayCircle className="w-3.5 h-3.5" />}
-                          Activate
-                        </button>
-                        <button
-                          onClick={() => handleDelete(launch)}
-                          disabled={deletingId === launch.id}
-                          className="p-1.5 text-[#1D211F]/30 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 transition-colors cursor-pointer rounded-none disabled:opacity-40"
-                        >
-                          {deletingId === launch.id
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : <Trash2 className="w-3.5 h-3.5" />}
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={() => toggleExpand(launch)}
-                      className="flex items-center gap-1 text-[10px] font-bold uppercase px-3 py-1.5 border border-[#1D211F]/15 text-[#1D211F]/60 hover:border-[#1D211F]/40 hover:text-[#1D211F] transition-colors cursor-pointer rounded-none"
-                    >
-                      {isExpanded ? (
-                        <><ChevronUp className="w-3.5 h-3.5" /> Hide steps</>
-                      ) : (
-                        <><ChevronDown className="w-3.5 h-3.5" /> View steps</>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Steps panel */}
-                {isExpanded && (
-                  <div className="border-t border-[#1D211F]/8 px-4 sm:px-5 pb-5 pt-4 space-y-3 bg-[#fafaf9]">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-mono text-[10px] tracking-widest uppercase text-[#1D211F]/40">
+                      <span className="font-mono text-[10px] tracking-widest uppercase text-[#1D211F]/35 shrink-0">
                         {launch.steps.length} steps
                       </span>
-                      <button
-                        onClick={() => handleSaveSteps(launch)}
-                        disabled={savingSteps}
-                        className="flex items-center gap-1.5 text-[10px] font-bold uppercase px-3 py-1.5 bg-[#1D211F] text-white hover:bg-[#1D211F]/80 transition-colors cursor-pointer rounded-none disabled:opacity-40"
-                      >
-                        {savingSteps
-                          ? <Loader2 className="w-3 h-3 animate-spin" />
-                          : <Save className="w-3 h-3" />}
-                        Save messages
-                      </button>
                     </div>
+                  </button>
 
-                    <div className="space-y-2">
-                      {launch.steps.map((step, idx) => (
-                        <div
-                          key={step.id}
-                          className="bg-white border border-[#1D211F]/8 p-3 sm:p-4 space-y-2"
-                        >
-                          {/* Step meta row */}
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-[9px] tracking-widest uppercase text-[#1D211F]/30 bg-[#1D211F]/5 px-1.5 py-0.5 border border-[#1D211F]/8">
-                                Step {idx + 1}
-                              </span>
-                              <span className="text-xs font-bold text-[#1D211F]">{step.label}</span>
-                              <span className="text-[10px] text-[#1D211F]/40">{fmtOffset(step.offsetMinutes)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <StepStatusIcon status={step.status} />
-                              <span className="font-mono text-[10px] tracking-widest uppercase text-[#1D211F]/40">
-                                {step.status === "sent"
-                                  ? `${step.sentCount} sent`
-                                  : step.status === "skipped"
-                                    ? "skipped"
-                                    : fmtDate(step.sendAt)}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Editable message */}
-                          <textarea
-                            rows={3}
-                            value={editSteps[step.id] ?? step.message}
-                            onChange={(e) =>
-                              setEditSteps((prev) => ({ ...prev, [step.id]: e.target.value }))
-                            }
-                            className="w-full bg-[#fafaf9] border border-[#1D211F]/10 text-[#1D211F] text-xs leading-relaxed p-2.5 resize-none focus:outline-none focus:border-[#1D211F]/40 font-medium rounded-none placeholder:text-[#1D211F]/30"
-                            placeholder="Enter WhatsApp message for this step…"
-                          />
-                        </div>
-                      ))}
+                  {/* Mobile inline detail */}
+                  {isSelected && (
+                    <div className="lg:hidden mt-2">
+                      <LaunchDetail launch={launch} {...detailProps} />
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Right: sequence detail (desktop) */}
+          <div className="hidden lg:block lg:col-span-7 xl:col-span-8">
+            {selected ? (
+              <LaunchDetail launch={selected} {...detailProps} />
+            ) : (
+              <div className="border border-dashed border-[#1D211F]/15 bg-white p-16 flex flex-col items-center gap-3 text-center">
+                <Rocket className="w-6 h-6 text-[#1D211F]/25" />
+                <p className="text-xs text-[#1D211F]/45 max-w-xs">Select a launch from the list to view and edit its countdown sequence.</p>
               </div>
-            );
-          })}
+            )}
+          </div>
         </div>
       )}
 

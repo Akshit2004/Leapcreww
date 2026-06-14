@@ -533,19 +533,24 @@ Features are ordered **most rich → least** for testing priority.
 
 | Feature | Details |
 |---|---|
-| Widget config | Configure widget color, greeting, trigger delay per org |
-| Public key | Each org gets a public key for widget authentication |
-| Widget snippet | Embeddable `<script>` tag for any website |
-| Click tracking | Track widget interactions via `/api/widget/[publicKey]/click` |
+| Widget config | Configure phone number, color, greeting bubble, position (bottom-left/right), prefilled visitor message per org |
+| Public key | Each org gets a public key (`wfw_…`); the only identifier customer sites ever see |
+| Widget snippet | One-line embeddable `<script src=".../widget.js" data-wf="wfw_…" async>` tag for any website |
+| Phone-number gating | Widget only renders when **enabled AND** a WhatsApp number is set; the public config reports `enabled: false` until then |
+| Clean prefilled message | Customer sees only the configured message — no internal `[ref:…]` tag. Inbound parser still strips/reads `[ref:…]` for backward compatibility |
+| Click tracking | Fire-and-forget click beacon via `/api/widget/[publicKey]/click` (works independent of the prefilled text) |
+| Loader diagnostics | `widget.js` logs a clear console warning when the button stays hidden (disabled, missing number, bad `data-wf` key, or unreachable host) |
+| CORS | Public config/click endpoints send `Access-Control-Allow-Origin: *` so the script works on any third-party domain |
 | Config endpoint | Public endpoint returns widget config by public key |
-| Widget UI card | Settings card in dashboard to manage widget |
+| Live preview | Settings card shows a live preview of the button + greeting bubble as you configure it |
 
 **Test checklist:**
-- [ ] Open Settings → Widget card → configure color and greeting
-- [ ] Copy embed snippet → paste into test HTML page → widget renders
-- [ ] Click widget → click tracked via `/api/widget/[publicKey]/click`
-- [ ] `GET /api/widget/[publicKey]/config` → returns correct config
-- [ ] Update widget config → changes reflect on embedded widget
+- [ ] Open Settings → Website Chat Button → set WhatsApp number (with country code), color, greeting → Save
+- [ ] Copy embed snippet → paste into test HTML page → widget renders (button appears)
+- [ ] With no phone number set → button stays hidden and console shows the "add a number" warning
+- [ ] Click widget → opens `wa.me` with the clean prefilled message (no `[ref:…]`) → click tracked via `/api/widget/[publicKey]/click`
+- [ ] `GET /api/widget/[publicKey]/config` → returns correct config with CORS header
+- [ ] Update widget config → changes reflect on embedded widget (hard-refresh to bust cached `widget.js`)
 
 **Routes:** `GET/PUT /api/org/[orgId]/widget` · `GET /api/widget/[publicKey]/config` · `POST /api/widget/[publicKey]/click`
 

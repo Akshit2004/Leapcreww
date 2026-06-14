@@ -34,7 +34,13 @@
   }
 
   function render(cfg) {
-    if (!cfg || !cfg.enabled || !cfg.phoneNumber) return;
+    if (!cfg || !cfg.enabled || !cfg.phoneNumber) {
+      console.warn(
+        "[LeapCreww] Chat button hidden: the widget is disabled or has no WhatsApp number. " +
+          "Open Settings → Website Chat Button, add a number (with country code), enable it, and Save."
+      );
+      return;
+    }
 
     var right = cfg.position !== "bottom-left";
     var dismissKey = "leapcreww-greeting-dismissed-" + key;
@@ -63,8 +69,9 @@
       } catch {
         /* beacon is best-effort */
       }
-      // Append attribution marker so the server can tag widget-originated contacts.
-      var prefill = (cfg.prefilledText || "") + (key ? "\n[ref:" + key + "]" : "");
+      // Open a clean prefilled chat — no visible attribution marker for the
+      // customer. Widget engagement is tracked server-side via the click beacon above.
+      var prefill = cfg.prefilledText || "";
       window.open(
         "https://wa.me/" + cfg.phoneNumber + "?text=" + encodeURIComponent(prefill),
         "_blank",
@@ -162,10 +169,14 @@
 
   fetch(base + "/api/widget/" + encodeURIComponent(key) + "/config")
     .then(function (res) {
-      return res.ok ? res.json() : null;
+      if (!res.ok) {
+        console.warn("[LeapCreww] Chat button hidden: config request failed (" + res.status + "). Check the data-wf key in your snippet.");
+        return null;
+      }
+      return res.json();
     })
     .then(render)
-    .catch(function () {
-      /* config unavailable — render nothing */
+    .catch(function (err) {
+      console.warn("[LeapCreww] Chat button hidden: could not reach " + base + " from this page.", err);
     });
 })();
