@@ -8,15 +8,15 @@ export const DURATION = FPS * DURATION_S; // 900 frames
 
 // Scene timing boundaries (in frames)
 export const SCENES = {
-  pileup: { from: 0, dur: 150 },      // 0–5s    Act I   · Tension / Reception hold friction
-  leap: { from: 150, dur: 120 },      // 5–9s    Act II  · Drop / White radial flood transition
-  booking: { from: 270, dur: 360 },   // 9–21s   Act III · WhatsApp chat booking simulation
-  paymentsync: { from: 630, dur: 150 },// 21–26s  Act IV  · Payment check & hospital dashboard sync
+  pileup: { from: 0, dur: 150 },      // 0–5s    Act I   · Tension / manual booking chaos
+  leap: { from: 150, dur: 120 },      // 5–9s    Act II  · Drop / brand reveal
+  chat: { from: 270, dur: 390 },      // 9–22s   Act III · Real WhatsApp appointment booking
+  showcase: { from: 660, dur: 120 },  // 22–26s  Act IV  · Real Appointment Console screens
   resolve: { from: 780, dur: 120 }    // 26–30s  Act V   · Brand lockup & CTA
 } as const;
 
 export const DROP = SCENES.leap.from; // 150 (5s)
-export const BREAKDOWN = SCENES.paymentsync.from; // 630 (21s)
+export const BREAKDOWN = SCENES.showcase.from; // 660 (22s)
 
 // Sub-boundaries inside Act V (Resolve splits into coming soon card and end CTA card)
 export const RESOLVE = {

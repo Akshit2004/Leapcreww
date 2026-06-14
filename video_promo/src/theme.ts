@@ -40,6 +40,22 @@ export const COLORS = {
   dangerGlow: "rgba(255, 0, 0, 0.22)",
 };
 
+// Pixel-accurate WhatsApp palette (current light theme)
+export const WA = {
+  header: "#008069",        // Top bar green (WhatsApp light theme)
+  headerInk: "#FFFFFF",
+  chatBg: "#EFEAE2",        // Chat wallpaper base
+  bubbleIn: "#FFFFFF",      // Incoming bubble
+  bubbleOut: "#D9FDD3",     // Outgoing bubble (sent)
+  ink: "#111B21",           // Primary message text
+  meta: "#667781",          // Timestamps / secondary
+  tick: "#53BDEB",          // Read (blue) double-tick
+  link: "#027EB5",          // Interactive reply text / links
+  inputBg: "#FFFFFF",
+  panelBg: "#F0F2F5",       // Input dock background
+  online: "rgba(255,255,255,0.85)",
+};
+
 // Structural typography scale (Multiples of 8 where possible)
 export const TYPE = {
   mega: 160,

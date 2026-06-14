@@ -48,7 +48,7 @@ export const ComingSoon: React.FC = () => {
           lineHeight: 1.2,
         }}
       >
-        The future of patient care.
+        Your patients are already on WhatsApp.
       </div>
 
       <div style={{

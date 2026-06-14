@@ -14,8 +14,8 @@ import { Grain } from "./components/Grain";
 import { LeapMark } from "./components/Logo";
 import { Pileup } from "./scenes/Pileup";
 import { LogoReveal } from "./scenes/LogoReveal";
-import { BookingFlow } from "./scenes/BookingFlow";
-import { PaymentSync } from "./scenes/PaymentSync";
+import { WhatsAppChat } from "./scenes/WhatsAppChat";
+import { PlatformShowcase } from "./scenes/PlatformShowcase";
 import { ComingSoon } from "./scenes/ComingSoon";
 import { EndCard } from "./scenes/EndCard";
 
@@ -39,7 +39,7 @@ const CornerBug: React.FC = () => {
   const frame = useCurrentFrame();
   const opacity = interpolate(
     frame,
-    [SCENES.booking.from, SCENES.booking.from + 16, SCENES.paymentsync.from + SCENES.paymentsync.dur - 16, SCENES.paymentsync.from + SCENES.paymentsync.dur],
+    [SCENES.chat.from, SCENES.chat.from + 16, SCENES.showcase.from + SCENES.showcase.dur - 16, SCENES.showcase.from + SCENES.showcase.dur],
     [0, 0.65, 0.65, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
@@ -85,14 +85,14 @@ export const Promo: React.FC = () => {
         <LogoReveal />
       </Sequence>
 
-      {/* Act III — The Chat Booking Flow */}
-      <Sequence from={SCENES.booking.from} durationInFrames={SCENES.booking.dur} name="III · Booking Flow">
-        <BookingFlow />
+      {/* Act III — Pixel-accurate WhatsApp conversation */}
+      <Sequence from={SCENES.chat.from} durationInFrames={SCENES.chat.dur} name="III · WhatsApp Chat">
+        <WhatsAppChat />
       </Sequence>
 
-      {/* Act IV — Payment & live reception sync */}
-      <Sequence from={SCENES.paymentsync.from} durationInFrames={SCENES.paymentsync.dur} name="IV · Payment & Sync">
-        <PaymentSync />
+      {/* Act IV — Real product screens */}
+      <Sequence from={SCENES.showcase.from} durationInFrames={SCENES.showcase.dur} name="IV · Platform Showcase">
+        <PlatformShowcase />
       </Sequence>
 
       {/* Act V — Resolve & Call To Action */}

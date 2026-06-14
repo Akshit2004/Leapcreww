@@ -1,13 +1,13 @@
 {
-  "name": "leapcreww-healthcare-video",
+  "name": "leapcreww-promo-video",
   "version": "1.0.0",
   "private": true,
-  "description": "LeapCreww Healthcare doctor booking promo video built with Remotion.",
+  "description": "LeapCreww WhatsApp suite promo video built with Remotion.",
   "scripts": {
     "beat": "node scripts/make-beat.mjs",
     "dev": "remotion studio",
-    "render": "remotion render Promo out/healthcare_promo.mp4",
-    "still": "remotion still Promo out/poster.png --frame=680",
+    "render": "remotion render Promo out/leapcreww_promo.mp4",
+    "still": "remotion still Promo out/poster.png --frame=620",
     "upgrade": "remotion upgrade"
   },
   "dependencies": {

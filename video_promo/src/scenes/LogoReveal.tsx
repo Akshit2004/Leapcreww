@@ -99,7 +99,7 @@ export const LogoReveal: React.FC = () => {
                 fontFamily: fontFamily,
               }}
             >
-              Put patient booking on <span style={{ color: COLORS.ink, fontStyle: "normal", fontWeight: 700 }}>autopilot.</span>
+              Put patient bookings on <span style={{ color: COLORS.ink, fontStyle: "normal", fontWeight: 700 }}>autopilot.</span>
             </div>
           </MaskLine>
         </div>
@@ -121,8 +121,8 @@ export const LogoReveal: React.FC = () => {
           opacity: line1,
         }}
       >
-        <span>LEAPCREWW HEALTH // FOR CLINICS</span>
-        <span>sync active</span>
+        <span>LEAPCREWW // APPOINTMENTS</span>
+        <span>book · confirm · sync</span>
       </div>
     </AbsoluteFill>
   );

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const SR = 44100;
 const DURATION = 30; // 30s
-const BPM = 120;
+const BPM = 124;
 const SPB = 60 / BPM; // 0.5s per beat
 const N = Math.floor(SR * DURATION);
 const buf = new Float32Array(N);
@@ -117,17 +117,52 @@ function impact(t, gain = 1) {
   }, 0.5 * gain);
 }
 
-// Medical warm, calm chord progression
-const A_MIN = [110, 130.81, 164.81, 196.00];  // Am7
-const D_MAJ = [146.83, 185.00, 220.00, 277.18]; // Dmaj7
-const G_MAJ = [98.00, 146.83, 196.00, 246.94];  // Gmaj7
+// Closed hi-hat — crisp offbeat shimmer for the groove.
+function hihat(t, gain = 0.12, decay = 60) {
+  add(t, 0.06, (s, p) => {
+    const noise = rand();
+    const shimmer = Math.sin(TWO_PI * 8000 * s) * 0.3;
+    return (noise + shimmer) * Math.exp(-decay * p);
+  }, gain);
+}
+
+// Layered clap/snare backbone on beats 2 & 4.
+function clap(t, gain = 0.3) {
+  add(t, 0.14, (s, p) => {
+    const burst = rand() * Math.exp(-34 * p);
+    const tone = Math.sin(TWO_PI * 1800 * s) * Math.exp(-22 * p) * 0.2;
+    return burst + tone;
+  }, gain);
+}
+
+// Bright plucked arpeggio note (efficient, technical sparkle).
+function pluck(t, freq, gain = 0.22) {
+  add(t, 0.42, (s, p) => {
+    const env = Math.exp(-6 * p);
+    const tone = Math.sin(TWO_PI * freq * s) + Math.sin(TWO_PI * freq * 2 * s) * 0.18;
+    return tone * env;
+  }, gain);
+}
+
+// Brighter, uplifting progression: Cmaj7 – Gmaj7 – Am7 – Fmaj7 (I–V–vi–IV).
 const C_MAJ = [130.81, 164.81, 196.00, 261.63]; // Cmaj7
+const G_MAJ = [98.00, 146.83, 196.00, 246.94];  // Gmaj7
+const A_MIN = [110, 130.81, 164.81, 196.00];    // Am7
+const F_MAJ = [87.31, 130.81, 174.61, 220.00];  // Fmaj7
 
-const CHORDS = [A_MIN, D_MAJ, G_MAJ, C_MAJ];
-const BASS_FREQS = [55.0, 73.42, 49.0, 65.41]; // A1, D2, G1, C2
+const CHORDS = [C_MAJ, G_MAJ, A_MIN, F_MAJ];
+const BASS_FREQS = [65.41, 49.0, 55.0, 43.65];  // C2, G1, A1, F1
 
-const DROP_T = 5;       // 5s (f150)
-const BREAKDOWN_T = 21; // 21s (f630)
+// Arp note pools per chord (one octave up) for the plucky topline.
+const ARPS = [
+  [261.63, 329.63, 392.00, 523.25], // C
+  [392.00, 293.66, 493.88, 587.33], // G
+  [220.00, 329.63, 440.00, 523.25], // Am
+  [349.23, 261.63, 440.00, 523.25], // F
+];
+
+const DROP_T = 5;        // 5s (f150) — brand drop
+const BREAKDOWN_T = 22;  // 22s (f660) — showcase breakdown
 
 // Act I — tension. Ticking + drone
 for (let beat = 0; beat < DROP_T / SPB; beat++) {
@@ -140,34 +175,50 @@ riser(DROP_T - 1.2, 1.2, 0.28);
 // The drop
 impact(DROP_T, 1);
 
-// Act III — Groove: Chord progression loop
+// Act III — Groove: four-on-the-floor + claps + hats + plucky arpeggio
 let chordIdx = 0;
 for (let t = DROP_T; t < BREAKDOWN_T; t += SPB * 4) {
   const chord = CHORDS[chordIdx % CHORDS.length];
   const bassFreq = BASS_FREQS[chordIdx % BASS_FREQS.length];
-  kick(t, 0.8);
-  rhodesChord(t, SPB * 4 * 0.98, chord, 0.48);
-  subDrone(t, SPB * 4 * 0.98, bassFreq, 0.38);
+  const arp = ARPS[chordIdx % ARPS.length];
+  rhodesChord(t, SPB * 4 * 0.98, chord, 0.38);
+  subDrone(t, SPB * 4 * 0.98, bassFreq, 0.36);
+  for (let b = 0; b < 4; b++) {
+    const bt = t + b * SPB;
+    if (b % 2 === 0) kick(bt, 0.8);   // beats 1 & 3
+    if (b % 2 === 1) clap(bt, 0.27);  // beats 2 & 4
+    hihat(bt, 0.09);
+    hihat(bt + SPB / 2, 0.13);        // accented offbeat
+  }
+  for (let e = 0; e < 8; e++) {
+    pluck(t + e * (SPB / 2), arp[e % arp.length], 0.17);
+  }
   chordIdx++;
 }
-// Keep the subtle tick going in groove
-for (let beat = DROP_T / SPB; beat < BREAKDOWN_T / SPB; beat++) {
-  tick(beat * SPB, 0.06);
-}
 
-// Act IV — Breakdown
+// Act IV — Breakdown: pull the drums back, let the arp breathe
 for (let t = BREAKDOWN_T; t < 26; t += SPB * 4) {
   const chord = CHORDS[chordIdx % CHORDS.length];
   const bassFreq = BASS_FREQS[chordIdx % BASS_FREQS.length];
-  rhodesChord(t, SPB * 4 * 0.98, chord, 0.42);
-  subDrone(t, SPB * 4 * 0.98, bassFreq, 0.32);
+  const arp = ARPS[chordIdx % ARPS.length];
+  rhodesChord(t, SPB * 4 * 0.98, chord, 0.40);
+  subDrone(t, SPB * 4 * 0.98, bassFreq, 0.30);
+  for (let b = 0; b < 4; b++) {
+    const bt = t + b * SPB;
+    kick(bt, 0.45);
+    hihat(bt + SPB / 2, 0.08);
+  }
+  for (let e = 0; e < 4; e++) pluck(t + e * SPB, arp[e % arp.length], 0.14);
   chordIdx++;
 }
 
-// Act V — Resolve: Final chord rings out
+// Act V — Resolve: final chord rings out with a gentle arp tail
 kick(26, 0.6);
 rhodesChord(26, 4 * 0.98, C_MAJ, 0.52);
 subDrone(26, 4 * 0.98, 65.41, 0.36);
+pluck(26, 523.25, 0.18);
+pluck(26.5, 659.25, 0.16);
+pluck(27, 783.99, 0.13);
 
 // Master Filter Sweep
 const sweepCurve = (p) => {

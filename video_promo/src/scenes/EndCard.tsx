@@ -79,7 +79,7 @@ export const EndCard: React.FC = () => {
             }}
           >
             <LeapMark size={20} />
-            LEAPCREWW.COM/HEALTH
+            LEAPCREWW.COM
           </div>
           <span
             style={{
@@ -91,7 +91,7 @@ export const EndCard: React.FC = () => {
               textTransform: "uppercase"
             }}
           >
-            Request demo
+            Start free
           </span>
         </div>
       </div>
@@ -108,7 +108,7 @@ export const EndCard: React.FC = () => {
           color: COLORS.dim,
         }}
       >
-        SYS_ENGINE // v1.0 // HEALTHCARE_NODE
+BOOK · CONFIRM · SYNC — ALL ON WHATSAPP
       </div>
     </AbsoluteFill>
   );

@@ -10,7 +10,11 @@ test.describe("Flows (WhatsApp Interactive Forms)", () => {
     await expect(page.getByRole("heading", { name: /whatsapp flows/i })).toBeVisible();
     // A floating Quick Action FAB shares the exact accessible name "New Flow"
     // via aria-label; the panel's own button has no aria-label, so exclude it.
-    await expect(page.locator('button:not([aria-label]):has-text("New Flow")')).toBeVisible();
+    // exact: true avoids matching sidebar list items for flows named
+    // "New Flow 2", "New Flow 3", etc. created by previous test runs.
+    await expect(
+      page.getByRole("button", { name: "New Flow", exact: true }).and(page.locator(":not([aria-label])"))
+    ).toBeVisible();
     await expect(page.getByText(/your flows/i)).toBeVisible();
   });
 
@@ -25,7 +29,7 @@ test.describe("Flows (WhatsApp Interactive Forms)", () => {
 
   test("create a new flow and toggle the JSON editor", async ({ page }) => {
     // See note above re: FAB sharing the "New Flow" accessible name.
-    await page.locator('button:not([aria-label]):has-text("New Flow")').click();
+    await page.getByRole("button", { name: "New Flow", exact: true }).and(page.locator(":not([aria-label])")).click();
 
     // A new flow should appear selected in the list and open the editor.
     await expect(page.getByRole("button", { name: /save json/i })).toBeVisible({ timeout: 15_000 });

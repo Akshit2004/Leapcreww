@@ -60,7 +60,7 @@ export const Logo: React.FC<{
               color: COLORS.accentDeep,
             }}
           >
-            HEALTHCARE
+HEALTHCARE
           </div>
         )}
       </div>

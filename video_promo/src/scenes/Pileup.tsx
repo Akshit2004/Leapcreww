@@ -120,9 +120,9 @@ const ScheduleBoard: React.FC = () => {
           letterSpacing: "0.1em",
         }}
       >
-        <span style={{ color: COLORS.darkDim }}>This Week's Schedule</span>
+        <span style={{ color: COLORS.darkDim }}>Reception Call Log</span>
         <span style={{ color: conflicts > 0 ? COLORS.danger : COLORS.darkFaint }}>
-          Double-bookings: {conflicts}
+          Missed calls: {conflicts}
         </span>
       </div>
 
@@ -231,7 +231,7 @@ export const Pileup: React.FC = () => {
             }}
           >
             <MaskLine delay={6} durationIn={16}>
-              <span>TRADITIONAL SCHEDULING</span>
+              <span>BOOKING BY PHONE</span>
             </MaskLine>
           </div>
 
