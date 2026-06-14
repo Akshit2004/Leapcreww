@@ -23,12 +23,21 @@ import {
   AlertTriangle,
   Info,
   BarChart3,
-  X
+  X,
+  Zap,
+  ShoppingBag,
+  PackageSearch,
+  HeadphonesIcon,
+  Settings,
+  ArrowRight,
 } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
 
 export const ChatbotTab: React.FC = () => {
   const { chatbotNodes, updateChatbotNodes, addSystemLog, lockSync, unlockSync } = useApp();
   const params = useParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const orgId = params.orgId as string;
 
   // Chatbot nodes drop-off stats
@@ -795,9 +804,9 @@ export const ChatbotTab: React.FC = () => {
           {/* Visual Builder Engine toggle */}
           <div className="flex items-center gap-2.5 pr-3 border-r border-stone-200">
             <div className="flex flex-col items-end leading-tight">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Builder Engine</span>
-              <span className={`text-[10px] font-bold ${organization?.chatbotBuilderEnabled ? "text-wa-green" : "text-stone-400"}`}>
-                {organization?.chatbotBuilderEnabled ? "Active" : "Pure AI Mode"}
+              <span className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Mode</span>
+              <span className={`text-[10px] font-bold ${organization?.chatbotBuilderEnabled ? "text-wa-green" : "text-emerald-500"}`}>
+                {organization?.chatbotBuilderEnabled ? "Visual Builder" : "AI Autoresponder"}
               </span>
             </div>
             <button
@@ -956,6 +965,87 @@ export const ChatbotTab: React.FC = () => {
                   <span className="h-px w-6 bg-stone-300" />
                   Add Step · Or use AI
                   <span className="h-px w-6 bg-stone-300" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Pure AI Mode — Autoresponder overlay */}
+          {!organization?.chatbotBuilderEnabled && (
+            <div className="absolute inset-0 z-30 bg-stone-950/95 flex items-center justify-center p-6 overflow-y-auto">
+              <div className="w-full max-w-xl space-y-6 my-auto">
+                {/* Header */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Live · 24 / 7</span>
+                  </div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">
+                    AI Autoresponder Active
+                  </h2>
+                  <p className="text-sm text-stone-400 leading-relaxed">
+                    Every inbound WhatsApp message is handled by the Groq AI engine in real time — no human required. Customers get instant, intelligent replies around the clock.
+                  </p>
+                </div>
+
+                {/* Capability cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-stone-900 border border-stone-700 p-4 space-y-2">
+                    <ShoppingBag className="w-5 h-5 text-emerald-400" />
+                    <div className="text-xs font-black text-white">Show Catalog</div>
+                    <p className="text-[11px] text-stone-500 leading-snug">
+                      Surfaces your product catalog when a customer asks "what do you sell?"
+                    </p>
+                  </div>
+                  <div className="bg-stone-900 border border-stone-700 p-4 space-y-2">
+                    <PackageSearch className="w-5 h-5 text-emerald-400" />
+                    <div className="text-xs font-black text-white">Order Status</div>
+                    <p className="text-[11px] text-stone-500 leading-snug">
+                      Fetches live order status by phone number and answers shipping queries.
+                    </p>
+                  </div>
+                  <div className="bg-stone-900 border border-stone-700 p-4 space-y-2">
+                    <HeadphonesIcon className="w-5 h-5 text-emerald-400" />
+                    <div className="text-xs font-black text-white">Escalate to Human</div>
+                    <p className="text-[11px] text-stone-500 leading-snug">
+                      Detects frustrated customers and routes them to a human agent.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Config strip */}
+                <div className="bg-stone-900 border border-stone-700 p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-stone-500 mb-0.5">AI Persona</div>
+                    <p className="text-xs text-stone-300">
+                      {organization?.aiPersona
+                        ? `"${organization.aiPersona.slice(0, 80)}${organization.aiPersona.length > 80 ? "…" : ""}"`
+                        : "Not configured — AI will respond generically."}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => router.push(`${pathname}?tab=settings`, { scroll: false })}
+                    className="shrink-0 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-stone-300 border border-stone-600 hover:border-stone-400 hover:text-white px-3 py-2 transition-colors cursor-pointer"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    Configure
+                  </button>
+                </div>
+
+                {/* Switch to Builder CTA */}
+                <div className="flex items-center justify-between pt-2 border-t border-stone-800">
+                  <p className="text-[11px] text-stone-500">
+                    Want to define an exact conversation flow instead?
+                  </p>
+                  <button
+                    disabled={botToggling}
+                    onClick={toggleBuilderStatus}
+                    className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-stone-300 border border-stone-600 hover:border-wa-green hover:text-wa-green px-3 py-2 transition-colors cursor-pointer disabled:opacity-40"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Switch to Visual Builder
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
             </div>

@@ -32,6 +32,8 @@ import { CampaignReportDrawer } from "./CampaignReportDrawer";
 import { CreateTemplateModal } from "@/features/templates/components/CreateTemplateModal";
 import { UploadButton } from "@/shared/lib/uploadthing";
 import { SegmentRules, evaluateSegmentRules } from "@/shared/lib/segmentMatch";
+import { LeadQualifierWizard } from "./LeadQualifierWizard";
+import type { LeadQualifierConfig } from "@/features/campaigns/lib/leadQualifier";
 
 export const CampaignsTab: React.FC = () => {
   const { organization, campaigns, templates, contacts, systemLogs, sendBroadcast, deleteCampaign, addSystemLog, refreshWorkspace } = useApp();
@@ -59,6 +61,20 @@ export const CampaignsTab: React.FC = () => {
   const [connectingWaba, setConnectingWaba] = useState(false);
   const [loadingStepText, setLoadingStepText] = useState("Analyzing market positioning...");
   const [isApplyingStrategy, setIsApplyingStrategy] = useState(false);
+  const [strategistQualifier, setStrategistQualifier] = useState<LeadQualifierConfig | null>(null);
+  const [qualifierEnabled, setQualifierEnabled] = useState(true);
+  const [sequenceEnabled, setSequenceEnabled] = useState(true);
+  const [isGeneratingQualifier, setIsGeneratingQualifier] = useState(false);
+  const [chatEditSection, setChatEditSection] = useState<"template" | "audience" | "schedule" | "sequence" | "qualifier" | null>(null);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [strategistResult, setStrategistResult] = useState<{
+    templateApproved: boolean;
+    templateName: string;
+    templateBody: string;
+    enrolledCount: number;
+    scheduledAt: string | null;
+    steps: Array<{ delayMinutes: number; message: string }>;
+  } | null>(null);
 
   // Load FB SDK for embedded WABA connection within strategist modal
   useEffect(() => {
@@ -172,6 +188,7 @@ export const CampaignsTab: React.FC = () => {
   const [excludeTag, setExcludeTag] = useState("None");
   const [templateName, setTemplateName] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
+  const [qualifierConfig, setQualifierConfig] = useState<LeadQualifierConfig | null>(null);
   const [broadcastMode, setBroadcastMode] = useState<"template" | "session">("template");
   const [sessionText, setSessionText] = useState("");
 
@@ -316,6 +333,28 @@ export const CampaignsTab: React.FC = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to generate strategy");
       setStrategistStrategy(data.strategy);
+
+      // Fire qualifier generation without blocking — populates section 5 while user reads sections 1–4
+      setStrategistQualifier(null);
+      setQualifierEnabled(true);
+      setSequenceEnabled(true);
+      setIsGeneratingQualifier(true);
+      fetch("/api/ai/lead-qualifier", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateBody: data.strategy.template.body,
+          templateName: data.strategy.template.name,
+          orgId,
+        }),
+      })
+        .then(async (r) => {
+          const d = await r.json();
+          if (r.ok && d.config) setStrategistQualifier(d.config);
+          // else: qualifier stays null, UI shows retry button
+        })
+        .catch(() => { /* network error — retry button handles it */ })
+        .finally(() => setIsGeneratingQualifier(false));
     } catch (err: any) {
       setStrategistError(err.message || "An unexpected error occurred.");
     } finally {
@@ -324,9 +363,28 @@ export const CampaignsTab: React.FC = () => {
     }
   }, [orgId]);
 
+  // Manual qualifier (re)generation — called from the retry button in the chat UI
+  const generateQualifier = useCallback(async () => {
+    if (!orgId || !strategistStrategy) return;
+    setIsGeneratingQualifier(true);
+    setStrategistQualifier(null);
+    try {
+      const r = await fetch("/api/ai/lead-qualifier", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateBody: strategistStrategy.template.body,
+          templateName: strategistStrategy.template.name,
+          orgId,
+        }),
+      });
+      const d = await r.json();
+      if (r.ok && d.config) setStrategistQualifier(d.config);
+    } catch { /* ignore */ }
+    finally { setIsGeneratingQualifier(false); }
+  }, [orgId, strategistStrategy]);
+
   // Dashboard "Done-For-You" copilot hands off here via ?tab=campaigns&goal=...
-  // Open the strategist, prefill the goal, and auto-generate. The ref guard + URL
-  // cleanup ensure this fires exactly once per handoff.
   const goalHandledRef = useRef(false);
   useEffect(() => {
     const goal = (searchParams.get("goal") || "").trim();
@@ -338,6 +396,18 @@ export const CampaignsTab: React.FC = () => {
     void handleGenerateStrategy(goal);
     router.replace(`${pathname}?tab=campaigns`, { scroll: false });
   }, [searchParams, orgId, pathname, router, handleGenerateStrategy]);
+
+  // Recipe "Launch Campaign →" hands off here via ?tab=campaigns&launchTemplate=<name>
+  const launchTemplateHandledRef = useRef(false);
+  useEffect(() => {
+    const tpl = (searchParams.get("launchTemplate") || "").trim();
+    if (!tpl || !orgId || launchTemplateHandledRef.current) return;
+    launchTemplateHandledRef.current = true;
+    setBroadcastMode("template");
+    setTemplateName(tpl);
+    setIsModalOpen(true);
+    router.replace(`${pathname}?tab=campaigns`, { scroll: false });
+  }, [searchParams, orgId, pathname, router]);
 
   const handleLaunchCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -397,6 +467,7 @@ export const CampaignsTab: React.FC = () => {
         excludeTag: excludeTag === "None" ? undefined : excludeTag,
         mediaType: activeTemplate?.mediaType,
         mediaUrl: mediaUrl.trim() || undefined,
+        leadQualifier: qualifierConfig ?? undefined,
       });
     }
 
@@ -408,6 +479,7 @@ export const CampaignsTab: React.FC = () => {
     setSessionText("");
     setMediaUrl("");
     setSelectedSegmentId("all_contacts");
+    setQualifierConfig(null);
     setIsModalOpen(false);
   };
 
@@ -1076,6 +1148,16 @@ export const CampaignsTab: React.FC = () => {
                 )}
               </div>
 
+              {/* Lead Qualifier Wizard — template mode only */}
+              {broadcastMode === "template" && activeTemplate && (
+                <LeadQualifierWizard
+                  templateBody={activeTemplate.body}
+                  templateName={templateName}
+                  orgId={orgId}
+                  onChange={setQualifierConfig}
+                />
+              )}
+
               {/* Footer CTA */}
               <div className="flex justify-end gap-2.5 pt-4 border-t border-stone-200">
                 <button
@@ -1116,7 +1198,7 @@ export const CampaignsTab: React.FC = () => {
       {/* AI Campaign Strategist Modal */}
       {isStrategistOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-4xl rounded-none flex flex-col overflow-hidden bg-white border border-stone-300 shadow-2xl h-[90vh]">
+          <div className="w-full max-w-2xl rounded-none flex flex-col overflow-hidden bg-white border border-stone-300 shadow-2xl h-[90vh]">
             {/* Header */}
             <div className="p-6 border-b border-stone-200 flex items-center justify-between shrink-0 bg-[#fafaf9]">
               <div className="flex items-center gap-2">
@@ -1129,6 +1211,12 @@ export const CampaignsTab: React.FC = () => {
                 onClick={() => {
                   setIsStrategistOpen(false);
                   setStrategistStrategy(null);
+                  setStrategistResult(null);
+                  setStrategistQualifier(null);
+                  setQualifierEnabled(true);
+                  setSequenceEnabled(true);
+                  setChatEditSection(null);
+                  setShowTemplatePicker(false);
                   setStrategistError("");
                 }}
                 className="p-1 rounded-none hover:bg-stone-200 text-stone-500 transition-colors border border-transparent cursor-pointer"
@@ -1140,7 +1228,93 @@ export const CampaignsTab: React.FC = () => {
             {/* Content Body */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
 
-              {!strategistStrategy ? (
+              {strategistResult ? (
+                /* Result Screen — shown after apply succeeds */
+                <div className="max-w-2xl mx-auto py-6 space-y-6">
+                  {/* Hero */}
+                  <div className="text-center space-y-3 pb-6 border-b border-stone-100">
+                    <div className="w-16 h-16 bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center mx-auto">
+                      <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-stone-950 tracking-tight">Campaign Built</h3>
+                      <p className="text-sm text-stone-500 mt-1.5 leading-relaxed">
+                        {strategistResult.templateApproved
+                          ? "Your campaign is live. Contacts have been enrolled and will receive the broadcast."
+                          : "Strategy saved. The campaign will launch automatically once Meta approves the template."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 4 stat cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Template</div>
+                      <div className="font-black text-stone-950 text-sm leading-snug break-words">{strategistResult.templateName}</div>
+                      <div className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 ${strategistResult.templateApproved ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-amber-100 text-amber-700 border border-amber-200"}`}>
+                        {strategistResult.templateApproved ? "Approved & Live" : "Pending Meta Review"}
+                      </div>
+                    </div>
+
+                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">
+                        {strategistResult.templateApproved ? "Enrolled" : "Queued"}
+                      </div>
+                      <div className="text-3xl font-black text-stone-950">{strategistResult.enrolledCount.toLocaleString()}</div>
+                      <div className="text-xs text-stone-500">contacts</div>
+                    </div>
+
+                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Broadcast Time</div>
+                      <div className="font-bold text-stone-950 text-sm">
+                        {strategistResult.scheduledAt
+                          ? new Date(strategistResult.scheduledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+                          : "Immediate"}
+                      </div>
+                    </div>
+
+                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Follow-Up Drip</div>
+                      <div className="text-3xl font-black text-stone-950">{strategistResult.steps.length}</div>
+                      <div className="text-xs text-stone-500">automated steps</div>
+                    </div>
+                  </div>
+
+                  {/* Message body preview */}
+                  <div className="bg-stone-950 p-5 space-y-2">
+                    <div className="text-[9px] font-black uppercase tracking-wider text-stone-500">Message Preview</div>
+                    <p className="text-sm leading-relaxed text-stone-100 whitespace-pre-wrap">{strategistResult.templateBody}</p>
+                  </div>
+
+                  {/* Drip sequence timeline */}
+                  {strategistResult.steps.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Drip Sequence</div>
+                      <div className="space-y-2">
+                        {strategistResult.steps.map((step, i) => (
+                          <div key={i} className="flex gap-3 items-start">
+                            <div className="w-5 h-5 bg-stone-950 text-white text-[9px] font-black flex items-center justify-center shrink-0 mt-0.5">
+                              {i + 1}
+                            </div>
+                            <div className="flex-1 bg-stone-50 border border-stone-100 p-3">
+                              <div className="text-[10px] font-bold text-stone-400 mb-1">
+                                {step.delayMinutes === 0
+                                  ? "Immediate"
+                                  : step.delayMinutes < 60
+                                  ? `After ${step.delayMinutes} min`
+                                  : `After ${Math.round(step.delayMinutes / 60)}h`}
+                              </div>
+                              <p className="text-xs text-stone-700 leading-snug">
+                                {step.message.length > 140 ? step.message.slice(0, 140) + "…" : step.message}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : !strategistStrategy ? (
                 /* Prompt State */
                 <div className="max-w-xl mx-auto py-12 space-y-6 text-center">
                   <div className="space-y-2">
@@ -1188,264 +1362,383 @@ export const CampaignsTab: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                /* Strategy Review Deck */
-                <div className="space-y-6">
+                /* Strategy Review — Immersive Chat Flow */
+                <div className="max-w-lg mx-auto space-y-6 pb-6">
 
-                  {/* Meta Signup / WABA warning */}
+                  {/* User bubble */}
+                  <div className="flex justify-end">
+                    <div className="max-w-[80%] bg-stone-950 text-white text-sm px-4 py-3 font-medium leading-relaxed" style={{borderRadius:"18px 18px 4px 18px"}}>
+                      {strategistPrompt}
+                    </div>
+                  </div>
+
+                  {/* AI: Status */}
+                  <div className="flex gap-3 items-end">
+                    <div className="w-9 h-9 bg-stone-950 flex items-center justify-center shrink-0 rounded-full border-2 border-stone-800">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div className={`px-4 py-3 text-xs font-semibold leading-snug flex-1 ${strategistStrategy.templateExists ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`} style={{borderRadius:"18px 18px 18px 4px"}}>
+                      {strategistStrategy.templateExists
+                        ? <>✓ Matched your approved template <strong>&quot;{strategistStrategy.template.name}&quot;</strong> — no Meta review needed, launches immediately.</>
+                        : <>Drafted <strong>&quot;{strategistStrategy.template.name}&quot;</strong> — will submit to Meta for approval. Review and edit below.</>}
+                    </div>
+                  </div>
+
+                  {/* WA not connected */}
                   {!organization?.whatsappConnected && (
-                    <div className="bg-red-50 border border-red-200 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <span className="text-xs font-bold text-red-700 flex items-center gap-1.5 uppercase">
-                          <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-                          WhatsApp Business Account is not Connected
-                        </span>
-                        <p className="text-[11px] text-red-600">
-                          Active broadcast launches require Meta connection. You can connect directly below or launch as local mock.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={launchEmbeddedSignup}
-                        disabled={connectingWaba}
-                        className="bg-[#1877F2] hover:bg-[#166FE5] text-white font-extrabold text-[10px] uppercase py-2 px-3 tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shrink-0 disabled:opacity-50"
-                      >
-                        {connectingWaba ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Send className="w-3.5 h-3.5" />
-                        )}
-                        Connect with Facebook
+                    <div className="ml-12 bg-red-50 border border-red-200 px-4 py-2.5 flex items-center justify-between gap-3">
+                      <p className="text-[11px] text-red-700 font-bold">WhatsApp not connected — required to broadcast.</p>
+                      <button type="button" onClick={launchEmbeddedSignup} disabled={connectingWaba}
+                        className="bg-[#1877F2] text-white font-bold text-[10px] px-3 py-1.5 flex items-center gap-1 cursor-pointer shrink-0 disabled:opacity-50">
+                        {connectingWaba ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Connect
                       </button>
                     </div>
                   )}
 
-                  {/* Template Approval Status Notice */}
-                  {strategistStrategy.templateExists ? (
-                    <div className="bg-emerald-50 border border-emerald-200 p-4 flex items-start gap-3 rounded-none shadow-sm">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        <span className="text-xs font-bold text-emerald-800 uppercase block">
-                          Approved Template Matched
-                        </span>
-                        <p className="text-[11px] text-emerald-700 leading-relaxed font-semibold">
-                          An approved template named <strong className="text-emerald-950 font-bold">&quot;{strategistStrategy.template.name}&quot;</strong> fits your objective.
-                          LeapCreww will reuse this template, so no new Meta registration is needed and you can launch immediately!
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-amber-50 border border-amber-250 p-4 flex items-start gap-3 rounded-none shadow-sm">
-                      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        <span className="text-xs font-bold text-amber-800 uppercase block">
-                          No Matching Approved Template Found
-                        </span>
-                        <p className="text-[11px] text-amber-700 leading-relaxed font-semibold">
-                          No suitable approved template was found in your library for this objective.
-                          To launch this strategy, LeapCreww will submit the proposed template <strong className="text-amber-950 font-bold">&quot;{strategistStrategy.template.name}&quot;</strong> to Meta for approval.
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                  {/* ── TEMPLATE ── */}
+                  <div className="flex gap-3 items-end">
+                    <div className="w-9 shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <p className="text-[10px] text-stone-400 font-semibold pl-1">Template · tap to edit</p>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                      {/* Template picker strip — when templateExists, offer switching */}
+                      {strategistStrategy.templateExists && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] text-stone-500">Using:</span>
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 border border-emerald-200">{strategistStrategy.template.name}</span>
+                          <button type="button" onClick={() => setShowTemplatePicker((v) => !v)}
+                            className="text-[10px] text-stone-400 underline hover:text-stone-700 cursor-pointer">
+                            {showTemplatePicker ? "hide" : "pick different ▾"}
+                          </button>
+                        </div>
+                      )}
 
-                    {/* LEFT COLUMN: Template and Segment */}
-                    <div className="space-y-6">
+                      {showTemplatePicker && (
+                        <div className="border border-stone-200 bg-white max-h-40 overflow-y-auto divide-y divide-stone-100">
+                          {templates.filter(t => t.metaStatus === "approved").map(t => (
+                            <button key={t.name} type="button"
+                              onClick={() => { setStrategistStrategy({ ...strategistStrategy, template: { ...strategistStrategy.template, name: t.name, body: t.body, buttons: t.buttons || [] } }); setShowTemplatePicker(false); }}
+                              className={`w-full text-left px-3 py-2 text-[11px] hover:bg-stone-50 cursor-pointer transition-colors ${strategistStrategy.template.name === t.name ? "bg-emerald-50 font-black text-emerald-800" : "text-stone-700 font-medium"}`}>
+                              {t.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
 
-                      {/* Draft Template Card */}
-                      <div className="bg-stone-50 border border-stone-200 p-5 rounded-none space-y-4">
-                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 flex justify-between border-b border-stone-200 pb-2">
-                          <span>1. Draft Template Payload</span>
-                          <span className="text-[9px] text-stone-400 lowercase">{strategistStrategy.template.category}</span>
-                        </h4>
-
-                        <div className="space-y-3">
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-stone-400 uppercase">Template Name</label>
-                            <input
-                              type="text"
-                              value={strategistStrategy.template.name}
-                              onChange={(e) => setStrategistStrategy({
-                                ...strategistStrategy,
-                                template: { ...strategistStrategy.template, name: e.target.value }
-                              })}
-                              className="w-full bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-950 font-bold"
-                            />
+                      {/* WhatsApp message preview card */}
+                      <div
+                        onClick={() => setChatEditSection(s => s === "template" ? null : "template")}
+                        className="bg-white border border-stone-200 overflow-hidden shadow-sm cursor-pointer hover:border-stone-400 transition-colors"
+                        style={{borderRadius: 12}}>
+                        {/* Phone-style header */}
+                        <div className="bg-[#075E54] px-4 py-2.5 flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-emerald-400 flex items-center justify-center text-white text-[10px] font-black">LC</div>
+                          <div>
+                            <p className="text-white text-[11px] font-bold leading-none">LeapCreww</p>
+                            <p className="text-emerald-200 text-[9px]">WhatsApp Business</p>
                           </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-stone-400 uppercase">Message Body</label>
-                            <textarea
-                              rows={5}
-                              value={strategistStrategy.template.body}
-                              onChange={(e) => setStrategistStrategy({
-                                ...strategistStrategy,
-                                template: { ...strategistStrategy.template, body: e.target.value }
-                              })}
-                              className="w-full bg-white border border-stone-200 rounded-none p-3 text-xs focus:outline-none focus:border-stone-950 resize-none font-medium leading-relaxed text-stone-800"
-                            />
-                          </div>
-
-                          {strategistStrategy.template.buttons && (
-                            <div className="space-y-1.5">
-                              <label className="text-[9px] font-bold text-stone-400 uppercase">Call-to-Action Buttons</label>
-                              <div className="flex flex-wrap gap-2">
-                                {strategistStrategy.template.buttons.map((btn: string, bIdx: number) => (
-                                  <input
-                                    key={bIdx}
-                                    type="text"
-                                    value={btn}
-                                    onChange={(e) => {
-                                      const nextBtns = [...strategistStrategy.template.buttons];
-                                      nextBtns[bIdx] = e.target.value;
-                                      setStrategistStrategy({
-                                        ...strategistStrategy,
-                                        template: { ...strategistStrategy.template, buttons: nextBtns }
-                                      });
-                                    }}
-                                    className="bg-white border border-stone-200 rounded-none py-1.5 px-3 text-[10px] focus:outline-none focus:border-stone-950 font-bold text-stone-700"
-                                  />
-                                ))}
-                              </div>
+                        </div>
+                        {/* Message bubble */}
+                        <div className="bg-[#ECE5DD] px-4 py-3">
+                          {chatEditSection === "template" ? (
+                            <div className="space-y-2" onClick={e => e.stopPropagation()}>
+                              <input type="text" value={strategistStrategy.template.name}
+                                onChange={(e) => setStrategistStrategy({ ...strategistStrategy, template: { ...strategistStrategy.template, name: e.target.value } })}
+                                className="w-full text-[10px] font-black text-stone-500 bg-transparent border-b border-stone-300 focus:outline-none focus:border-stone-600 pb-0.5"
+                                placeholder="template_name"
+                              />
+                              <textarea rows={4} value={strategistStrategy.template.body}
+                                onChange={(e) => setStrategistStrategy({ ...strategistStrategy, template: { ...strategistStrategy.template, body: e.target.value } })}
+                                className="w-full bg-white/80 text-sm font-medium leading-relaxed text-stone-800 p-2 focus:outline-none resize-none border border-stone-200"
+                              />
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <p className="text-[9px] font-black text-stone-400 uppercase tracking-wider">{strategistStrategy.template.name}</p>
+                              <p className="text-sm leading-relaxed text-stone-800 font-medium whitespace-pre-wrap">{strategistStrategy.template.body}</p>
                             </div>
                           )}
                         </div>
-                      </div>
-
-                      {/* Target Audience Segment Card */}
-                      <div className="bg-stone-50 border border-stone-200 p-5 rounded-none space-y-4">
-                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 border-b border-stone-200 pb-2">
-                          2. Target Audience Segment
-                        </h4>
-
-                        <div className="space-y-3">
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-stone-400 uppercase">Segment Name</label>
-                            <input
-                              type="text"
-                              value={strategistStrategy.segment.name}
-                              onChange={(e) => setStrategistStrategy({
-                                ...strategistStrategy,
-                                segment: { ...strategistStrategy.segment, name: e.target.value }
-                              })}
-                              className="w-full bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-950 font-bold text-stone-850"
-                            />
+                        {/* CTA buttons */}
+                        {strategistStrategy.template.buttons && strategistStrategy.template.buttons.length > 0 && (
+                          <div className="bg-white border-t border-stone-100 divide-x divide-stone-100 flex">
+                            {chatEditSection === "template"
+                              ? strategistStrategy.template.buttons.map((btn: string, bIdx: number) => (
+                                <input key={bIdx} type="text" value={btn} onClick={e => e.stopPropagation()}
+                                  onChange={(e) => { const nb = [...strategistStrategy.template.buttons]; nb[bIdx] = e.target.value; setStrategistStrategy({ ...strategistStrategy, template: { ...strategistStrategy.template, buttons: nb } }); }}
+                                  className="flex-1 text-center text-[11px] font-black text-[#128C7E] py-2.5 focus:outline-none bg-transparent"
+                                />
+                              ))
+                              : strategistStrategy.template.buttons.map((btn: string, bIdx: number) => (
+                                <div key={bIdx} className="flex-1 text-center text-[11px] font-black text-[#128C7E] py-2.5">{btn}</div>
+                              ))
+                            }
                           </div>
+                        )}
+                        {chatEditSection !== "template" && (
+                          <div className="border-t border-stone-100 px-3 py-1.5 flex items-center justify-end gap-1 bg-stone-50">
+                            <span className="text-[9px] text-stone-400">tap to edit</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-stone-400 uppercase">Segment Filtering Rules</label>
-                            <div className="space-y-2">
+                  {/* AI bubble: audience */}
+                  <div className="flex gap-3 items-end">
+                    <div className="w-9 h-9 bg-stone-950 flex items-center justify-center shrink-0 rounded-full border-2 border-stone-800">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div className="bg-stone-100 px-4 py-2.5 text-[12px] font-medium text-stone-700" style={{borderRadius:"18px 18px 18px 4px"}}>
+                      Who should receive this message?
+                    </div>
+                  </div>
+
+                  {/* ── AUDIENCE ── */}
+                  <div className="flex gap-3 items-end">
+                    <div className="w-9 shrink-0" />
+                    <div
+                      onClick={() => setChatEditSection(s => s === "audience" ? null : "audience")}
+                      className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden cursor-pointer hover:border-stone-400 transition-colors"
+                      style={{borderRadius: 12}}>
+                      <div className="px-4 py-3 space-y-2">
+                        {chatEditSection === "audience" ? (
+                          <div className="space-y-2" onClick={e => e.stopPropagation()}>
+                            <input type="text" value={strategistStrategy.segment.name}
+                              onChange={(e) => setStrategistStrategy({ ...strategistStrategy, segment: { ...strategistStrategy.segment, name: e.target.value } })}
+                              className="w-full font-black text-sm text-stone-950 bg-transparent border-b border-stone-300 focus:outline-none focus:border-stone-950 pb-0.5"
+                            />
+                            <div className="space-y-1.5 pt-1">
                               {strategistStrategy.segment.rules.all?.map((rule: any, rIdx: number) => (
-                                <div key={rIdx} className="bg-white border border-stone-200 p-3 flex justify-between items-center text-xs">
-                                  <span className="font-semibold text-stone-600">
-                                    Target contacts where <strong className="text-stone-900 uppercase">{rule.field}</strong> is <strong className="text-stone-900 uppercase">{rule.op}</strong>
-                                  </span>
-                                  <input
-                                    type="text"
-                                    value={rule.value}
-                                    onChange={(e) => {
-                                      const nextRules = { ...strategistStrategy.segment.rules };
-                                      nextRules.all[rIdx].value = e.target.value;
-                                      setStrategistStrategy({
-                                        ...strategistStrategy,
-                                        segment: { ...strategistStrategy.segment, rules: nextRules }
-                                      });
-                                    }}
-                                    className="bg-stone-50 border border-stone-200 rounded-none p-1.5 text-[11px] text-right font-bold w-28 focus:outline-none"
+                                <div key={rIdx} className="flex items-center gap-2 text-[11px]">
+                                  <span className="text-stone-500">where <strong className="text-stone-900 uppercase">{rule.field}</strong> is</span>
+                                  <input type="text" value={rule.value}
+                                    onChange={(e) => { const nr = { ...strategistStrategy.segment.rules }; nr.all[rIdx].value = e.target.value; setStrategistStrategy({ ...strategistStrategy, segment: { ...strategistStrategy.segment, rules: nr } }); }}
+                                    className="flex-1 bg-stone-50 border border-stone-200 px-2 py-1 text-[11px] font-black focus:outline-none focus:border-stone-950"
                                   />
                                 </div>
                               ))}
                             </div>
                           </div>
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* RIGHT COLUMN: Schedule & Sequence */}
-                    <div className="space-y-6">
-
-                      {/* Schedule Settings */}
-                      <div className="bg-stone-50 border border-stone-200 p-5 rounded-none space-y-4">
-                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 border-b border-stone-200 pb-2">
-                          3. Launch Schedule
-                        </h4>
-
-                        <div className="space-y-3">
-                          <p className="text-[11px] text-stone-600 leading-relaxed font-semibold italic bg-white p-3 border border-stone-200/50">
-                            💡 AI Reasoning: {strategistStrategy.schedule.reasoning}
-                          </p>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-bold text-stone-400 uppercase">Target DateTime</label>
-                              <input
-                                type="datetime-local"
-                                value={strategistStrategy.schedule.scheduledAt ? strategistStrategy.schedule.scheduledAt.substring(0, 16) : ""}
-                                onChange={(e) => setStrategistStrategy({
-                                  ...strategistStrategy,
-                                  schedule: { ...strategistStrategy.schedule, scheduledAt: new Date(e.target.value).toISOString() }
-                                })}
-                                className="w-full bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-950 font-bold"
-                              />
+                        ) : (
+                          <>
+                            <p className="font-black text-sm text-stone-950">{strategistStrategy.segment.name}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {strategistStrategy.segment.rules.all?.map((rule: any, rIdx: number) => (
+                                <span key={rIdx} className="bg-stone-100 border border-stone-200 px-2 py-0.5 text-[10px] font-bold text-stone-600">
+                                  {rule.field} = <strong className="text-stone-900">{rule.value}</strong>
+                                </span>
+                              ))}
                             </div>
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-bold text-stone-400 uppercase">Spam Delay (s)</label>
-                              <input
-                                type="number"
-                                min="1"
-                                max="5"
-                                value={strategistStrategy.schedule.delay}
-                                onChange={(e) => setStrategistStrategy({
-                                  ...strategistStrategy,
-                                  schedule: { ...strategistStrategy.schedule, delay: parseInt(e.target.value) }
-                                })}
-                                className="w-full bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-950 font-bold"
-                              />
+                          </>
+                        )}
+                      </div>
+                      {chatEditSection !== "audience" && (
+                        <div className="border-t border-stone-100 px-3 py-1.5 flex items-center justify-end bg-stone-50">
+                          <span className="text-[9px] text-stone-400">tap to edit filters</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* AI bubble: schedule */}
+                  <div className="flex gap-3 items-end">
+                    <div className="w-9 h-9 bg-stone-950 flex items-center justify-center shrink-0 rounded-full border-2 border-stone-800">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div className="bg-stone-100 px-4 py-2.5 text-[12px] font-medium text-stone-700" style={{borderRadius:"18px 18px 18px 4px"}}>
+                      When should it go out?
+                    </div>
+                  </div>
+
+                  {/* ── SCHEDULE ── */}
+                  <div className="flex gap-3 items-end">
+                    <div className="w-9 shrink-0" />
+                    <div
+                      onClick={() => setChatEditSection(s => s === "schedule" ? null : "schedule")}
+                      className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden cursor-pointer hover:border-stone-400 transition-colors"
+                      style={{borderRadius: 12}}>
+                      <div className="px-4 py-3 space-y-2">
+                        {chatEditSection === "schedule" ? (
+                          <div className="space-y-2" onClick={e => e.stopPropagation()}>
+                            <p className="text-[10px] text-stone-400 italic">{strategistStrategy.schedule.reasoning}</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <p className="text-[9px] font-bold text-stone-400 uppercase mb-1">Send at</p>
+                                <input type="datetime-local" value={strategistStrategy.schedule.scheduledAt ? strategistStrategy.schedule.scheduledAt.substring(0, 16) : ""}
+                                  onChange={(e) => setStrategistStrategy({ ...strategistStrategy, schedule: { ...strategistStrategy.schedule, scheduledAt: new Date(e.target.value).toISOString() } })}
+                                  className="w-full bg-stone-50 border border-stone-200 py-1.5 px-2 text-[11px] font-bold focus:outline-none focus:border-stone-950"
+                                />
+                              </div>
+                              <div>
+                                <p className="text-[9px] font-bold text-stone-400 uppercase mb-1">Delay (s)</p>
+                                <input type="number" min="1" max="5" value={strategistStrategy.schedule.delay}
+                                  onChange={(e) => setStrategistStrategy({ ...strategistStrategy, schedule: { ...strategistStrategy.schedule, delay: parseInt(e.target.value) } })}
+                                  className="w-full bg-stone-50 border border-stone-200 py-1.5 px-2 text-[11px] font-bold focus:outline-none focus:border-stone-950"
+                                />
+                              </div>
                             </div>
                           </div>
+                        ) : (
+                          <div className="flex items-center gap-3">
+                            <Calendar className="w-4 h-4 text-stone-400 shrink-0" />
+                            <div>
+                              <p className="text-sm font-black text-stone-950">
+                                {strategistStrategy.schedule.scheduledAt
+                                  ? new Date(strategistStrategy.schedule.scheduledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+                                  : "Send immediately"}
+                              </p>
+                              <p className="text-[10px] text-stone-400">{strategistStrategy.schedule.delay}s between messages · anti-spam</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {chatEditSection !== "schedule" && (
+                        <div className="border-t border-stone-100 px-3 py-1.5 flex items-center justify-end bg-stone-50">
+                          <span className="text-[9px] text-stone-400">tap to adjust</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ── DRIP SEQUENCE ── */}
+                  <div className="flex gap-3 items-end">
+                    <div className="w-9 shrink-0" />
+                    <div className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden" style={{borderRadius: 12}}>
+                      <div className="px-4 py-3 flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-black text-stone-950">Follow-up Drip</p>
+                          <p className="text-[9px] text-stone-400 mt-0.5">{strategistStrategy.sequence.steps.length} automated messages after the broadcast</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button type="button"
+                            onClick={() => setChatEditSection(s => s === "sequence" ? null : "sequence")}
+                            className="text-[9px] text-stone-400 underline hover:text-stone-700 cursor-pointer">
+                            {chatEditSection === "sequence" ? "done" : "edit"}
+                          </button>
+                          <button type="button" onClick={() => setSequenceEnabled((v) => !v)}
+                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ease-in-out ${sequenceEnabled ? "bg-wa-green border-wa-green" : "bg-stone-200 border-stone-300"}`}>
+                            <span aria-hidden="true" className={`inline-block h-4 w-4 transform bg-white ring-0 transition duration-200 ease-in-out rounded-full ${sequenceEnabled ? "translate-x-4" : "translate-x-0.5"} mt-0.5`} />
+                          </button>
                         </div>
                       </div>
-
-                      {/* 3-Step Follow-Up Sequence */}
-                      <div className="bg-stone-50 border border-stone-200 p-5 rounded-none space-y-4">
-                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 border-b border-stone-200 pb-2">
-                          4. 3-Step Drip Follow-Up Sequence
-                        </h4>
-
-                        <div className="space-y-3">
+                      {sequenceEnabled && (
+                        <div className="border-t border-stone-100 px-4 py-3 space-y-2 bg-stone-50">
                           {strategistStrategy.sequence.steps.map((step: any, sIdx: number) => (
-                            <div key={sIdx} className="bg-white border border-stone-200 p-4 space-y-2 relative">
-                              <div className="flex justify-between items-center">
-                                <span className="bg-stone-950 text-white font-extrabold text-[9px] uppercase tracking-wider px-2 py-0.5">
-                                  Step {sIdx + 1}
-                                </span>
-                                <div className="text-[10px] font-bold text-stone-500">
-                                  Delay: {step.delayMinutes === 0 ? "Immediate" : step.delayMinutes < 60 ? `${step.delayMinutes}m` : `${Math.round(step.delayMinutes / 60)}h`}
-                                </div>
-                              </div>
-
-                              <textarea
-                                rows={2}
-                                value={step.message}
-                                onChange={(e) => {
-                                  const nextSteps = [...strategistStrategy.sequence.steps];
-                                  nextSteps[sIdx].message = e.target.value;
-                                  setStrategistStrategy({
-                                    ...strategistStrategy,
-                                    sequence: { ...strategistStrategy.sequence, steps: nextSteps }
-                                  });
-                                }}
-                                className="w-full bg-stone-50 border border-stone-200 rounded-none p-2 text-xs focus:outline-none focus:border-stone-950 resize-none font-semibold text-stone-700"
-                              />
+                            <div key={sIdx} className="flex gap-2 items-start">
+                              <span className="bg-stone-950 text-white text-[9px] font-black px-2 py-0.5 shrink-0 mt-0.5">
+                                {step.delayMinutes === 0 ? "Now" : step.delayMinutes < 60 ? `+${step.delayMinutes}m` : `+${Math.round(step.delayMinutes / 60)}h`}
+                              </span>
+                              {chatEditSection === "sequence" ? (
+                                <textarea rows={2} value={step.message}
+                                  onChange={(e) => { const ns = [...strategistStrategy.sequence.steps]; ns[sIdx].message = e.target.value; setStrategistStrategy({ ...strategistStrategy, sequence: { ...strategistStrategy.sequence, steps: ns } }); }}
+                                  className="flex-1 bg-white border border-stone-200 p-2 text-[11px] font-medium text-stone-700 focus:outline-none focus:border-stone-950 resize-none"
+                                />
+                              ) : (
+                                <p className="flex-1 text-[11px] text-stone-600 font-medium leading-snug">{step.message.length > 100 ? step.message.slice(0, 100) + "…" : step.message}</p>
+                              )}
                             </div>
                           ))}
                         </div>
-                      </div>
-
+                      )}
                     </div>
+                  </div>
 
+                  {/* ── LEAD QUALIFIER ── */}
+                  <div className="flex gap-3 items-end">
+                    <div className="w-9 shrink-0" />
+                    <div className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden" style={{borderRadius: 12}}>
+                      <div className="px-4 py-3 flex items-center justify-between">
+                        <div>
+                          <p className="text-[11px] font-black text-stone-950">Lead Qualifier</p>
+                          <p className="text-[9px] text-stone-400 mt-0.5">
+                            {isGeneratingQualifier ? "Generating questions…" : strategistQualifier ? `${strategistQualifier.questions.length} qualifying questions` : "Not generated"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {strategistQualifier && !isGeneratingQualifier && (
+                            <button type="button"
+                              onClick={() => setChatEditSection(s => s === "qualifier" ? null : "qualifier")}
+                              className="text-[9px] text-stone-400 underline hover:text-stone-700 cursor-pointer">
+                              {chatEditSection === "qualifier" ? "done" : "edit"}
+                            </button>
+                          )}
+                          <button type="button" onClick={() => setQualifierEnabled((v) => !v)}
+                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ease-in-out ${qualifierEnabled ? "bg-wa-green border-wa-green" : "bg-stone-200 border-stone-300"}`}>
+                            <span aria-hidden="true" className={`inline-block h-4 w-4 transform bg-white ring-0 transition duration-200 ease-in-out rounded-full ${qualifierEnabled ? "translate-x-4" : "translate-x-0.5"} mt-0.5`} />
+                          </button>
+                        </div>
+                      </div>
+                      {isGeneratingQualifier ? (
+                        <div className="border-t border-stone-100 px-4 py-3 flex items-center gap-2 bg-stone-50">
+                          <Loader2 className="w-3 h-3 animate-spin text-stone-400" />
+                          <span className="text-[10px] text-stone-400">Generating questions…</span>
+                        </div>
+                      ) : qualifierEnabled && !strategistQualifier ? (
+                        <div className="border-t border-stone-100 px-4 py-3 flex items-center justify-between bg-stone-50">
+                          <span className="text-[10px] text-stone-400">Could not auto-generate</span>
+                          <button type="button" onClick={generateQualifier}
+                            className="flex items-center gap-1 text-[10px] font-black bg-stone-950 text-white px-3 py-1.5 cursor-pointer hover:bg-stone-800">
+                            <Sparkles className="w-3 h-3" /> Generate
+                          </button>
+                        </div>
+                      ) : qualifierEnabled && strategistQualifier && (
+                        <div className="border-t border-stone-100 px-4 py-3 space-y-2 bg-stone-50">
+                          {strategistQualifier.questions.map((q, qIdx) => (
+                            <div key={q.id} className="space-y-1.5">
+                              <div className="flex items-start gap-2">
+                                <span className="bg-stone-950 text-white text-[9px] font-black w-4 h-4 flex items-center justify-center shrink-0 mt-0.5 rounded-full">{qIdx + 1}</span>
+                                {chatEditSection === "qualifier" ? (
+                                  <input type="text" value={q.text}
+                                    onChange={(e) => { const upd = { ...strategistQualifier, questions: strategistQualifier.questions.map((qq, i) => i === qIdx ? { ...qq, text: e.target.value } : qq) }; setStrategistQualifier(upd); }}
+                                    className="flex-1 text-[11px] font-bold text-stone-900 bg-white border-b border-stone-200 focus:outline-none focus:border-stone-950 pb-0.5"
+                                  />
+                                ) : (
+                                  <p className="flex-1 text-[11px] font-bold text-stone-800">{q.text}</p>
+                                )}
+                                <button type="button" onClick={() => { const upd = { ...strategistQualifier, questions: strategistQualifier.questions.filter((_, i) => i !== qIdx) }; setStrategistQualifier(upd); }}
+                                  className="text-stone-300 hover:text-red-400 cursor-pointer shrink-0">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <div className="flex flex-wrap gap-1 pl-6">
+                                {q.options.map((opt, oIdx) => {
+                                  const isDisq = q.disqualifyOn?.includes(opt) ?? false;
+                                  return chatEditSection === "qualifier" ? (
+                                    <div key={oIdx} className="flex items-center gap-0.5">
+                                      <input type="text" value={opt}
+                                        onChange={(e) => { const nv = e.target.value; const upd = { ...strategistQualifier, questions: strategistQualifier.questions.map((qq, i) => i !== qIdx ? qq : { ...qq, options: qq.options.map((o, j) => j === oIdx ? nv : o), disqualifyOn: (qq.disqualifyOn || []).map(d => d === opt ? nv : d) }) }; setStrategistQualifier(upd); }}
+                                        className={`text-[10px] px-1.5 py-0.5 w-20 border focus:outline-none ${isDisq ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-white border-stone-200 text-stone-600"}`}
+                                      />
+                                      <button type="button" onClick={() => { const upd = { ...strategistQualifier, questions: strategistQualifier.questions.map((qq, i) => i !== qIdx ? qq : { ...qq, disqualifyOn: isDisq ? (qq.disqualifyOn||[]).filter(d => d !== opt) : [...(qq.disqualifyOn||[]), opt] }) }; setStrategistQualifier(upd); }}
+                                        className={`text-[9px] px-1 py-0.5 border cursor-pointer ${isDisq ? "bg-amber-100 border-amber-300 text-amber-600" : "bg-stone-50 border-stone-200 text-stone-300 hover:text-amber-500"}`}>✕</button>
+                                    </div>
+                                  ) : (
+                                    <span key={oIdx} className={`text-[10px] px-2 py-0.5 border font-medium ${isDisq ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-white border-stone-200 text-stone-600"}`}>{opt}</span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                          <div className="flex items-center gap-2 text-[9px] font-bold pt-1 pl-0.5">
+                            <span className="text-stone-400">Tags:</span>
+                            <span className="text-emerald-600">{strategistQualifier.qualifiedTag}</span>
+                            <span className="text-stone-300">·</span>
+                            <span className="text-stone-400">{strategistQualifier.disqualifiedTag}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* AI closing bubble */}
+                  <div className="flex gap-3 items-end">
+                    <div className="w-9 h-9 bg-stone-950 flex items-center justify-center shrink-0 rounded-full border-2 border-stone-800">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div className="bg-stone-100 px-4 py-2.5 text-[12px] font-medium text-stone-700" style={{borderRadius:"18px 18px 18px 4px"}}>
+                      Everything&apos;s set 🚀 Approve to launch.
+                    </div>
                   </div>
 
                 </div>
@@ -1455,11 +1748,56 @@ export const CampaignsTab: React.FC = () => {
 
             {/* Footer */}
             <div className="p-6 border-t border-stone-200 flex justify-between items-center shrink-0 bg-[#fafaf9] select-none">
+              {strategistResult ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStrategistResult(null);
+                      setStrategistStrategy(null);
+                      setStrategistPrompt("");
+                      setStrategistError("");
+                    }}
+                    className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-300"
+                  >
+                    Build Another
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsStrategistOpen(false);
+                        setStrategistStrategy(null);
+                        setStrategistResult(null);
+                        setStrategistError("");
+                      }}
+                      className="px-4 py-2 bg-white hover:bg-stone-50 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-200"
+                    >
+                      Done
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsStrategistOpen(false);
+                        setStrategistStrategy(null);
+                        setStrategistResult(null);
+                        setStrategistError("");
+                        router.push(`${pathname}?tab=campaigns`, { scroll: false });
+                      }}
+                      className="px-5 py-2 bg-stone-950 hover:bg-stone-800 text-white font-black text-xs rounded-none cursor-pointer flex items-center gap-1.5 border border-stone-950"
+                    >
+                      View Campaigns
+                      <TrendingUp className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+              <>
               <div>
                 {strategistStrategy && (
                   <button
                     type="button"
-                    onClick={() => setStrategistStrategy(null)}
+                    onClick={() => { setStrategistStrategy(null); setStrategistQualifier(null); setQualifierEnabled(true); setSequenceEnabled(true); setChatEditSection(null); setShowTemplatePicker(false); }}
                     className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-300"
                   >
                     Start Over
@@ -1496,25 +1834,21 @@ export const CampaignsTab: React.FC = () => {
                             template: strategistStrategy.template,
                             segment: strategistStrategy.segment,
                             schedule: strategistStrategy.schedule,
-                            sequence: strategistStrategy.sequence
+                            sequence: sequenceEnabled ? strategistStrategy.sequence : null,
+                            leadQualifier: qualifierEnabled && strategistQualifier ? strategistQualifier : null,
                           })
                         });
                         const data = await res.json();
                         if (!res.ok) throw new Error(data.error || "Failed to apply strategy");
 
-                        if (data.templateApproved) {
-                          notify.success(
-                            "Strategy applied",
-                            `Your campaign is live${typeof data.enrolledCount === "number" ? ` — ${data.enrolledCount} contact(s) enrolled` : ""}. Check Campaigns and workflows.`
-                          );
-                        } else {
-                          notify.success(
-                            "Template submitted to Meta",
-                            "Your campaign is queued — it will broadcast automatically the moment Meta approves the new template."
-                          );
-                        }
-                        setIsStrategistOpen(false);
-                        setStrategistStrategy(null);
+                        setStrategistResult({
+                          templateApproved: data.templateApproved,
+                          templateName: strategistStrategy.template.name,
+                          templateBody: strategistStrategy.template.body,
+                          enrolledCount: data.enrolledCount ?? data.pendingCount ?? 0,
+                          scheduledAt: strategistStrategy.schedule.scheduledAt ?? null,
+                          steps: strategistStrategy.sequence.steps ?? [],
+                        });
                         if (orgId) await refreshWorkspace(orgId);
                       } catch (err: any) {
                         notify.error("Couldn't apply strategy", err.message || "Something went wrong. Please try again.");
@@ -1538,6 +1872,8 @@ export const CampaignsTab: React.FC = () => {
                   </button>
                 )}
               </div>
+              </>
+              )}
             </div>
 
           </div>

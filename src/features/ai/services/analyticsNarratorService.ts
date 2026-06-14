@@ -98,7 +98,7 @@ Name the best and worst performer explicitly. Be brief and highly professional. 
     const narration = await getGroqChatCompletion([
       { role: "system", content: systemPrompt },
       { role: "user", content: `Telemetry Data:\n${JSON.stringify(telemetry, null, 2)}` },
-    ], "llama-3.3-70b-versatile");
+    ], "llama-3.1-8b-instant");
     return narration || FALLBACK_NARRATION;
   } catch (err) {
     // Missing GROQ_API_KEY or a transient Groq failure should never break this page.

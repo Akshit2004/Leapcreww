@@ -284,6 +284,7 @@ export async function launchCampaign(input: LaunchCampaignInput): Promise<Campai
     date: new Date().toISOString().split("T")[0],
     scheduledAt: isScheduled ? new Date(input.scheduledAt as string) : null,
     organizationId: input.organizationId,
+    leadQualifier: (input.leadQualifier as unknown as object) ?? null,
   });
 }
 

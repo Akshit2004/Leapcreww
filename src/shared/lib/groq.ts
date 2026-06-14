@@ -1,5 +1,5 @@
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const DEFAULT_MODEL = "llama-3.3-70b-versatile";
+const DEFAULT_MODEL = "llama-3.1-8b-instant";
 const MAX_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 500;
 
@@ -28,6 +28,7 @@ interface GroqCompletionOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  jsonMode?: boolean;
   tools?: GroqTool[];
   toolChoice?: "auto" | "none" | "required";
 }
@@ -51,6 +52,9 @@ async function callGroq(
     temperature: options.temperature ?? 0.7,
     max_tokens: options.maxTokens ?? 1024,
   };
+  if (options.jsonMode) {
+    body.response_format = { type: "json_object" };
+  }
   if (options.tools && options.tools.length > 0) {
     body.tools = options.tools;
     body.tool_choice = options.toolChoice ?? "auto";
@@ -105,6 +109,31 @@ export async function getGroqChatCompletion(
 ): Promise<string> {
   const message = await callGroq(messages, { ...options, model: modelOverride });
   return message.content || "";
+}
+
+/**
+ * Try `preferredModel` first; if it hits a daily/token rate limit (429 with
+ * "tokens per day" in the error message) fall back to `fallbackModel`.
+ * Use this for quality-sensitive calls where 70b is preferred but 8b is
+ * acceptable when the daily quota is exhausted.
+ */
+export async function getGroqChatCompletionWithFallback(
+  messages: { role: string; content: string }[],
+  preferredModel: string,
+  fallbackModel: string,
+  options?: Omit<GroqCompletionOptions, "model" | "tools" | "toolChoice">
+): Promise<string> {
+  try {
+    return await getGroqChatCompletion(messages, preferredModel, options);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Only fall back on daily token quota errors — not on auth/bad-request errors
+    if (msg.includes("tokens per day") || msg.includes("TPD") || msg.includes("Rate limit reached")) {
+      console.warn(`[groq] ${preferredModel} daily limit hit — falling back to ${fallbackModel}`);
+      return await getGroqChatCompletion(messages, fallbackModel, options);
+    }
+    throw err;
+  }
 }
 
 /**

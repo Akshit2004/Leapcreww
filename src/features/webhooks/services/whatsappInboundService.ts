@@ -18,6 +18,7 @@ import {
   failCampaignsAwaitingTemplate,
 } from "@/features/campaigns/services/strategistActivation";
 import { handleCodReply } from "@/features/cod/services/codService";
+import { handleLeadQualifier } from "@/features/campaigns/services/leadQualifierService";
 import { handleNdrReply } from "@/features/ndr/services/ndrService";
 import { handleSizeFinderReply, handleShadeFinderReply } from "@/features/size-shade-finder/services/sizeShadeService";
 import { handleReplenishmentReply } from "@/features/replenishment/services/replenishmentService";
@@ -383,6 +384,18 @@ export async function processInboundMessage(
       });
     }
     return;
+  }
+
+  // Lead qualifier intercept: runs before all other routing so that contacts
+  // mid-session (or triggering a keyword) are handled by the qualifier flow.
+  const contactWithAttrs = await repo.findContactWithAttributes(contact.id, orgId);
+  if (contactWithAttrs) {
+    const qualifierHandled = await handleLeadQualifier(
+      cleanText,
+      { ...contactWithAttrs, attributes: (contactWithAttrs.attributes as Record<string, unknown>) ?? {} },
+      orgId
+    );
+    if (qualifierHandled) return;
   }
 
   // COD confirmation intercept: takes priority over all other routing.

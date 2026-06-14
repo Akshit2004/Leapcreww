@@ -26,9 +26,9 @@ export const POST = route(async (req) => {
   }
 
   if (action === "apply") {
-    const { template, segment, schedule, sequence } = payload;
-    requireFields({ template, segment, schedule, sequence }, ["template", "segment", "schedule", "sequence"]);
-    const result = await applyCampaignStrategy(orgId, { template, segment, schedule, sequence });
+    const { template, segment, schedule, sequence, leadQualifier } = payload;
+    requireFields({ template, segment, schedule }, ["template", "segment", "schedule"]);
+    const result = await applyCampaignStrategy(orgId, { template, segment, schedule, sequence: sequence ?? null, leadQualifier });
     return ok(result);
   }
 

@@ -51,6 +51,7 @@ export async function listRecipes(organizationId: string): Promise<RecipeWithSta
       stepCount: def.sequence.steps.length,
       installed: installed.has(id),
       sequenceId: installed.get(id) ?? null,
+      firstTemplateName: def.templates[0]?.name ?? null,
     };
   });
 }

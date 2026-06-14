@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import type { LeadQualifierConfig } from "@/features/campaigns/lib/leadQualifier";
 
 export interface BrandProfile {
   name: string;
@@ -144,10 +145,10 @@ export interface AppContextType {
   updateContact: (id: string, updates: Partial<Contact>) => void;
   deleteContact: (id: string) => void;
   deleteCampaign: (id: string) => Promise<void>;
-  sendBroadcast: (campaign: { 
-    name: string; 
-    targetTag: string; 
-    templateName: string; 
+  sendBroadcast: (campaign: {
+    name: string;
+    targetTag: string;
+    templateName: string;
     organizationId: string;
     variables?: Array<{ key: string; type: "contact_field" | "static"; value: string }>;
     delay?: number;
@@ -156,6 +157,7 @@ export interface AppContextType {
     mediaType?: string;
     mediaUrl?: string;
     segmentId?: string;
+    leadQualifier?: LeadQualifierConfig;
   }) => Promise<void>;
   sendLiveChatMessage: (contactId: string, text: string, sender?: "user" | "agent" | "system", buttons?: string[]) => void;
   updateChatbotNodes: (nodes: ChatbotNode[], organizationId: string) => Promise<void>;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/features/auth/api/[...nextauth]/route";
-import { getGroqChatCompletion } from "@/shared/lib/groq";
+import { getGroqChatCompletionWithFallback } from "@/shared/lib/groq";
 
 // Helper: Extract valid JSON from LLM string output
 function extractJsonFromString(str: string): unknown {
@@ -70,7 +70,7 @@ Do not include any conversational headers or markdown backticks in your output.`
       }
     ];
 
-    const resultString = await getGroqChatCompletion(prompt);
+    const resultString = await getGroqChatCompletionWithFallback(prompt, "llama-3.3-70b-versatile", "llama-3.1-8b-instant", { jsonMode: true });
     const parsedData = extractJsonFromString(resultString);
 
     if (!parsedData) {
