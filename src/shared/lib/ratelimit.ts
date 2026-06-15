@@ -28,13 +28,13 @@ export interface RateLimitResult {
 /** Window definitions per tier. Tuned to throttle abuse, not normal usage. */
 const TIERS: Record<RateLimitTier, { tokens: number; window: Parameters<typeof Ratelimit.slidingWindow>[1] }> = {
   // AI routes call paid LLM APIs — keep the ceiling low to cap spend per user.
-  ai: { tokens: 500, window: "1 d" },
+  ai: { tokens: 50, window: "1 d" },
   // Public Project-API key traffic (/api/v1/*): generous but bounded per key.
-  publicApi: { tokens: 240, window: "1 m" },
+  publicApi: { tokens: 24, window: "1 m" },
   // Everything else under /api/*: normal operational headroom per user.
-  standard: { tokens: 100, window: "10 s" },
+  standard: { tokens: 10, window: "10 s" },
   // WhatsApp OTP sends — keyed by normalized phone to prevent OTP bombing.
-  otp: { tokens: 3, window: "15 m" },
+  otp: { tokens: 2, window: "15 m" },
 };
 
 let redis: Redis | null = null;
