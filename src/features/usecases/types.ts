@@ -35,8 +35,13 @@ export interface UpdateBookingInput {
   status: BookingStatusAction;
 }
 
+export type BusinessVertical = "ECOMMERCE" | "APPOINTMENT" | "GENERAL";
+
 export interface UseCaseSettingsInput {
   organizationId: string;
   activeUseCase?: UseCaseId;
   appointmentPreset?: AppointmentPresetId;
+  businessVertical?: BusinessVertical;
+  useCaseOnboarded?: boolean;
+  navShowAllTabs?: boolean;
 }

@@ -4,7 +4,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { ChevronDown, LogOut, Sparkles, X, Menu, Wifi, WifiOff } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useApp } from "../../context/AppContext";
-import { NAV_GROUPS, type NavItem } from "../../config/navigation";
+import { getVisibleNavGroups, type NavItem } from "../../config/navigation";
 
 interface SidebarProps {
   activeTab: string;
@@ -25,13 +25,20 @@ declare global {
   }
 }
 
-// Mobile bottom nav: the 5 most important items
-const MOBILE_PRIMARY_IDS = ["overview", "inbox", "customers", "campaigns", "templates"];
+// Mobile bottom nav: the 5 most important items (vertical-aware)
+const MOBILE_PRIMARY_IDS_DEFAULT = ["overview", "inbox", "customers", "campaigns", "templates"];
+const MOBILE_PRIMARY_IDS_APPOINTMENT = ["overview", "inbox", "customers", "campaigns", "bookingcustomers"];
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onOpenCopilot }) => {
   const { contacts, organization } = useApp();
   const { data: session } = useSession();
   const waConnected = organization?.whatsappConnected ?? false;
+
+  const navGroups = getVisibleNavGroups(organization?.businessVertical, organization?.navShowAllTabs);
+  const MOBILE_PRIMARY_IDS =
+    organization?.businessVertical === "APPOINTMENT" && !organization?.navShowAllTabs
+      ? MOBILE_PRIMARY_IDS_APPOINTMENT
+      : MOBILE_PRIMARY_IDS_DEFAULT;
 
   const [isHovered, setIsHovered] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
@@ -132,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onOpe
     );
   };
 
-  const allNonPrimaryItems = NAV_GROUPS.flatMap((g) =>
+  const allNonPrimaryItems = navGroups.flatMap((g) =>
     g.items.filter((i) => !MOBILE_PRIMARY_IDS.includes(i.id))
   );
 
@@ -180,7 +187,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onOpe
 
         {/* Navigation */}
         <nav className="flex-1 px-2 py-3 overflow-y-auto overflow-x-hidden custom-scrollbar">
-          {NAV_GROUPS.map((group) => {
+          {navGroups.map((group) => {
             const isCollapsed = !!collapsedGroups[group.id];
             const hasActiveItem = group.items.some((i) => i.id === activeTab);
 
@@ -299,7 +306,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onOpe
       <nav className="max-lg:flex lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-200 items-center pb-safe">
         {/* Primary 5 items */}
         {MOBILE_PRIMARY_IDS.map((id) => {
-          const item = NAV_GROUPS.flatMap((g) => g.items).find((i) => i.id === id);
+          const item = navGroups.flatMap((g) => g.items).find((i) => i.id === id);
           if (!item) return null;
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -372,7 +379,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onOpe
             </div>
 
             <div className="px-3 py-3 space-y-4">
-              {NAV_GROUPS.filter((g) =>
+              {navGroups.filter((g) =>
                 g.items.some((i) => !MOBILE_PRIMARY_IDS.includes(i.id))
               ).map((group) => {
                 const mobileItems = group.items.filter(

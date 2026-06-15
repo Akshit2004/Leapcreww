@@ -65,9 +65,55 @@ export const authOptions: NextAuthOptions = {
           };
         }
 
-        // Email OTP is used only to VERIFY an email during signup — never to
-        // authenticate a session. Email login goes through the password branch
-        // below. (Removed the former type === "email" attempt-based sign-in.)
+        if (credentials?.type === "email") {
+          if (!credentials.attemptId) {
+            throw new Error("Missing email verification attempt ID.");
+          }
+
+          const attempt = await prisma.emailOtpAttempt.findUnique({
+            where: { id: credentials.attemptId }
+          });
+
+          if (!attempt) {
+            throw new Error("Email authentication session not found.");
+          }
+
+          if (attempt.status !== "VERIFIED") {
+            throw new Error("Email authentication has not been verified.");
+          }
+
+          if (attempt.expiresAt < new Date()) {
+            throw new Error("Email authentication session has expired.");
+          }
+
+          const user = await prisma.user.findUnique({
+            where: { email: attempt.email },
+            include: {
+              memberships: {
+                include: {
+                  organization: true
+                }
+              }
+            }
+          });
+
+          if (!user) {
+            throw new Error("No account found for this email.");
+          }
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            organizations: (user.memberships as { organization: { id: string; name: string; slug: string }; role: string }[]).map((m) => ({
+              id: m.organization.id,
+              name: m.organization.name,
+              slug: m.organization.slug,
+              role: m.role
+            }))
+          };
+        }
 
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Missing email or password credentials.");

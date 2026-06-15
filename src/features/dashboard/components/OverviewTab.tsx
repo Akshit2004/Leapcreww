@@ -23,13 +23,15 @@ import {
   Eye,
   Mic,
   Play,
+  ShoppingBag,
+  Clock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
 import { CSVImporterModal } from "@/features/inbox/components/CSVImporterModal";
 import { MetaBillingModal } from "@/features/wallet/components/MetaBillingModal";
-import { RecipesSection } from "@/features/recipes/components/RecipesSection";
+import { ChecklistWizard } from "@/features/dashboard/components/ChecklistWizard";
 import type { CampaignStrategy } from "@/features/ai/services/campaignStrategistService";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -72,6 +74,14 @@ interface OverviewTabProps {
   onNavigate?: (tab: string) => void;
 }
 
+interface TodayBooking {
+  id: string;
+  serviceName: string;
+  startTime: string;
+  bookingForName: string;
+  status: "booked" | "completed" | "no_show" | "cancelled";
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const INITIAL_GREETING: ChatMessage = {
@@ -88,18 +98,14 @@ const INITIAL_GREETING: ChatMessage = {
 };
 
 const chipColors = [
-  "bg-amber-400/20 border-amber-400/50 text-amber-300 hover:bg-amber-400/30",
-  "bg-emerald-400/20 border-emerald-400/50 text-emerald-300 hover:bg-emerald-400/30",
-  "bg-violet-400/20 border-violet-400/50 text-violet-300 hover:bg-violet-400/30",
-  "bg-rose-400/20 border-rose-400/50 text-rose-300 hover:bg-rose-400/30",
-  "bg-sky-400/20 border-sky-400/50 text-sky-300 hover:bg-sky-400/30",
+  "bg-white border-stone-200 text-stone-700 hover:border-wa-green hover:text-wa-green-dark",
 ];
 
 const actionColors: Record<string, string> = {
-  campaign: "bg-amber-500/20 border-amber-500/40 text-amber-200",
-  automation: "bg-emerald-500/20 border-emerald-500/40 text-emerald-200",
-  chatbot: "bg-violet-500/20 border-violet-500/40 text-violet-200",
-  template: "bg-sky-500/20 border-sky-500/40 text-sky-200",
+  campaign: "bg-stone-50 border-stone-200 text-stone-700",
+  automation: "bg-stone-50 border-stone-200 text-stone-700",
+  chatbot: "bg-stone-50 border-stone-200 text-stone-700",
+  template: "bg-stone-50 border-stone-200 text-stone-700",
 };
 
 const actionIcons: Record<string, React.ElementType> = {
@@ -161,16 +167,14 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
   </div>
 );
 
-const PillToggle: React.FC<{ on: boolean; onToggle: () => void; color?: "emerald" | "amber" }> = ({
+const PillToggle: React.FC<{ on: boolean; onToggle: () => void }> = ({
   on,
   onToggle,
-  color = "emerald",
 }) => {
-  const onColor = color === "amber" ? "bg-amber-500 border-amber-500" : "bg-emerald-500 border-emerald-500";
   return (
     <button
       onClick={onToggle}
-      className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ${on ? onColor : "bg-stone-200 border-stone-200"}`}
+      className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ${on ? "bg-wa-green border-wa-green" : "bg-stone-200 border-stone-200"}`}
     >
       <span
         className={`inline-block h-3 w-3 rounded-full bg-white shadow transform transition-transform duration-200 mt-0.5 ${on ? "translate-x-4" : "translate-x-0.5"}`}
@@ -208,52 +212,29 @@ const InboundBubble: React.FC<{ text: string }> = ({ text }) => (
 
 // ─── RIGHT PANEL MODES ────────────────────────────────────────────────────────
 
-interface StatsPanelProps {
-  totalContacts: number;
-  totalCampaigns: number;
-  totalMessages: number;
-  templateCount: number;
-  onNavigate?: (tab: string) => void;
+interface GetStartedPanelProps {
+  suggestions: string[];
+  onSuggestionClick: (text: string) => void;
 }
 
-const StatsPanel: React.FC<StatsPanelProps> = ({
-  totalContacts,
-  totalCampaigns,
-  totalMessages,
-  templateCount,
-  onNavigate,
-}) => {
-  const cards = [
-    { label: "Contacts", value: totalContacts, icon: Users, gradient: "from-blue-500 to-indigo-500", border: "border-t-blue-500", tab: "customers" },
-    { label: "Campaigns", value: totalCampaigns, icon: Send, gradient: "from-orange-500 to-amber-500", border: "border-t-orange-500", tab: "campaigns" },
-    { label: "Messages Sent", value: totalMessages, icon: Zap, gradient: "from-emerald-500 to-teal-500", border: "border-t-emerald-500", tab: "campaigns" },
-    { label: "Templates", value: templateCount, icon: FileText, gradient: "from-violet-500 to-purple-500", border: "border-t-violet-500", tab: "templates" },
-  ];
-
-  return (
-    <div className="p-5 flex flex-col">
-      <div className="grid grid-cols-2 gap-3">
-        {cards.map(({ label, value, icon: Icon, gradient, border, tab }) => (
-          <button
-            key={label}
-            onClick={() => onNavigate?.(tab)}
-            className={`bg-white border border-stone-200 border-t-4 ${border} p-4 text-left cursor-pointer hover:shadow-sm transition-all group relative`}
-          >
-            <ArrowUpRight className="w-3 h-3 text-stone-300 absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center mb-3`}>
-              <Icon className="w-4 h-4 text-white" />
-            </div>
-            <div className="text-2xl font-black text-stone-900 tracking-tight">{value.toLocaleString()}</div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-stone-500 mt-0.5">{label}</div>
-          </button>
-        ))}
-      </div>
-      <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider text-center mt-4">
-        Ask the AI anything to get started →
-      </p>
+const GetStartedPanel: React.FC<GetStartedPanelProps> = ({ suggestions, onSuggestionClick }) => (
+  <div className="p-5 flex flex-col gap-3 h-full justify-center">
+    <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 text-center mb-1">
+      Try asking the AI
+    </p>
+    <div className="flex flex-col gap-2">
+      {suggestions.map((s) => (
+        <button
+          key={s}
+          onClick={() => onSuggestionClick(s)}
+          className="w-full text-left text-sm font-semibold text-stone-700 bg-white border border-stone-200 px-4 py-3 hover:border-wa-green hover:text-wa-green-dark transition-colors cursor-pointer"
+        >
+          {s}
+        </button>
+      ))}
     </div>
-  );
-};
+  </div>
+);
 
 const CampaignLoadingPanel: React.FC = () => (
   <div className="p-5 flex flex-col items-center justify-center h-full gap-5">
@@ -371,11 +352,11 @@ const CampaignPreviewPanel: React.FC<CampaignPreviewPanelProps> = ({
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="px-4 pt-3 pb-2.5 border-b border-stone-100 flex items-center justify-between shrink-0 bg-white">
         <div>
-          <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Campaign Ready</p>
+          <p className="text-[9px] font-black uppercase tracking-widest text-wa-green-dark">Campaign Ready</p>
           <p className="text-sm font-black text-stone-900 mt-0.5 font-mono truncate max-w-[200px]">{strategy.template.name}</p>
         </div>
         {strategy.templateExists
-          ? <span className="text-[9px] font-black bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 uppercase shrink-0">Approved</span>
+          ? <span className="text-[9px] font-black bg-wa-green/10 border border-wa-green/30 text-wa-green-dark px-2 py-0.5 uppercase shrink-0">Approved</span>
           : <span className="text-[9px] font-black bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 uppercase shrink-0">Pending Meta</span>
         }
       </div>
@@ -434,7 +415,7 @@ const CampaignPreviewPanel: React.FC<CampaignPreviewPanelProps> = ({
               <p className="text-sm font-black text-stone-900 uppercase tracking-tight">Lead Qualifier</p>
               <p className="text-xs text-stone-500 mt-1">Auto-qualify leads who tap Interested</p>
             </div>
-            <PillToggle on={qualifierEnabled} onToggle={onQualifierEnabledChange} color="amber" />
+            <PillToggle on={qualifierEnabled} onToggle={onQualifierEnabledChange} />
           </div>
           {qualifierEnabled && (
             <>
@@ -467,7 +448,7 @@ const CampaignPreviewPanel: React.FC<CampaignPreviewPanelProps> = ({
                   {qualifier.questions.map((q, qi) => (
                     <div key={q.id} className="bg-stone-50 border border-stone-200 p-3 space-y-2">
                       <div className="flex items-start gap-2">
-                        <span className="text-[9px] font-black bg-amber-500 text-white w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">{qi + 1}</span>
+                        <span className="text-[9px] font-black bg-wa-green text-white w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">{qi + 1}</span>
                         <input
                           type="text"
                           value={q.text}
@@ -477,7 +458,7 @@ const CampaignPreviewPanel: React.FC<CampaignPreviewPanelProps> = ({
                             );
                             onQualifierQuestionsChange(updated);
                           }}
-                          className="flex-1 text-xs font-semibold text-stone-800 bg-transparent border-b border-stone-200 hover:border-stone-400 focus:border-amber-500 focus:outline-none pb-0.5 transition-colors"
+                          className="flex-1 text-xs font-semibold text-stone-800 bg-transparent border-b border-stone-200 hover:border-stone-400 focus:border-wa-green focus:outline-none pb-0.5 transition-colors"
                         />
                         <button
                           type="button"
@@ -491,7 +472,7 @@ const CampaignPreviewPanel: React.FC<CampaignPreviewPanelProps> = ({
                         {q.options.map((opt, oi) => (
                           <span
                             key={oi}
-                            className={`text-[10px] font-medium px-2 py-0.5 border ${(q.disqualifyOn ?? []).includes(opt) ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-white border-stone-200 text-stone-600"}`}
+                            className={`text-[10px] font-medium px-2 py-0.5 border ${(q.disqualifyOn ?? []).includes(opt) ? "bg-stone-800 border-stone-800 text-white" : "bg-white border-stone-200 text-stone-600"}`}
                           >
                             {opt}
                           </span>
@@ -616,7 +597,7 @@ const CampaignPreviewPanel: React.FC<CampaignPreviewPanelProps> = ({
         <button
           onClick={onPreviewFlow}
           disabled={isLaunching}
-          className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 text-white font-black text-sm uppercase tracking-wider py-3 flex items-center justify-center gap-2 transition-all cursor-pointer"
+          className="flex-1 bg-gradient-to-r from-wa-green to-wa-green-dark hover:opacity-90 disabled:opacity-50 text-white font-black text-sm uppercase tracking-wider py-3 flex items-center justify-center gap-2 transition-all cursor-pointer"
         >
           {isLaunching ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -864,33 +845,33 @@ interface AutomationPanelProps {
 
 const AutomationPanel: React.FC<AutomationPanelProps> = ({ onNavigate }) => {
   const steps = [
-    { emoji: "⚡", label: "TRIGGER EVENT", desc: "Contact joins a tag", gradient: "from-amber-500/20 to-orange-500/20", border: "border-amber-500/40", text: "text-amber-200" },
-    { emoji: "📨", label: "MESSAGE SENT", desc: "Welcome message fires", gradient: "from-emerald-500/20 to-teal-500/20", border: "border-emerald-500/40", text: "text-emerald-200" },
-    { emoji: "📨", label: "FOLLOW-UP (DAY 1)", desc: "Nurture sequence continues", gradient: "from-teal-500/20 to-cyan-500/20", border: "border-teal-500/40", text: "text-teal-200" },
+    { emoji: "⚡", label: "TRIGGER EVENT", desc: "Contact joins a tag" },
+    { emoji: "📨", label: "MESSAGE SENT", desc: "Welcome message fires" },
+    { emoji: "📨", label: "FOLLOW-UP (DAY 1)", desc: "Nurture sequence continues" },
   ];
   return (
     <div className="p-5 flex flex-col gap-3">
-      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600">Automation Flow</span>
+      <span className="text-[10px] font-black uppercase tracking-wider text-wa-green-dark">Automation Flow</span>
       {steps.map((step, i) => (
         <div key={i} className="flex flex-col items-center">
-          <div className={`w-full bg-gradient-to-r ${step.gradient} border ${step.border} px-4 py-3 flex items-center gap-3`}>
+          <div className="w-full bg-stone-50 border border-stone-200 px-4 py-3 flex items-center gap-3">
             <span className="text-base leading-none">{step.emoji}</span>
             <div>
-              <p className={`text-[10px] font-black uppercase tracking-wider ${step.text}`}>{step.label}</p>
+              <p className="text-[10px] font-black uppercase tracking-wider text-stone-700">{step.label}</p>
               <p className="text-[10px] text-stone-400 mt-0.5">{step.desc}</p>
             </div>
           </div>
           {i < steps.length - 1 && (
             <div className="flex flex-col items-center">
-              <div className="w-px h-3 bg-stone-600" />
-              <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-stone-500" />
+              <div className="w-px h-3 bg-stone-300" />
+              <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-stone-300" />
             </div>
           )}
         </div>
       ))}
       <button
         onClick={() => onNavigate?.("campaigns")}
-        className="mt-auto w-full border border-emerald-500/40 text-emerald-400 font-black text-[10px] uppercase tracking-wider py-2.5 hover:bg-emerald-500/10 transition-colors cursor-pointer"
+        className="mt-auto w-full border border-stone-300 text-stone-700 font-black text-[10px] uppercase tracking-wider py-2.5 hover:border-wa-green hover:text-wa-green-dark transition-colors cursor-pointer"
       >
         View Automations →
       </button>
@@ -904,7 +885,7 @@ interface ChatbotPanelProps {
 
 const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ onNavigate }) => (
   <div className="p-5 flex flex-col gap-4">
-    <span className="text-[10px] font-black uppercase tracking-wider text-violet-600">Chatbot Preview</span>
+    <span className="text-[10px] font-black uppercase tracking-wider text-wa-green-dark">Chatbot Preview</span>
     <PhoneMockup>
       <InboundBubble text="Hi! 👋" />
       <OutboundBubble text="Welcome! How can I help?" />
@@ -918,7 +899,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ onNavigate }) => (
     </PhoneMockup>
     <button
       onClick={() => onNavigate?.("chatbot")}
-      className="mt-auto w-full border border-violet-500/40 text-violet-400 font-black text-[10px] uppercase tracking-wider py-2.5 hover:bg-violet-500/10 transition-colors cursor-pointer"
+      className="mt-auto w-full border border-stone-300 text-stone-700 font-black text-[10px] uppercase tracking-wider py-2.5 hover:border-wa-green hover:text-wa-green-dark transition-colors cursor-pointer"
     >
       Build Chatbot →
     </button>
@@ -931,7 +912,7 @@ interface TemplatePanelProps {
 
 const TemplatePanel: React.FC<TemplatePanelProps> = ({ onNavigate }) => (
   <div className="p-5 flex flex-col gap-4">
-    <span className="text-[10px] font-black uppercase tracking-wider text-sky-600">Template Preview</span>
+    <span className="text-[10px] font-black uppercase tracking-wider text-wa-green-dark">Template Preview</span>
     <div className="bg-white border border-stone-200 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-[9px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5">
@@ -950,7 +931,7 @@ const TemplatePanel: React.FC<TemplatePanelProps> = ({ onNavigate }) => (
     </div>
     <button
       onClick={() => onNavigate?.("templates")}
-      className="mt-auto w-full border border-sky-500/40 text-sky-400 font-black text-[10px] uppercase tracking-wider py-2.5 hover:bg-sky-500/10 transition-colors cursor-pointer"
+      className="mt-auto w-full border border-stone-300 text-stone-700 font-black text-[10px] uppercase tracking-wider py-2.5 hover:border-wa-green hover:text-wa-green-dark transition-colors cursor-pointer"
     >
       Create Template →
     </button>
@@ -960,7 +941,7 @@ const TemplatePanel: React.FC<TemplatePanelProps> = ({ onNavigate }) => (
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
-  const { organization, contacts, campaigns, templates, systemLogs, refreshWorkspace } = useApp();
+  const { organization, contacts, campaigns, templates, systemLogs, orders, refreshWorkspace, dismissOnboarding } = useApp();
 
   const params = useParams();
   const orgId = params.orgId as string;
@@ -989,13 +970,35 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
     });
   }, []);
 
+  // Today's bookings (Appointment-vertical orgs only)
+  const [todayBookings, setTodayBookings] = useState<TodayBooking[] | null>(null);
+  const businessVertical = organization?.businessVertical;
+
+  useEffect(() => {
+    if (businessVertical !== "APPOINTMENT" || !organization?.id) return;
+    let cancelled = false;
+    fetch(`/api/usecase/bookings?orgId=${organization.id}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => {
+        if (cancelled) return;
+        const bookings: TodayBooking[] = data.bookings || [];
+        const todayStr = new Date().toDateString();
+        setTodayBookings(
+          bookings.filter(
+            (b) => b.status === "booked" && new Date(b.startTime).toDateString() === todayStr
+          )
+        );
+      })
+      .catch(() => { if (!cancelled) setTodayBookings([]); });
+    return () => { cancelled = true; };
+  }, [businessVertical, organization?.id]);
+
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_GREETING]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   // Mode switcher
-  const [mode, setMode] = useState<"ai" | "manual">("ai");
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
 
   // Right panel
@@ -1031,6 +1034,24 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
     () => [...new Set((contacts as Array<{ tags?: string[] }>).flatMap((c) => c.tags ?? []))].filter(Boolean),
     [contacts]
   );
+
+  // Today widget — top unread inbox conversations (all verticals)
+  const unreadContacts = useMemo(
+    () =>
+      contacts
+        .filter((c) => (c.unreadCount ?? 0) > 0)
+        .sort((a, b) => new Date(b.lastMessageTime ?? 0).getTime() - new Date(a.lastMessageTime ?? 0).getTime())
+        .slice(0, 3),
+    [contacts]
+  );
+
+  // Today widget — recent orders (E-commerce vertical)
+  const todayOrdersCount = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return (orders as Array<{ createdAt?: string }>).filter(
+      (o) => o.createdAt && new Date(o.createdAt).toDateString() === todayStr
+    ).length;
+  }, [orders]);
 
   // Scroll chat container (not the page) on new messages
   useEffect(() => {
@@ -1342,12 +1363,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
     switch (rightPanel) {
       case "stats":
         return (
-          <StatsPanel
-            totalContacts={totalContacts}
-            totalCampaigns={totalCampaigns}
-            totalMessages={totalMessages}
-            templateCount={templates.length}
-            onNavigate={onNavigate}
+          <GetStartedPanel
+            suggestions={INITIAL_GREETING.suggestions ?? []}
+            onSuggestionClick={(s) => void handleSuggestion(s)}
           />
         );
       case "campaign-loading":
@@ -1450,53 +1468,179 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
         )}
       </div>
 
-      {/* ── AI Command Center ── */}
-      <div className="border border-stone-200 overflow-hidden flex flex-col">
-        {/* Panel label bar */}
-        <div className="bg-white border-b border-stone-200 px-5 py-3 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-wa-green" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-stone-700">Command Center</span>
-          </div>
-          {/* Mode switcher */}
-          <div className="flex bg-stone-100 p-0.5 gap-0">
-            <button
-              onClick={() => setMode("ai")}
-              className={`px-4 py-1.5 text-[11px] font-black uppercase tracking-wider transition-colors cursor-pointer ${mode === "ai" ? "bg-stone-900 text-white" : "text-stone-500 hover:text-stone-800"}`}
-            >
-              AI Mode
-            </button>
-            <button
-              onClick={() => setMode("manual")}
-              className={`px-4 py-1.5 text-[11px] font-black uppercase tracking-wider transition-colors cursor-pointer ${mode === "manual" ? "bg-stone-900 text-white" : "text-stone-500 hover:text-stone-800"}`}
-            >
-              Manual
-            </button>
-          </div>
-        </div>
+      {/* ── Setup Checklist (first-time / incomplete workspaces) ── */}
+      {organization && (
+        <ChecklistWizard
+          organizationId={organization.id}
+          fbConnected={fbConnected}
+          templatesApproved={templates.some((t) => t.metaStatus === "approved")}
+          contactsImported={totalContacts > 0}
+          campaignSent={totalCampaigns > 0}
+          onNavigate={onNavigate}
+          onImportClick={() => setIsCSVModalOpen(true)}
+          dismissOnboarding={dismissOnboarding}
+          showChecklist={!organization.onboardingDismissed}
+          businessVertical={businessVertical}
+        />
+      )}
 
+      {/* ── Key Stats ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Contacts", value: totalContacts, icon: Users, tab: "customers", hint: "Import your contacts" },
+          { label: "Campaigns", value: totalCampaigns, icon: Send, tab: "campaigns", hint: "Launch your first campaign" },
+          { label: "Messages Sent", value: totalMessages, icon: Zap, tab: "campaigns", hint: "Send a broadcast to see activity" },
+          { label: "Templates", value: templates.length, icon: FileText, tab: "templates", hint: "Create a message template" },
+        ].map(({ label, value, icon: Icon, tab, hint }) => (
+          <button
+            key={label}
+            onClick={() => onNavigate?.(tab)}
+            className="bg-white border border-stone-200 border-t-4 border-t-wa-green p-4 text-left cursor-pointer hover:border-stone-400 transition-all group relative"
+          >
+            <ArrowUpRight className="w-3 h-3 text-stone-300 absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="w-8 h-8 bg-stone-900 flex items-center justify-center mb-3">
+              <Icon className="w-4 h-4 text-wa-green" />
+            </div>
+            <div className="text-2xl font-black text-stone-900 tracking-tight">{value.toLocaleString()}</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-stone-500 mt-0.5">{label}</div>
+            {value === 0 && (
+              <div className="text-[10px] font-semibold text-wa-green-dark mt-1.5">{hint} →</div>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Today ── */}
+      <div>
+        <SectionHeader
+          title="Today"
+          sectionId="today"
+          collapsed={!!collapsedSections["today"]}
+          onToggle={toggleSection}
+        />
+        {!collapsedSections["today"] && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {businessVertical === "APPOINTMENT" && (
+              <div className="bg-white border border-stone-200 p-5 flex flex-col">
+                <div className="flex items-center gap-2 mb-3">
+                  <Calendar className="w-4 h-4 text-stone-500" />
+                  <h3 className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Today&apos;s Bookings</h3>
+                </div>
+                {todayBookings === null ? (
+                  <div className="flex items-center gap-2 text-stone-400 text-xs py-4">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
+                  </div>
+                ) : todayBookings.length === 0 ? (
+                  <p className="text-sm text-stone-400 py-4">No bookings scheduled for today.</p>
+                ) : (
+                  <div className="space-y-2.5 mb-3">
+                    <p className="text-2xl font-black text-stone-900">{todayBookings.length}</p>
+                    {todayBookings.slice(0, 3).map((b) => (
+                      <div key={b.id} className="flex items-center gap-2 text-xs">
+                        <Clock className="w-3 h-3 text-stone-400 shrink-0" />
+                        <span className="font-semibold text-stone-700 truncate">{b.bookingForName}</span>
+                        <span className="text-stone-400 truncate">— {b.serviceName}</span>
+                        <span className="text-stone-400 ml-auto shrink-0">
+                          {new Date(b.startTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => onNavigate?.("bookingcustomers")}
+                  className="mt-auto text-[10px] font-black uppercase tracking-wider text-stone-500 hover:text-stone-900 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  View Bookings <ArrowUpRight className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {businessVertical === "ECOMMERCE" && (
+              <div className="bg-white border border-stone-200 p-5 flex flex-col">
+                <div className="flex items-center gap-2 mb-3">
+                  <ShoppingBag className="w-4 h-4 text-stone-500" />
+                  <h3 className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Today&apos;s Orders</h3>
+                </div>
+                <p className="text-2xl font-black text-stone-900 mb-3">{todayOrdersCount}</p>
+                <p className="text-xs text-stone-400 mb-3">
+                  {orders.length} total order{orders.length === 1 ? "" : "s"} on record.
+                </p>
+                <button
+                  onClick={() => onNavigate?.("marketplace")}
+                  className="mt-auto text-[10px] font-black uppercase tracking-wider text-stone-500 hover:text-stone-900 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  View Marketplace <ArrowUpRight className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            <div className="bg-white border border-stone-200 p-5 flex flex-col">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageCircle className="w-4 h-4 text-stone-500" />
+                <h3 className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Unread Conversations</h3>
+              </div>
+              {unreadContacts.length === 0 ? (
+                <p className="text-sm text-stone-400 py-4">You&apos;re all caught up — no unread messages.</p>
+              ) : (
+                <div className="space-y-2.5 mb-3">
+                  {unreadContacts.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => onNavigate?.("inbox")}
+                      className="w-full flex items-center gap-2 text-xs text-left hover:bg-stone-50 -mx-1 px-1 py-0.5 transition-colors cursor-pointer"
+                    >
+                      <span className="font-semibold text-stone-700 truncate">{c.name}</span>
+                      <span className="text-stone-400 truncate flex-1">{c.lastMessage}</span>
+                      <span className="text-[9px] font-black uppercase tracking-wider bg-wa-green/10 text-wa-green px-1.5 py-0.5 shrink-0">
+                        {c.unreadCount}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => onNavigate?.("inbox")}
+                className="mt-auto text-[10px] font-black uppercase tracking-wider text-stone-500 hover:text-stone-900 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                Go to Inbox <ArrowUpRight className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── AI Command Center ── */}
+      <div>
+        <SectionHeader
+          title="AI Command Center"
+          sectionId="command_center"
+          collapsed={!!collapsedSections["command_center"]}
+          onToggle={toggleSection}
+        />
+        {!collapsedSections["command_center"] && (
+        <div className="border border-stone-200 overflow-hidden flex flex-col">
         {/* Split panels — always side-by-side */}
-        {mode === "ai" && (
-        <div className="flex flex-row h-[640px] overflow-hidden">
+        <div className="flex flex-row h-[480px] overflow-hidden">
           {/* ── LEFT — Chat (55%) ── */}
-          <div className="flex-[55] flex flex-col bg-gradient-to-b from-indigo-950 via-slate-900 to-violet-950 min-h-0 min-w-0">
+          <div className="flex-[55] flex flex-col bg-white min-h-0 min-w-0">
             {/* Chat header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 shrink-0 bg-white">
               <div className="flex items-center gap-2.5">
                 <div className="relative">
-                  <div className="w-2 h-2 bg-emerald-400 absolute -top-0.5 -right-0.5 animate-pulse" />
-                  <div className="w-7 h-7 bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center">
+                  <div className="w-2 h-2 bg-wa-green absolute -top-0.5 -right-0.5 animate-pulse" />
+                  <div className="w-7 h-7 bg-wa-green flex items-center justify-center">
                     <Sparkles className="w-3.5 h-3.5 text-white" />
                   </div>
                 </div>
                 <div>
-                  <p className="text-white font-black text-sm uppercase tracking-wider leading-none">AI Copilot</p>
+                  <p className="text-stone-900 font-black text-sm uppercase tracking-wider leading-none">AI Copilot</p>
                   <p className="text-stone-400 text-[10px] mt-0.5">Your WhatsApp marketing assistant</p>
                 </div>
               </div>
               <button
                 onClick={handleReset}
-                className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/40 hover:text-white/80 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-stone-400 hover:text-stone-900 transition-colors cursor-pointer"
                 title="New conversation"
               >
                 <RotateCcw className="w-3 h-3" />
@@ -1505,46 +1649,47 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
             </div>
 
             {/* Chat thread */}
-            <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-1 custom-scrollbar">
+            <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 custom-scrollbar bg-[#fafaf9]">
               {messages.map((message) => {
                 if (message.role === "assistant") {
                   const ActionIcon = message.action ? actionIcons[message.action] : null;
                   return (
-                    <div key={message.id} className="flex items-start gap-2.5 mb-4">
+                    <div key={message.id} className="flex items-start gap-2.5">
                       {/* AI avatar */}
-                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <div className="w-7 h-7 bg-wa-green flex items-center justify-center shrink-0 mt-0.5">
                         <Sparkles className="w-3 h-3 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        {/* Bubble */}
-                        <div className="bg-white/10 backdrop-blur-sm border border-white/20 px-3.5 py-2.5 inline-flex items-center gap-2 max-w-[85%]">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-stone-400 mb-1">AI Copilot</p>
+                        {/* Card */}
+                        <div className="bg-white border border-stone-200 px-3.5 py-2.5 inline-flex items-center gap-2 max-w-[90%]">
                           {message.isLoading && (
-                            <Loader2 className="w-3.5 h-3.5 text-teal-400 animate-spin shrink-0" />
+                            <Loader2 className="w-3.5 h-3.5 text-wa-green animate-spin shrink-0" />
                           )}
-                          <p className="text-sm text-white leading-relaxed">{message.content}</p>
+                          <p className="text-sm text-stone-800 leading-relaxed">{message.content}</p>
                         </div>
 
                         {/* Compact strategy-ready card */}
                         {message.strategyReady && (
-                          <div className="mt-3 max-w-[95%] border border-emerald-500/30 bg-emerald-500/5 overflow-hidden">
-                            <div className="px-3.5 py-2.5 border-b border-emerald-500/20">
+                          <div className="mt-3 max-w-[95%] border border-wa-green/30 bg-wa-green/5 overflow-hidden">
+                            <div className="px-3.5 py-2.5 border-b border-wa-green/20">
                               <div className="flex items-center gap-2 mb-1.5">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                                <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-wa-green-dark shrink-0" />
+                                <span className="text-[11px] font-black text-wa-green-dark uppercase tracking-wider">
                                   Strategy Ready
                                 </span>
                               </div>
                               <div className="space-y-0.5 text-[11px]">
-                                <p className="text-white/60">
-                                  <span className="text-white/30 font-bold">Template: </span>
+                                <p className="text-stone-600">
+                                  <span className="text-stone-400 font-bold">Template: </span>
                                   {message.strategyReady.template.name}
                                 </p>
-                                <p className="text-white/60">
-                                  <span className="text-white/30 font-bold">Segment: </span>
+                                <p className="text-stone-600">
+                                  <span className="text-stone-400 font-bold">Segment: </span>
                                   {message.strategyReady.segment.name}
                                 </p>
-                                <p className="text-white/60">
-                                  <span className="text-white/30 font-bold">Sequence: </span>
+                                <p className="text-stone-600">
+                                  <span className="text-stone-400 font-bold">Sequence: </span>
                                   {message.strategyReady.sequence.steps.length} follow-ups
                                 </p>
                               </div>
@@ -1553,25 +1698,25 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
                               <button
                                 onClick={handleLaunch}
                                 disabled={isLaunching}
-                                className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white text-[10px] font-black uppercase tracking-wider py-1.5 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer transition-all"
+                                className="flex-1 bg-wa-green hover:bg-wa-green-dark text-white text-[10px] font-black uppercase tracking-wider py-1.5 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer transition-colors"
                               >
                                 {isLaunching
                                   ? <Loader2 className="w-3 h-3 animate-spin" />
                                   : <><Send className="w-3 h-3" /> Quick Launch</>
                                 }
                               </button>
-                              <span className="text-[10px] text-white/30 shrink-0">Edit in panel →</span>
+                              <span className="text-[10px] text-stone-400 shrink-0">Edit in panel →</span>
                             </div>
                           </div>
                         )}
 
                         {/* Action card */}
                         {message.isAction && message.action && ActionIcon && (
-                          <div className={`mt-2 border px-3 py-2.5 flex items-center gap-2.5 max-w-[85%] ${actionColors[message.action]}`}>
-                            <ActionIcon className="w-4 h-4 shrink-0" />
+                          <div className={`mt-2 border px-3 py-2.5 flex items-center gap-2.5 max-w-[90%] ${actionColors[message.action]}`}>
+                            <ActionIcon className="w-4 h-4 shrink-0 text-wa-green-dark" />
                             <div>
                               <p className="text-xs font-black uppercase tracking-wider">{actionLabels[message.action]}</p>
-                              {message.summary && <p className="text-[11px] mt-0.5 opacity-80">{message.summary}</p>}
+                              {message.summary && <p className="text-[11px] mt-0.5 text-stone-500">{message.summary}</p>}
                             </div>
                           </div>
                         )}
@@ -1579,12 +1724,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
                         {/* Suggestion chips */}
                         {message.suggestions && message.suggestions.length > 0 && (
                           <div className="flex flex-wrap gap-1.5 mt-2">
-                            {message.suggestions.map((s, i) => (
+                            {message.suggestions.map((s) => (
                               <button
                                 key={s}
                                 onClick={() => handleSuggestion(s)}
                                 disabled={isLoading}
-                                className={`text-xs font-bold px-3 py-1.5 border cursor-pointer transition-all hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed ${chipColors[i % chipColors.length]}`}
+                                className={`text-xs font-bold px-3 py-1.5 border cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${chipColors[0]}`}
                               >
                                 {s}
                               </button>
@@ -1598,12 +1743,15 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
 
                 // User message
                 return (
-                  <div key={message.id} className="flex items-start gap-2.5 mb-4 flex-row-reverse">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <div key={message.id} className="flex items-start gap-2.5 flex-row-reverse">
+                    <div className="w-7 h-7 bg-stone-900 flex items-center justify-center shrink-0 mt-0.5">
                       <span className="text-white text-[11px] font-black">{orgInitial}</span>
                     </div>
-                    <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-3.5 py-2.5 max-w-[80%]">
-                      <p className="text-sm text-white leading-relaxed">{message.content}</p>
+                    <div className="flex-1 flex flex-col items-end min-w-0">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-stone-400 mb-1">You</p>
+                      <div className="bg-stone-900 px-3.5 py-2.5 max-w-[90%]">
+                        <p className="text-sm text-white leading-relaxed">{message.content}</p>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1611,21 +1759,21 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
 
               {/* Typing indicator */}
               {isLoading && (
-                <div className="flex items-start gap-2.5 mb-4">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center shrink-0">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-7 h-7 bg-wa-green flex items-center justify-center shrink-0">
                     <Sparkles className="w-3 h-3 text-white" />
                   </div>
-                  <div className="bg-white/10 border border-white/20 px-3.5 py-3 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <div className="bg-white border border-stone-200 px-3.5 py-3 flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-wa-green animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-wa-green animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-2 h-2 bg-wa-green animate-bounce" style={{ animationDelay: "300ms" }} />
                   </div>
                 </div>
               )}
             </div>
 
             {/* Input area */}
-            <div className="border-t border-white/10 p-3 flex gap-2 shrink-0">
+            <div className="border-t border-stone-200 p-3 flex gap-2 shrink-0 bg-white">
               <input
                 ref={inputRef}
                 value={input}
@@ -1637,13 +1785,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
                   }
                 }}
                 placeholder="Tell me what you want to do…"
-                className="flex-1 bg-white/10 border border-white/20 text-white placeholder:text-white/40 text-sm px-3 py-2 focus:outline-none focus:border-teal-400/60 transition-colors"
+                className="flex-1 bg-white border border-stone-200 text-stone-900 placeholder:text-stone-400 text-sm px-3 py-2 focus:outline-none focus:border-wa-green transition-colors"
                 disabled={isLoading}
               />
               <button
                 onClick={() => void handleSend()}
                 disabled={isLoading || !input.trim()}
-                className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 disabled:opacity-40 text-white font-black text-xs uppercase tracking-wider px-4 py-2 flex items-center gap-1.5 transition-all cursor-pointer shrink-0 disabled:cursor-not-allowed"
+                className="bg-wa-green hover:bg-stone-900 disabled:opacity-40 text-white font-black text-xs uppercase tracking-wider px-4 py-2 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 disabled:cursor-not-allowed"
               >
                 {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Send className="w-3.5 h-3.5" />Send</>}
               </button>
@@ -1655,84 +1803,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
             {renderRightPanel()}
           </div>
         </div>
-        )}
-
-        {/* ── MANUAL MODE ── */}
-        {mode === "manual" && (
-          <div className="bg-[#fafaf9] p-6 space-y-8">
-            {/* 4 Action Tiles */}
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                {
-                  icon: Send,
-                  label: "Campaign",
-                  title: "Send a Campaign",
-                  description: "Broadcast WhatsApp messages to your entire contact list or a specific audience segment.",
-                  cta: "Launch Campaign",
-                  tab: "campaigns",
-                  gradient: "from-amber-500 to-orange-500",
-                  borderTop: "border-t-amber-500",
-                },
-                {
-                  icon: Zap,
-                  label: "Automation",
-                  title: "Set Up Automation",
-                  description: "Build automated follow-up sequences that run on autopilot based on contact actions.",
-                  cta: "View Automations",
-                  tab: "campaigns",
-                  gradient: "from-emerald-500 to-teal-500",
-                  borderTop: "border-t-emerald-500",
-                },
-                {
-                  icon: Bot,
-                  label: "Chatbot",
-                  title: "Build a Chatbot",
-                  description: "Design conversational flows with a visual drag-and-drop node builder for WhatsApp.",
-                  cta: "Open Builder",
-                  tab: "chatbot",
-                  gradient: "from-violet-500 to-purple-500",
-                  borderTop: "border-t-violet-500",
-                },
-                {
-                  icon: FileText,
-                  label: "Template",
-                  title: "Create Template",
-                  description: "Design and submit Meta-approved WhatsApp message templates with buttons and media.",
-                  cta: "Manage Templates",
-                  tab: "templates",
-                  gradient: "from-sky-500 to-blue-500",
-                  borderTop: "border-t-sky-500",
-                },
-              ].map(({ icon: Icon, label, title, description, cta, tab, gradient, borderTop }) => (
-                <button
-                  key={label}
-                  onClick={() => onNavigate?.(tab)}
-                  className={`bg-white border border-stone-200 border-t-4 ${borderTop} p-6 text-left cursor-pointer hover:shadow-md transition-all group flex flex-col gap-4 relative`}
-                >
-                  <ArrowUpRight className="w-4 h-4 text-stone-300 absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className={`w-11 h-11 bg-gradient-to-br ${gradient} flex items-center justify-center`}>
-                    <Icon className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-stone-400 mb-1">{label}</p>
-                    <p className="text-base font-black text-stone-900 tracking-tight mb-2">{title}</p>
-                    <p className="text-sm text-stone-500 leading-relaxed">{description}</p>
-                  </div>
-                  <div className={`text-[11px] font-black uppercase tracking-wider bg-gradient-to-r ${gradient} bg-clip-text text-transparent flex items-center gap-1`}>
-                    {cta} <ArrowUpRight className="w-3 h-3 opacity-60" />
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {/* One-Click Automations */}
-            <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-4 border-b border-stone-200 pb-2">
-                One-Click Automations
-              </h3>
-              <RecipesSection hideHeader />
-            </div>
-          </div>
+        </div>
         )}
       </div>
 
@@ -1777,9 +1848,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
                     <div key={log.id} className="flex items-start gap-3">
                       <span className="text-[10px] text-stone-400 mt-0.5 shrink-0 font-mono w-14">{log.timestamp}</span>
                       <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 shrink-0 mt-0.5 ${
-                        log.type === "campaign" ? "bg-blue-50 text-blue-600"
-                          : log.type === "chat" ? "bg-emerald-50 text-emerald-600"
-                          : log.type === "integration" ? "bg-purple-50 text-purple-600"
+                        log.type === "campaign" ? "bg-wa-green/10 text-wa-green-dark"
                           : "bg-stone-100 text-stone-500"
                       }`}>
                         {log.type}

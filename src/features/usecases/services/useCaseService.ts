@@ -234,6 +234,21 @@ export async function updateSettings(input: UseCaseSettingsInput) {
     data.appointmentPreset = input.appointmentPreset;
   }
 
+  if (input.businessVertical !== undefined) {
+    if (!["ECOMMERCE", "APPOINTMENT", "GENERAL"].includes(input.businessVertical)) {
+      throw new ApiError("Invalid business vertical.", 400);
+    }
+    data.businessVertical = input.businessVertical;
+  }
+
+  if (input.useCaseOnboarded !== undefined) {
+    data.useCaseOnboarded = input.useCaseOnboarded;
+  }
+
+  if (input.navShowAllTabs !== undefined) {
+    data.navShowAllTabs = input.navShowAllTabs;
+  }
+
   if (Object.keys(data).length === 0) {
     throw new ApiError("Nothing to update.", 400);
   }

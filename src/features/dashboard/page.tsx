@@ -21,6 +21,7 @@ import { AdsTab } from "@/features/ads/components/AdsTab";
 import { LaunchesTab } from "@/features/launches/components/LaunchesTab";
 import { NdrTab } from "@/features/ndr/components/NdrTab";
 import { MarketplaceTab } from "@/features/marketplace/components/MarketplaceTab";
+import { BusinessTypeOnboarding } from "@/features/dashboard/components/BusinessTypeOnboarding";
 import { AICopilotSidebar } from "@/features/ai/components/AICopilotSidebar";
 import { CommandPalette } from "@/shared/components/CommandPalette";
 import { DashboardSkeleton } from "@/shared/components/ui/Skeleton";
@@ -37,7 +38,7 @@ function TenantDashboardInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { status } = useSession();
-  const { initializeWorkspace } = useApp();
+  const { initializeWorkspace, organization, refreshWorkspace } = useApp();
 
   const orgId = params.orgId as string;
 
@@ -272,6 +273,13 @@ function TenantDashboardInner() {
         onNavigate={handleTabChange}
         onOpenCopilot={() => setIsCopilotOpen(true)}
       />
+
+      {!loading && organization && organization.useCaseOnboarded === false && (
+        <BusinessTypeOnboarding
+          organizationId={orgId}
+          onComplete={() => refreshWorkspace(orgId)}
+        />
+      )}
     </div>
   );
 }

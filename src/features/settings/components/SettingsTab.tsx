@@ -52,6 +52,34 @@ export const SettingsTab: React.FC = () => {
   const confirm = useConfirm();
   const orgId = organization?.id;
 
+  // ─── Workspace navigation preferences ──────────────────────────────────
+  const [showAllTabs, setShowAllTabs] = useState(organization?.navShowAllTabs ?? false);
+  const [savingShowAllTabs, setSavingShowAllTabs] = useState(false);
+
+  useEffect(() => {
+    setShowAllTabs(organization?.navShowAllTabs ?? false);
+  }, [organization?.navShowAllTabs]);
+
+  const handleToggleShowAllTabs = useCallback(async () => {
+    if (!orgId || savingShowAllTabs) return;
+    const next = !showAllTabs;
+    setSavingShowAllTabs(true);
+    setShowAllTabs(next);
+    try {
+      const res = await fetch("/api/usecase/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: orgId, navShowAllTabs: next }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      await refreshWorkspace(orgId);
+    } catch {
+      setShowAllTabs(!next);
+    } finally {
+      setSavingShowAllTabs(false);
+    }
+  }, [orgId, showAllTabs, savingShowAllTabs, refreshWorkspace]);
+
   // ─── Brand Profile (Brand-Aware AI content generation) ────────────────
   const [brandName, setBrandName] = useState("");
   const [brandIndustry, setBrandIndustry] = useState("");
@@ -801,6 +829,28 @@ export const SettingsTab: React.FC = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Workspace Navigation */}
+      <div className="bg-white border border-stone-200 rounded-2xl p-6">
+        <h3 className="font-bold text-stone-900 text-sm">Workspace Navigation</h3>
+        <p className="text-stone-400 text-[11px] mt-0.5 mb-4">
+          The sidebar shows only the tools relevant to your business type, set via Use Cases.
+        </p>
+        <label className="flex items-center justify-between gap-3 cursor-pointer">
+          <div>
+            <p className="text-xs font-bold text-stone-800">Show all platform features</p>
+            <p className="text-[11px] text-stone-400 mt-0.5">
+              Reveal every tab in the sidebar, regardless of business type — useful for hybrid businesses.
+            </p>
+          </div>
+          <div
+            onClick={handleToggleShowAllTabs}
+            className={`relative w-9 h-5 shrink-0 transition-colors cursor-pointer ${showAllTabs ? "bg-emerald-500" : "bg-stone-200"} ${savingShowAllTabs ? "opacity-50" : ""}`}
+          >
+            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white transition-transform ${showAllTabs ? "translate-x-4" : ""}`} />
+          </div>
+        </label>
       </div>
 
       {/* Security Info */}

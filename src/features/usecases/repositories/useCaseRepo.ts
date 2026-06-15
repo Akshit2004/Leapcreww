@@ -52,7 +52,7 @@ export function reopenSlot(slotId: string) {
 export function getOrganization(organizationId: string) {
   return prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { id: true, activeUseCase: true, appointmentPreset: true, marketplaceBotEnabled: true },
+    select: { id: true, activeUseCase: true, appointmentPreset: true, marketplaceBotEnabled: true, businessVertical: true, useCaseOnboarded: true, navShowAllTabs: true },
   });
 }
 
@@ -60,7 +60,7 @@ export function updateUseCaseSettings(organizationId: string, data: Prisma.Organ
   return prisma.organization.update({
     where: { id: organizationId },
     data,
-    select: { id: true, activeUseCase: true, appointmentPreset: true, marketplaceBotEnabled: true },
+    select: { id: true, activeUseCase: true, appointmentPreset: true, marketplaceBotEnabled: true, businessVertical: true, useCaseOnboarded: true, navShowAllTabs: true },
   });
 }
 
