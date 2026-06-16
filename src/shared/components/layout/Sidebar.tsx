@@ -98,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onOpe
         title={!isExpanded || compact ? item.label : undefined}
         className={`w-full flex items-center gap-3 px-3 py-2.5 mb-0.5 transition-all group relative cursor-pointer border ${
           isActive
-            ? "bg-stone-950 text-white font-bold border-stone-950"
+            ? "bg-wa-green text-white font-bold border-wa-green"
             : "hover:bg-stone-100 text-stone-600 hover:text-stone-950 border-transparent"
         } ${!isExpanded && !compact ? "lg:px-2.5 lg:justify-center" : ""}`}
       >
@@ -116,10 +116,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onOpe
         {/* Badge */}
         {badge !== undefined && (isExpanded || compact) && (
           <span
-            className={`text-[9px] font-black px-1.5 py-0.5 shrink-0 border ${
+            className={`text-[9px] font-black px-1.5 py-0.5 shrink-0 rounded-full border ${
               isActive
-                ? "bg-white/20 border-white/30 text-white"
-                : "bg-stone-100 border-stone-200 text-stone-900"
+                ? "bg-white/25 border-white/40 text-white"
+                : "bg-wa-green text-white border-wa-green"
             }`}
           >
             {badge > 99 ? "99+" : badge}
@@ -133,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onOpe
 
         {/* Active left bar */}
         {isActive && !compact && (
-          <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-wa-green" />
+          <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-white/50" />
         )}
       </button>
     );

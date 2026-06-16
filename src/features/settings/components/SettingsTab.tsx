@@ -411,31 +411,35 @@ export const SettingsTab: React.FC = () => {
   const isConnected = whatsappStatus?.connected;
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9]">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-stone-100">
       {/* Page Header */}
       <div className="flex max-md:flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-200 pb-6">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-stone-900 uppercase">Settings</h2>
+          <h2 className="text-xl font-black tracking-tight text-stone-900">Settings</h2>
           <p className="text-stone-500 text-xs mt-1">Manage your WhatsApp Business connection and workspace settings.</p>
         </div>
       </div>
 
       {/* Status Messages */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-medium px-4 py-3 rounded-xl flex items-center gap-2 animate-slide-up">
-          <XCircle className="w-4 h-4 shrink-0" />
-          {error}
+        <div className="flex items-center gap-2 animate-slide-up">
+          <span className="ds-badge ds-badge-danger">
+            <XCircle className="w-3 h-3 shrink-0" />
+            {error}
+          </span>
         </div>
       )}
       {successMsg && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium px-4 py-3 rounded-xl flex items-center gap-2 animate-slide-up">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          {successMsg}
+        <div className="flex items-center gap-2 animate-slide-up">
+          <span className="ds-badge ds-badge-success">
+            <CheckCircle2 className="w-3 h-3 shrink-0" />
+            {successMsg}
+          </span>
         </div>
       )}
 
       {/* WhatsApp Connection Card */}
-      <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+      <div className="kc-float overflow-hidden">
         <div className="p-6 border-b border-stone-100">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isConnected ? "bg-emerald-100 text-emerald-600" : "bg-stone-100 text-stone-400"}`}>
@@ -443,11 +447,17 @@ export const SettingsTab: React.FC = () => {
             </div>
             <div>
               <h3 className="font-bold text-stone-900 text-sm">WhatsApp Business Connection</h3>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-stone-300"}`} />
-                <span className={`text-[10px] font-bold uppercase tracking-widest ${isConnected ? "text-emerald-600" : "text-stone-400"}`}>
-                  {loading ? "Checking..." : isConnected ? "Connected" : "Not Connected"}
-                </span>
+              <div className="flex items-center gap-2 mt-1.5">
+                {loading ? (
+                  <span className="ds-badge ds-badge-muted">Checking...</span>
+                ) : isConnected ? (
+                  <span className="ds-badge ds-badge-success">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Connected
+                  </span>
+                ) : (
+                  <span className="ds-badge ds-badge-danger">Not Connected</span>
+                )}
               </div>
             </div>
           </div>
@@ -493,7 +503,7 @@ export const SettingsTab: React.FC = () => {
             <div className="flex items-center gap-3 pt-2">
               <button
                 onClick={() => fetchStatus()}
-                className="flex items-center gap-2 px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                className="ds-btn ds-btn-secondary ds-btn-sm"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 Refresh Status
@@ -501,7 +511,7 @@ export const SettingsTab: React.FC = () => {
               <button
                 onClick={handleDisconnect}
                 disabled={disconnecting}
-                className="flex items-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                className="ds-btn ds-btn-danger ds-btn-sm disabled:opacity-50"
               >
                 {disconnecting ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Unplug className="w-3.5 h-3.5" />}
                 Disconnect
@@ -571,14 +581,14 @@ export const SettingsTab: React.FC = () => {
               <button
                 onClick={confirmSelection}
                 disabled={!selectedWaba || !selectedPhone || saving}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                className="ds-btn ds-btn-primary flex-1 justify-center disabled:opacity-50"
               >
                 {saving ? <Loader className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 Connect Selected Account
               </button>
               <button
                 onClick={() => { setSelectionRequired(false); setPortfolios([]); }}
-                className="px-4 py-3 bg-stone-100 hover:bg-stone-200 text-stone-600 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                className="ds-btn ds-btn-ghost"
               >
                 Cancel
               </button>
@@ -615,7 +625,7 @@ export const SettingsTab: React.FC = () => {
             <button
               onClick={launchEmbeddedSignup}
               disabled={connecting}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-[#1877F2] hover:bg-[#166FE5] text-white font-bold text-sm rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 cursor-pointer disabled:opacity-60"
+              className="ds-btn ds-btn-lg w-full justify-center bg-[#1877F2] hover:bg-[#166FE5] border-[#1877F2] hover:border-[#166FE5] text-white disabled:opacity-60"
             >
               {connecting ? (
                 <Loader className="w-5 h-5 animate-spin" />
@@ -647,14 +657,14 @@ export const SettingsTab: React.FC = () => {
       <WorkingHoursCard />
 
       {/* Brand Profile Card */}
-      <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+      <div className="kc-float overflow-hidden">
         <div className="p-6 border-b border-stone-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-100 text-indigo-600">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-stone-900 text-sm">Brand Profile</h3>
+              <h3 className="font-black text-stone-700 text-sm uppercase tracking-wide">Brand Profile</h3>
               <p className="text-stone-400 text-[11px] mt-0.5">
                 Powers Brand-Aware AI so generated templates sound like your business.
               </p>
@@ -665,54 +675,56 @@ export const SettingsTab: React.FC = () => {
         <div className="p-6 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Brand Name</label>
+              <label className="kc-label text-stone-400">Brand Name</label>
               <input
                 type="text"
                 value={brandName}
                 onChange={(e) => setBrandName(e.target.value)}
                 placeholder="e.g. Aurora Coffee Co."
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all"
+                className="ds-input"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Industry</label>
+              <label className="kc-label text-stone-400">Industry</label>
               <input
                 type="text"
                 value={brandIndustry}
                 onChange={(e) => setBrandIndustry(e.target.value)}
                 placeholder="e.g. E-commerce, EdTech, D2C"
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all"
+                className="ds-input"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Tone of Voice</label>
+              <label className="kc-label text-stone-400">Tone of Voice</label>
               <input
                 type="text"
                 value={brandTone}
                 onChange={(e) => setBrandTone(e.target.value)}
                 placeholder="e.g. Professional, Friendly, Urgent, Playful"
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all"
+                className="ds-input"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Website URL</label>
+              <label className="kc-label text-stone-400">Website URL</label>
               <input
                 type="url"
                 value={brandWebsite}
                 onChange={(e) => setBrandWebsite(e.target.value)}
                 placeholder="e.g. https://www.auroracoffee.com"
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all"
+                className="ds-input"
               />
             </div>
           </div>
 
           {brandError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-medium px-4 py-2.5 rounded-xl flex items-center gap-2">
-              <XCircle className="w-4 h-4 shrink-0" />
-              {brandError}
+            <div className="flex items-center gap-2">
+              <span className="ds-badge ds-badge-danger">
+                <XCircle className="w-3 h-3 shrink-0" />
+                {brandError}
+              </span>
             </div>
           )}
 
@@ -720,14 +732,14 @@ export const SettingsTab: React.FC = () => {
             <button
               onClick={handleSaveBrand}
               disabled={savingBrand || !brandName.trim()}
-              className="flex items-center gap-2 px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50"
+              className="ds-btn ds-btn-primary ds-btn-sm disabled:opacity-50"
             >
               {savingBrand ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               {savingBrand ? "Saving..." : "Save Profile"}
             </button>
             {brandSaved && (
-              <span className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold">
-                <CheckCircle2 className="w-4 h-4" />
+              <span className="ds-badge ds-badge-success">
+                <CheckCircle2 className="w-3 h-3" />
                 Saved
               </span>
             )}
@@ -736,14 +748,14 @@ export const SettingsTab: React.FC = () => {
       </div>
 
       {/* AI Agent Settings Card */}
-      <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+      <div className="kc-float overflow-hidden">
         <div className="p-6 border-b border-stone-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-100 text-emerald-600">
               <Bot className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-stone-900 text-sm">AI Agent Settings</h3>
+              <h3 className="font-black text-stone-700 text-sm uppercase tracking-wide">AI Agent Settings</h3>
               <p className="text-stone-400 text-[11px] mt-0.5">
                 Give your Pure AI Mode autoresponder business knowledge, a custom persona, and a creativity level.
               </p>
@@ -753,7 +765,7 @@ export const SettingsTab: React.FC = () => {
 
         <div className="p-6 space-y-5">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+            <label className="kc-label text-stone-400">
               Knowledge Base
             </label>
             <textarea
@@ -762,7 +774,7 @@ export const SettingsTab: React.FC = () => {
               placeholder="e.g. We sell handmade leather wallets starting at ₹1,200. Shipping takes 3-5 days across India. Returns accepted within 7 days. Store hours: 10am-7pm Mon-Sat."
               rows={5}
               maxLength={8000}
-              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all resize-none"
+              className="ds-input resize-none"
             />
             <p className="text-[10px] text-stone-400">
               Facts, pricing, policies and FAQs the AI can use to answer questions accurately instead of guessing.
@@ -770,7 +782,7 @@ export const SettingsTab: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+            <label className="kc-label text-stone-400">
               Persona & Tone
             </label>
             <textarea
@@ -779,13 +791,13 @@ export const SettingsTab: React.FC = () => {
               placeholder="e.g. Speak as 'Riya', a warm and upbeat support specialist. Use simple English, avoid jargon, and always greet returning customers by name."
               rows={3}
               maxLength={8000}
-              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium text-stone-800 focus:outline-none focus:border-stone-900 transition-all resize-none"
+              className="ds-input resize-none"
             />
           </div>
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+              <label className="kc-label text-stone-400">
                 Creativity (Temperature)
               </label>
               <span className="text-xs font-bold text-stone-900">{aiTemperature.toFixed(1)}</span>
@@ -806,9 +818,11 @@ export const SettingsTab: React.FC = () => {
           </div>
 
           {aiSettingsError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-medium px-4 py-2.5 rounded-xl flex items-center gap-2">
-              <XCircle className="w-4 h-4 shrink-0" />
-              {aiSettingsError}
+            <div className="flex items-center gap-2">
+              <span className="ds-badge ds-badge-danger">
+                <XCircle className="w-3 h-3 shrink-0" />
+                {aiSettingsError}
+              </span>
             </div>
           )}
 
@@ -816,14 +830,14 @@ export const SettingsTab: React.FC = () => {
             <button
               onClick={handleSaveAiSettings}
               disabled={savingAiSettings}
-              className="flex items-center gap-2 px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50"
+              className="ds-btn ds-btn-primary ds-btn-sm disabled:opacity-50"
             >
               {savingAiSettings ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               {savingAiSettings ? "Saving..." : "Save AI Settings"}
             </button>
             {aiSettingsSaved && (
-              <span className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold">
-                <CheckCircle2 className="w-4 h-4" />
+              <span className="ds-badge ds-badge-success">
+                <CheckCircle2 className="w-3 h-3" />
                 Saved
               </span>
             )}
@@ -832,8 +846,8 @@ export const SettingsTab: React.FC = () => {
       </div>
 
       {/* Workspace Navigation */}
-      <div className="bg-white border border-stone-200 rounded-2xl p-6">
-        <h3 className="font-bold text-stone-900 text-sm">Workspace Navigation</h3>
+      <div className="kc-float p-6">
+        <h3 className="font-black text-stone-700 text-sm uppercase tracking-wide">Workspace Navigation</h3>
         <p className="text-stone-400 text-[11px] mt-0.5 mb-4">
           The sidebar shows only the tools relevant to your business type, set via Use Cases.
         </p>
@@ -854,8 +868,8 @@ export const SettingsTab: React.FC = () => {
       </div>
 
       {/* Security Info */}
-      <div className="bg-white border border-stone-200 rounded-2xl p-6">
-        <h3 className="font-bold text-stone-900 text-sm mb-3">Security & Privacy</h3>
+      <div className="kc-float p-6">
+        <h3 className="font-black text-stone-700 text-sm uppercase tracking-wide mb-3">Security & Privacy</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-stone-50 rounded-xl p-4 space-y-1">
             <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Token Architecture</p>

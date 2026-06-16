@@ -71,52 +71,71 @@ export const WinBackModal: React.FC<WinBackModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-stone-900/50" onClick={handleClose} />
-      <div className="relative bg-white border border-stone-200 w-full max-w-sm">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
+
+      <div className="relative bg-white border border-stone-200 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-sm animate-slide-up overflow-hidden">
+
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-          <div className="flex items-center gap-2">
-            <Flame className="w-4 h-4 text-[#D05E3C]" />
-            <span className="text-sm font-bold text-stone-900 uppercase tracking-wider">
-              Win-Back Campaign
-            </span>
+        <div className="px-6 py-5 border-b border-stone-100 flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <div className="w-7 h-7 rounded-lg bg-[#D05E3C]/10 flex items-center justify-center">
+                <Flame className="w-3.5 h-3.5 text-[#D05E3C]" />
+              </div>
+              <h3 className="text-base font-black text-stone-900">Win-Back Campaign</h3>
+            </div>
+            <p className="text-xs text-stone-500 mt-1">Re-engage dormant contacts automatically</p>
           </div>
-          <button onClick={handleClose} className="text-stone-400 hover:text-stone-700 cursor-pointer">
+          <button
+            onClick={handleClose}
+            className="p-2 rounded-xl hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
+        <div className="p-6 space-y-5">
           {result ? (
-            <div className="text-center space-y-3 py-2">
-              <CheckCircle2 className="w-8 h-8 text-[#2E4A3F] mx-auto" />
-              <p className="text-sm font-bold text-stone-900">Campaign launched</p>
-              <p className="text-xs text-stone-500">
-                <span className="font-bold text-stone-800">{result.tagged}</span> contact
-                {result.tagged !== 1 ? "s" : ""} tagged "win-back" —{" "}
-                <span className="font-bold text-stone-800">{result.enrolled}</span> enrolled in
-                the win-back sequence.
-              </p>
-              <p className="text-[10px] text-stone-400 uppercase tracking-wider font-bold">
+            <div className="text-center space-y-4 py-2">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-7 h-7 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-stone-900 mb-1">Campaign launched!</p>
+                <p className="text-xs text-stone-500 leading-relaxed">
+                  <span className="font-bold text-stone-800">{result.tagged}</span> contact
+                  {result.tagged !== 1 ? "s" : ""} tagged{" "}
+                  <span className="font-mono bg-stone-100 px-1.5 py-0.5 rounded-md text-[10px]">win-back</span>{" "}
+                  — <span className="font-bold text-stone-800">{result.enrolled}</span> enrolled in the sequence.
+                </p>
+              </div>
+              <p className="text-[10px] text-stone-400 leading-relaxed">
                 Install the win-back recipe in Use Cases if not already active.
               </p>
+              <button
+                onClick={handleClose}
+                className="w-full py-2.5 text-xs font-bold text-stone-700 border border-stone-200 hover:bg-stone-50 rounded-xl transition-colors cursor-pointer"
+              >
+                Done
+              </button>
             </div>
           ) : (
             <>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+              {/* Threshold selector */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500">
                   Target contacts inactive for
-                </p>
+                </label>
                 <div className="grid grid-cols-4 gap-1.5">
                   {THRESHOLDS.map(({ label, days }) => (
                     <button
                       key={days}
                       onClick={() => setDormantDays(days)}
-                      className={`py-2 text-[11px] font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                      className={`py-2 text-[11px] font-bold rounded-xl border transition-all cursor-pointer ${
                         dormantDays === days
-                          ? "bg-stone-900 text-white border-stone-900"
-                          : "bg-white text-stone-500 border-stone-200 hover:border-stone-400"
+                          ? "bg-[#D05E3C] text-white border-[#D05E3C]"
+                          : "bg-white text-stone-500 border-stone-200 hover:border-[#D05E3C]/40 hover:text-[#D05E3C]"
                       }`}
                     >
                       {label}
@@ -125,40 +144,48 @@ export const WinBackModal: React.FC<WinBackModalProps> = ({
                 </div>
               </div>
 
-              <div className="bg-stone-50 border border-stone-100 px-4 py-3 flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
-                  Contacts matched
+              {/* Match count preview */}
+              <div className="bg-stone-50 border border-stone-200 rounded-xl px-4 py-3.5 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">Contacts matched</span>
+                  <span className="text-xs text-stone-500 mt-0.5">Will receive win-back tag</span>
+                </div>
+                <span className={`text-3xl font-black font-mono ${matchCount > 0 ? "text-[#D05E3C]" : "text-stone-300"}`}>
+                  {matchCount}
                 </span>
-                <span className="text-2xl font-bold text-stone-900">{matchCount}</span>
               </div>
 
               <p className="text-[11px] text-stone-400 leading-relaxed">
-                These contacts will be tagged <span className="font-mono bg-stone-100 px-1">win-back</span> and
-                automatically enrolled into the win-back sequence.
+                These contacts will be tagged{" "}
+                <span className="font-mono bg-stone-100 px-1.5 py-0.5 rounded-md text-[10px] text-stone-600">win-back</span>{" "}
+                and automatically enrolled into the re-engagement sequence.
               </p>
 
               {error && (
-                <p className="text-xs text-red-600 font-medium">{error}</p>
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-600 font-medium">
+                  {error}
+                </div>
               )}
 
+              {/* Footer actions */}
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={handleClose}
-                  className="flex-1 py-2.5 text-xs font-bold text-stone-600 border border-stone-200 hover:border-stone-400 transition-colors cursor-pointer"
+                  className="flex-1 py-2.5 text-xs font-bold text-stone-700 border border-stone-200 bg-white hover:bg-stone-50 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleLaunch}
                   disabled={loading || matchCount === 0}
-                  className="flex-1 py-2.5 text-xs font-bold text-white bg-[#D05E3C] hover:bg-[#b84e30] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 text-xs font-bold text-white bg-[#D05E3C] hover:bg-[#b84e30] disabled:opacity-40 rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <Loader className="w-3.5 h-3.5 animate-spin" />
                   ) : (
                     <Flame className="w-3.5 h-3.5" />
                   )}
-                  {loading ? "Launching..." : "Launch Campaign"}
+                  {loading ? "Launching…" : "Launch Campaign"}
                 </button>
               </div>
             </>

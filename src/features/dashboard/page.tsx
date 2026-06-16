@@ -13,6 +13,7 @@ import { TemplatesTab } from "@/features/templates/components/TemplatesTab";
 import { FlowsTab } from "@/features/flows/components/FlowsTab";
 import { ChatbotTab } from "@/features/chatbot/components/ChatbotTab";
 import { UseCasesTab } from "@/features/usecases/components/UseCasesTab";
+import { RecipesSection } from "@/features/recipes/components/RecipesSection";
 import { BookingCustomersTab } from "@/features/usecases/components/BookingCustomersTab";
 import { SettingsTab } from "@/features/settings/components/SettingsTab";
 import { IntegrationsTab } from "@/features/integrations/components/IntegrationsTab";
@@ -23,6 +24,7 @@ import { NdrTab } from "@/features/ndr/components/NdrTab";
 import { MarketplaceTab } from "@/features/marketplace/components/MarketplaceTab";
 import { BusinessTypeOnboarding } from "@/features/dashboard/components/BusinessTypeOnboarding";
 import { AICopilotSidebar } from "@/features/ai/components/AICopilotSidebar";
+import { AiWorkspace } from "@/features/ai/components/AiWorkspace";
 import { CommandPalette } from "@/shared/components/CommandPalette";
 import { DashboardSkeleton } from "@/shared/components/ui/Skeleton";
 import { WalletWarningBanner } from "@/shared/components/ui/WalletWarningBanner";
@@ -140,11 +142,13 @@ function TenantDashboardInner() {
       case "campaigns":
         return <CampaignsTab />;
       case "templates":
-        return <TemplatesTab />;
+        return <TemplatesTab onNavigate={handleTabChange} />;
       case "flows":
         return <FlowsTab />;
       case "chatbot":
         return <ChatbotTab />;
+      case "recipes":
+        return <RecipesSection />;
       case "usecases":
         return <UseCasesTab />;
       case "bookingcustomers":
@@ -159,6 +163,8 @@ function TenantDashboardInner() {
         return <MarketplaceTab />;
       case "settings":
         return <SettingsTab />;
+      case "ai-workspace":
+        return <AiWorkspace onNavigate={handleTabChange} />;
       default:
         return <OverviewTab onNavigate={handleTabChange} />;
     }

@@ -514,7 +514,7 @@ function LoginContent() {
         </div>
 
         {/* Elevated Right Card */}
-        <div className="w-full max-w-sm bg-white border border-stone-200/85 p-6 sm:p-8 rounded-3xl shadow-xl space-y-6 relative z-10 bg-gradient-to-b from-[#FDFDFD] to-white animate-slide-up">
+        <div className="w-full max-w-sm kc-float p-6 sm:p-8 space-y-6 relative z-10 animate-slide-up ds-modal-in">
           
           <div className="text-center space-y-1">
             <h2 className="text-lg font-serif text-stone-900 font-semibold tracking-tight">Access Your Instance</h2>
@@ -543,7 +543,7 @@ function LoginContent() {
                 type="button"
                 onClick={() => { setActiveTab(tab); setErrorMsg(""); setSuccessMsg(""); setOtpSent(false); }}
                 className={`flex-1 text-center py-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                  activeTab === tab ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-800"
+                  activeTab === tab ? "bg-wa-green text-white" : "text-stone-500 hover:text-stone-800"
                 }`}
               >
                 {tab === "password" ? "Password" : tab === "email" ? "Email OTP" : "WhatsApp"}
@@ -555,7 +555,7 @@ function LoginContent() {
           {activeTab === "password" && (
             <form onSubmit={handlePasswordLogin} className="space-y-4 animate-slide-up">
               <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
+                <label className="kc-label text-stone-500 flex items-center gap-1">
                   <Mail className="w-3 h-3" /> Email Address
                 </label>
                 <input
@@ -565,11 +565,11 @@ function LoginContent() {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
+                  className="ds-input disabled:opacity-50 select-text"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
+                <label className="kc-label text-stone-500 flex items-center gap-1">
                   <Lock className="w-3 h-3" /> Password
                 </label>
                 <input
@@ -579,13 +579,13 @@ function LoginContent() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
+                  className="ds-input disabled:opacity-50 select-text"
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading || !email.trim() || !password}
-                className="w-full bg-stone-900 hover:bg-stone-800 disabled:opacity-40 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98"
+                className="ds-btn ds-btn-primary w-full justify-center disabled:opacity-40"
               >
                 {loading ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <><span>Sign In</span><ArrowRight className="w-3.5 h-3.5" /></>}
               </button>
@@ -661,16 +661,16 @@ function LoginContent() {
                     placeholder="WhatsApp number (e.g. +91 87969 16888)"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
+                    className="ds-input select-text"
                   />
                   <button
                     type="button"
                     disabled={loading || !phone.trim()}
                     onClick={handleSendWaOtp}
-                    className="w-full bg-stone-900 hover:bg-stone-850 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all active:scale-98 shadow-sm flex items-center justify-center gap-1.5"
+                    className="ds-btn ds-btn-primary w-full justify-center disabled:opacity-50"
                   >
                     {loading ? (
-                      <Loader className="w-3.5 h-3.5 animate-spin text-white" />
+                      <Loader className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <>
                         <span>Send OTP Code</span>
@@ -693,7 +693,7 @@ function LoginContent() {
                         onChange={(e) => handleOtpChange(idx, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                         ref={(el) => { otpInputsRef.current[idx] = el; }}
-                        className="w-full aspect-square text-center font-mono text-base font-bold bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-850 focus:border-transparent disabled:opacity-50 transition-all select-text"
+                        className="w-full aspect-square text-center font-mono text-base font-bold bg-white border border-stone-200 rounded-xl focus:outline-none focus:border-wa-green disabled:opacity-50 transition-all select-text"
                       />
                     ))}
                   </div>
@@ -705,7 +705,7 @@ function LoginContent() {
                       <button
                         type="button"
                         onClick={handleSendWaOtp}
-                        className="text-emerald-800 hover:text-emerald-700 font-bold underline cursor-pointer"
+                        className="text-wa-green hover:text-[#075e54] font-bold underline cursor-pointer"
                       >
                         Resend OTP
                       </button>
@@ -713,7 +713,7 @@ function LoginContent() {
                     <button
                       type="button"
                       onClick={() => setOtpSent(false)}
-                      className="text-stone-500 hover:text-stone-700 font-semibold"
+                      className="ds-btn ds-btn-ghost ds-btn-sm"
                     >
                       Change number
                     </button>
@@ -722,10 +722,10 @@ function LoginContent() {
                   <button
                     type="submit"
                     disabled={otpVerifying || otpValues.join("").length !== 6}
-                    className="w-full bg-[#128c7e] hover:bg-[#075e54] disabled:opacity-55 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all active:scale-98 shadow-sm flex items-center justify-center gap-1.5"
+                    className="ds-btn ds-btn-primary w-full justify-center disabled:opacity-55"
                   >
                     {otpVerifying ? (
-                      <Loader className="w-3.5 h-3.5 animate-spin text-white" />
+                      <Loader className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <span>Submit Code</span>
                     )}
@@ -741,7 +741,7 @@ function LoginContent() {
               {!otpSent ? (
                 <form onSubmit={handleSendEmailOtp} className="space-y-4">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
+                    <label className="kc-label text-stone-500 flex items-center gap-1">
                       <Mail className="w-3 h-3" />
                       Email Address
                     </label>
@@ -752,17 +752,17 @@ function LoginContent() {
                       placeholder="e.g. alex@leapcreww.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 disabled:opacity-50 select-text"
+                      className="ds-input disabled:opacity-50 select-text"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={loading || !email.trim()}
-                    className="w-full bg-stone-900 hover:bg-stone-850 disabled:opacity-40 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98"
+                    className="ds-btn ds-btn-primary w-full justify-center disabled:opacity-40"
                   >
                     {loading ? (
-                      <Loader className="w-3.5 h-3.5 animate-spin text-white" />
+                      <Loader className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <>
                         <span>Send Login Code</span>
@@ -785,7 +785,7 @@ function LoginContent() {
                         onChange={(e) => handleOtpChange(idx, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                         ref={(el) => { otpInputsRef.current[idx] = el; }}
-                        className="w-full aspect-square text-center font-mono text-base font-bold bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-850 focus:border-transparent disabled:opacity-50 transition-all select-text"
+                        className="w-full aspect-square text-center font-mono text-base font-bold bg-white border border-stone-200 rounded-xl focus:outline-none focus:border-wa-green disabled:opacity-50 transition-all select-text"
                       />
                     ))}
                   </div>
@@ -797,7 +797,7 @@ function LoginContent() {
                       <button
                         type="button"
                         onClick={handleSendEmailOtp}
-                        className="text-emerald-800 hover:text-emerald-700 font-bold underline cursor-pointer"
+                        className="text-wa-green hover:text-[#075e54] font-bold underline cursor-pointer"
                       >
                         Resend OTP
                       </button>
@@ -805,7 +805,7 @@ function LoginContent() {
                     <button
                       type="button"
                       onClick={() => setOtpSent(false)}
-                      className="text-stone-500 hover:text-stone-700 font-semibold"
+                      className="ds-btn ds-btn-ghost ds-btn-sm"
                     >
                       Change email
                     </button>
@@ -814,10 +814,10 @@ function LoginContent() {
                   <button
                     type="submit"
                     disabled={otpVerifying || otpValues.join("").length !== 6}
-                    className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-55 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all active:scale-98 shadow-sm flex items-center justify-center gap-1.5"
+                    className="ds-btn ds-btn-primary w-full justify-center disabled:opacity-55"
                   >
                     {otpVerifying ? (
-                      <Loader className="w-3.5 h-3.5 animate-spin text-white" />
+                      <Loader className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <span>Verify & Login</span>
                     )}
@@ -844,10 +844,10 @@ function LoginContent() {
       {/* ─── Premium Multi-Step Onboarding Modal ─── */}
       {showOnboarding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-md px-4">
-          <div className="w-full max-w-sm bg-white border border-stone-250 p-6 sm:p-8 rounded-3xl shadow-2xl space-y-5 animate-slide-up relative bg-gradient-to-b from-[#FAF9F6] to-white">
+          <div className="w-full max-w-sm kc-float p-6 sm:p-8 space-y-5 relative ds-modal-in">
             
             <div className="text-center space-y-1">
-              <div className="inline-flex w-8 h-8 rounded-xl bg-emerald-850 items-center justify-center shadow-lg shadow-emerald-950/20 mb-1">
+              <div className="inline-flex w-8 h-8 rounded-xl bg-wa-green items-center justify-center mb-1">
                 <Bot className="w-4 h-4 text-white" />
               </div>
               <h3 className="text-lg font-serif text-stone-900 font-semibold tracking-tight">Configure Your SaaS Instance</h3>
@@ -871,7 +871,7 @@ function LoginContent() {
               {onboardingStep === 1 && (
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
+                    <label className="kc-label text-stone-500 flex items-center gap-1">
                       <User className="w-3 h-3" />
                       Full Name
                     </label>
@@ -881,12 +881,12 @@ function LoginContent() {
                       placeholder="e.g. Alex Rivera"
                       value={obName}
                       onChange={(e) => setObName(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 select-text"
+                      className="ds-input select-text"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1">
+                    <label className="kc-label text-stone-500 flex items-center gap-1">
                       <Building className="w-3 h-3" />
                       Workspace Name
                     </label>
@@ -896,14 +896,14 @@ function LoginContent() {
                       placeholder="e.g. Acme Corp"
                       value={obOrgName}
                       onChange={(e) => setObOrgName(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-xl py-2 px-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-850 select-text"
+                      className="ds-input select-text"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={obLoading || !obName.trim() || !obOrgName.trim()}
-                    className="w-full bg-stone-900 hover:bg-stone-850 text-white text-xs font-bold py-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-98"
+                    className="ds-btn ds-btn-primary w-full justify-center disabled:opacity-50"
                   >
                     <span>Launch Workspace</span>
                     <Bot className="w-3.5 h-3.5" />

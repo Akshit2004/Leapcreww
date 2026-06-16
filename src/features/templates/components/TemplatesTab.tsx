@@ -4,25 +4,27 @@ import React, { useState, useEffect } from "react";
 import {
   FileText,
   Search,
-  Check,
+  CheckCircle2,
   Loader,
   Image,
   Video,
   MousePointerClick,
   X,
   Plus,
-  ArrowRight,
+  Megaphone,
   Trash2,
   Globe,
   GlobeOff,
   RefreshCw,
+  Clock,
+  XCircle,
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { useParams } from "next/navigation";
 import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
 import { CreateTemplateModal } from "./CreateTemplateModal";
 
-export const TemplatesTab: React.FC = () => {
+export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({ onNavigate }) => {
   const { templates, deleteTemplate, addSystemLog, refreshWorkspace } = useApp();
   const confirm = useConfirm();
 
@@ -72,16 +74,18 @@ export const TemplatesTab: React.FC = () => {
     return matchesCategory && matchesSearch;
   });
 
-  const getCategoryBadge = (category: string) => {
-    switch (category) {
-      case "Marketing":
-        return <span className="bg-stone-100 text-stone-900 border border-stone-300 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-none">Marketing</span>;
-      case "Utility":
-        return <span className="bg-stone-100 text-stone-800 border border-stone-300 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-none">Utility</span>;
-      default:
-        return <span className="bg-stone-950 text-white border border-stone-950 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-none">Authentication</span>;
-    }
+  /** Convert snake_case or slug to Title Case — e.g. "diwali_discount20" → "Diwali Discount20" */
+  const formatName = (name: string) =>
+    name.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const categoryConfig: Record<string, { color: string; bg: string; border: string }> = {
+    Marketing:      { color: "#0891b2", bg: "#e0f2fe", border: "#0891b2" },
+    Utility:        { color: "#7c3aed", bg: "#ede9fe", border: "#7c3aed" },
+    Authentication: { color: "#059669", bg: "#d1fae5", border: "#059669" },
   };
+
+  const getCategoryStyle = (category: string) =>
+    categoryConfig[category] ?? { color: "#6b7280", bg: "#f3f4f6", border: "#9ca3af" };
 
   // Poll pending templates every 5s for status changes in sandbox
   useEffect(() => {
@@ -106,39 +110,30 @@ export const TemplatesTab: React.FC = () => {
     return () => clearInterval(interval);
   }, [templates, addSystemLog, refreshWorkspace, orgId]);
 
-  const getStatusBadge = (status?: string) => {
-    switch (status?.toLowerCase()) {
-      case "approved":
-        return (
-          <span className="bg-stone-900 text-white border border-stone-950 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-none flex items-center gap-1">
-            <Check className="w-3 h-3" />
-            Meta Approved
-          </span>
-        );
-      case "rejected":
-        return (
-          <span className="bg-stone-100 text-stone-500 border border-stone-300 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-none">
-            Rejected by Meta
-          </span>
-        );
-      default:
-        return (
-          <span className="bg-stone-50 text-stone-600 border border-stone-200 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-none flex items-center gap-1">
-            <Loader className="w-3 h-3 animate-spin" />
-            Pending Meta Approval
-          </span>
-        );
-    }
+  const statusConfig = {
+    approved: { icon: CheckCircle2, label: "Approved", cls: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+    rejected: { icon: XCircle,      label: "Rejected",  cls: "text-red-700 bg-red-50 border-red-200" },
+    pending:  { icon: Clock,        label: "Pending",   cls: "text-amber-700 bg-amber-50 border-amber-200" },
   };
 
-  const getMediaIcon = (mediaType?: string) => {
-    if (!mediaType || mediaType === "none") return null;
-    let Icon = FileText;
-    if (mediaType === "image") Icon = Image;
-    if (mediaType === "video") Icon = Video;
+  const getStatusChip = (status?: string) => {
+    const key = (status?.toLowerCase() ?? "pending") as keyof typeof statusConfig;
+    const cfg = statusConfig[key] ?? statusConfig.pending;
+    const Icon = key === "pending" ? Loader : cfg.icon;
     return (
-      <span className="text-[10px] bg-stone-50 text-stone-500 border border-stone-200 px-2 py-0.5 rounded-none font-semibold flex items-center gap-1 uppercase">
-        <Icon className="w-3 h-3 text-stone-500" />
+      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 border rounded-full ${cfg.cls}`}>
+        <Icon className={`w-3 h-3 ${key === "pending" ? "animate-spin" : ""}`} />
+        {cfg.label}
+      </span>
+    );
+  };
+
+  const getMediaTag = (mediaType?: string) => {
+    if (!mediaType || mediaType === "none") return null;
+    const Icon = mediaType === "image" ? Image : mediaType === "video" ? Video : FileText;
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-stone-500 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-full capitalize">
+        <Icon className="w-3 h-3" />
         {mediaType}
       </span>
     );
@@ -152,7 +147,7 @@ export const TemplatesTab: React.FC = () => {
         return (
           <span
             key={idx}
-            className="bg-stone-100 text-stone-900 border border-stone-300 font-bold px-1 rounded-none"
+            className="ds-badge ds-badge-muted inline-flex"
           >
             {part}
           </span>
@@ -163,80 +158,78 @@ export const TemplatesTab: React.FC = () => {
   };
 
   return (
-    <div className={`flex-1 p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9] ${
-      isModalOpen ? "overflow-hidden" : "overflow-y-auto"
-    }`}>
+    <div className="flex-1 overflow-y-auto custom-scrollbar animate-slide-up bg-stone-100">
 
-      {/* Tab Header */}
-      <div className="flex max-sm:flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-6">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-stone-900 uppercase">Meta Approved Templates</h2>
-          <p className="text-stone-500 text-xs mt-1">Manage WhatsApp-compliant template layouts, media variables, and quick action headers.</p>
+      {/* ── Sticky header ─────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-4 sm:px-8">
+
+        <div className="flex items-center justify-between py-4 gap-3">
+          <div className="min-w-0">
+            <h2 className="text-xl font-black tracking-tight text-stone-900">Meta Approved Templates</h2>
+            <p className="text-stone-500 text-xs mt-0.5">WhatsApp-compliant layouts · ready to broadcast</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleSyncTemplates}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 border border-stone-200 bg-white text-stone-700 hover:border-wa-green hover:text-wa-green rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+              <span>{isSyncing ? "Syncing…" : "Sync Meta"}</span>
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 bg-wa-green hover:bg-wa-green-dark text-white rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              New Template
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleSyncTemplates}
-            disabled={isSyncing}
-            className="bg-white hover:bg-stone-100 text-stone-900 font-bold text-xs px-4 py-2.5 rounded-none flex items-center gap-2 cursor-pointer border border-stone-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
-            {isSyncing ? "SYNCING..." : "SYNC FROM META"}
-          </button>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-stone-950 hover:bg-stone-900 text-white font-bold text-xs px-4 py-2.5 rounded-none flex items-center gap-2 cursor-pointer border border-stone-950 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            CREATE TEMPLATE
-          </button>
+
+        {/* Row 2: category filters + search */}
+        <div className="flex items-center justify-between gap-3 pb-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {["all", "Marketing", "Utility", "Authentication"].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                  activeCategory === cat
+                    ? "bg-wa-green text-white border-wa-green"
+                    : "text-stone-500 border-stone-300 hover:border-stone-500 bg-white"
+                }`}
+              >
+                {cat === "all" ? "All" : cat}
+              </button>
+            ))}
+          </div>
+          <div className="relative w-56 shrink-0">
+            <input
+              type="text"
+              placeholder="Search templates…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="ds-input text-xs pl-8 pr-8 py-1.5 w-full"
+            />
+            <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-900"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Filter and Search controls */}
-      <div className="flex max-md:flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-200 pb-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {["all", "Marketing", "Utility", "Authentication"].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => {
-                setActiveCategory(cat);
-              }}
-              className={`text-xs font-semibold px-4 py-1.5 rounded-none border transition-all cursor-pointer ${
-                activeCategory === cat
-                  ? "bg-stone-950 text-white border-stone-950"
-                  : "text-stone-500 border-transparent hover:bg-stone-100"
-              }`}
-            >
-              {cat === "all" ? "All Templates" : cat}
-            </button>
-          ))}
-        </div>
-
-        {/* Search Box */}
-        <div className="relative max-md:w-full md:w-72">
-          <input
-            type="text"
-            placeholder="Search templates by name or content..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full text-xs pl-8 pr-8 py-2 rounded-none border border-stone-200 bg-white text-stone-700 placeholder-stone-400 focus:outline-none focus:border-stone-900 transition-all"
-          />
-          <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-900 focus:outline-none"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Templates Grid listing */}
+      {/* ── Content grid ─────────────────────────────────────────────────── */}
+      <div className="px-4 sm:px-8 py-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTemplates.length === 0 && (
-          <div className="col-span-full p-12 text-center bg-white border border-stone-200 space-y-4">
+          <div className="col-span-full p-12 text-center kc-float space-y-4">
             <FileText className="w-10 h-10 text-stone-300 mx-auto" />
             {templates.length === 0 ? (
               <>
@@ -246,7 +239,7 @@ export const TemplatesTab: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-stone-950 text-white text-xs font-bold uppercase tracking-wider hover:bg-stone-800 transition-colors cursor-pointer"
+                  className="ds-btn ds-btn-primary ds-btn-sm"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   Create First Template
@@ -257,106 +250,124 @@ export const TemplatesTab: React.FC = () => {
             )}
           </div>
         )}
-        {filteredTemplates.map((t) => (
+        {filteredTemplates.map((t) => {
+          const catStyle = getCategoryStyle(t.category);
+          const isApproved = t.metaStatus?.toLowerCase() === "approved";
+          return (
           <div
             key={t.id}
-            className="rounded-none flex flex-col justify-between border border-stone-200 transition-all duration-300 overflow-hidden bg-white"
+            className="bg-white border border-stone-200 flex flex-col overflow-hidden rounded-xl shadow-sm hover:shadow-md transition-shadow"
           >
-            {/* Template Card Content */}
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-[10px] text-stone-400 font-bold select-none">{t.id.slice(0, 13)}</span>
-                <div className="flex items-center gap-2">
-                  {getCategoryBadge(t.category)}
-                  {t.isShared && (
-                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-stone-400 border border-stone-200 px-1.5 py-0.5" title="Shared with all orgs">
-                      <Globe className="w-3 h-3" />
-                      Shared
-                    </span>
-                  )}
-                  {t.organizationId === orgId && (
-                    <button
-                      onClick={async () => {
-                        await fetch("/api/whatsapp/toggle-share", {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ templateId: t.id, isShared: !t.isShared }),
-                        });
-                        window.location.reload();
-                      }}
-                      className="p-1 rounded-none text-stone-400 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer border border-transparent"
-                      title={t.isShared ? "Remove from shared" : "Share with all orgs"}
-                    >
-                      {t.isShared ? <GlobeOff className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
-                    </button>
-                  )}
+            {/* Colored top accent bar based on category */}
+            <div className="h-1 shrink-0" style={{ background: catStyle.border }} />
+
+            {/* Card header */}
+            <div className="px-5 pt-4 pb-3 flex items-start justify-between gap-3 border-b border-stone-100">
+              <div className="min-w-0 flex-1">
+                <h4 className="font-black text-sm text-stone-900 leading-tight truncate">{formatName(t.name)}</h4>
+                <p className="text-[10px] text-stone-400 font-mono mt-0.5 truncate">{t.name}</p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {t.organizationId === orgId && (
                   <button
                     onClick={async () => {
-                      if (await confirm({
-                        title: "Delete this template?",
-                        description: "This permanently removes the template from LeapCreww and the Meta Business portal. This can't be undone.",
-                        tone: "danger",
-                        confirmLabel: "Delete template",
-                      })) {
-                        await deleteTemplate(t.id);
-                      }
+                      await fetch("/api/whatsapp/toggle-share", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ templateId: t.id, isShared: !t.isShared }),
+                      });
+                      window.location.reload();
                     }}
-                    className="p-1 rounded-none text-stone-400 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer border border-transparent"
-                    title="Delete Template"
+                    className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+                    title={t.isShared ? "Remove from shared" : "Share with all orgs"}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    {t.isShared ? <GlobeOff className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
                   </button>
-                </div>
+                )}
+                <button
+                  onClick={async () => {
+                    if (await confirm({
+                      title: "Delete this template?",
+                      description: "This permanently removes the template from LeapCreww and the Meta Business portal. This can't be undone.",
+                      tone: "danger",
+                      confirmLabel: "Delete template",
+                    })) {
+                      await deleteTemplate(t.id);
+                    }
+                  }}
+                  className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Delete Template"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
+            </div>
 
-              <div className="space-y-1">
-                <h4 className="font-bold text-sm text-stone-900 truncate leading-none">{t.name}</h4>
-                <div className="flex items-center gap-2 pt-1 select-none">
-                  {getMediaIcon(t.mediaType)}
-                  {getStatusBadge(t.metaStatus)}
-                </div>
-              </div>
+            {/* Meta chips: status + category + media */}
+            <div className="px-5 py-2.5 flex flex-wrap items-center gap-1.5 border-b border-stone-100">
+              {getStatusChip(t.metaStatus)}
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 border rounded-full"
+                style={{ color: catStyle.color, background: catStyle.bg, borderColor: catStyle.border + "66" }}
+              >
+                {t.category}
+              </span>
+              {t.isShared && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-stone-500 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-full">
+                  <Globe className="w-3 h-3" />
+                  Shared
+                </span>
+              )}
+              {getMediaTag(t.mediaType)}
+            </div>
 
-              {/* Message body box with highlights */}
-              <div className="bg-stone-50 border border-stone-200 p-4 rounded-none text-xs leading-relaxed text-stone-700 max-h-40 overflow-y-auto custom-scrollbar select-text whitespace-pre-wrap">
+            {/* Message body — styled like a WA bubble */}
+            <div className="px-5 py-4 flex-1">
+              <div
+                className="text-xs leading-relaxed text-stone-800 bg-[#dcf8c6] rounded-xl rounded-tl-sm p-3.5 max-h-28 overflow-y-auto custom-scrollbar select-text whitespace-pre-wrap shadow-sm"
+              >
                 {formatBodyWithHighlights(t.body)}
               </div>
             </div>
 
-            {/* Quick reply buttons footer */}
+            {/* Footer: buttons or broadcast CTA */}
             {t.buttons && t.buttons.length > 0 ? (
-              <div className="bg-stone-50 border-t border-stone-200 p-3.5 space-y-2 select-none shrink-0 rounded-none">
-                <div className="text-[9px] uppercase tracking-wider font-bold text-stone-600 flex items-center gap-1">
-                  <MousePointerClick className="w-3 h-3 text-stone-500" />
-                  Interactive Buttons
+              <div className="px-5 pb-4 space-y-2">
+                <div className="text-[9px] uppercase tracking-wider font-bold text-stone-400 flex items-center gap-1">
+                  <MousePointerClick className="w-3 h-3" />
+                  Quick Reply Buttons
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {t.buttons.map((btn, bIdx) => (
                     <span
                       key={bIdx}
-                      className="text-[10px] font-bold border border-stone-300 bg-white px-2.5 py-1 text-stone-800 rounded-none flex items-center gap-1 leading-none animate-pulse-soft"
+                      className="text-[11px] font-semibold border border-[#53bdeb] text-[#0a7abf] bg-white px-3 py-1 rounded-full leading-none"
                     >
                       {btn}
                     </span>
                   ))}
                 </div>
               </div>
+            ) : isApproved ? (
+              <div className="px-5 pb-4">
+                <button
+                  onClick={() => onNavigate?.(`campaigns&launchTemplate=${encodeURIComponent(t.name)}`)}
+                  className="w-full flex items-center justify-center gap-2 bg-wa-green hover:bg-wa-green-dark text-white text-[11px] font-black uppercase tracking-wider py-2 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Megaphone className="w-3.5 h-3.5" />
+                  Use in Campaign
+                </button>
+              </div>
             ) : (
-              <div className="bg-stone-50 border-t border-stone-200 py-3.5 px-6 shrink-0 flex justify-between items-center rounded-none">
-                <span className="text-[10px] italic text-stone-500">No CTA buttons defined.</span>
-
-                {/* One-Click Shortcut Campaign Trigger Link if Approved */}
-                {t.metaStatus === "approved" && (
-                  <div className="text-[10px] text-stone-900 font-bold flex items-center gap-1 select-none">
-                    Ready to Broadcast
-                    <ArrowRight className="w-3.5 h-3.5 text-stone-900" />
-                  </div>
-                )}
+              <div className="px-5 pb-4">
+                <div className="text-[10px] text-stone-400 italic text-center py-1">No CTA buttons · Awaiting Meta review</div>
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
+      </div>{/* end scrollable area */}
 
       {/* Template Creator Modal Wizard */}
       <CreateTemplateModal

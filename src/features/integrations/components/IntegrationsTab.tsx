@@ -310,11 +310,11 @@ export function IntegrationsTab() {
   const meta = INTEGRATIONS.find((i) => i.id === selected)!;
 
   return (
-    <div className="flex h-full overflow-hidden bg-[#fafaf9]">
+    <div className="flex h-full overflow-hidden bg-stone-100">
       {/* ── Left: Integration List (Shopify Only) ─────────────────────────── */}
       <aside className="w-72 shrink-0 flex flex-col border-r border-stone-200 bg-white h-full max-lg:hidden lg:flex">
         <div className="px-5 pt-6 pb-4 border-b border-stone-100">
-          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400 mb-1">
+          <p className="kc-label text-stone-400 mb-1">
             Integration Hub
           </p>
           <h1 className="text-lg font-black tracking-tight text-stone-950 leading-none">
@@ -406,13 +406,7 @@ export function IntegrationsTab() {
             <div>
               <div className="flex items-center gap-3">
                 <h2 className="text-base font-black text-stone-950 tracking-tight">{meta.name}</h2>
-                <span
-                  className={`text-[8px] font-black tracking-widest uppercase px-2 py-0.5 border ${
-                    isConnected
-                      ? "border-[#96bf48]/30 text-[#96bf48] bg-[#96bf48]/5"
-                      : "border-stone-200 text-stone-400 bg-stone-50"
-                  }`}
-                >
+                <span className={isConnected ? "ds-badge ds-badge-success" : "ds-badge ds-badge-muted"}>
                   {isConnected ? "Connected" : "Not connected"}
                 </span>
               </div>
@@ -428,7 +422,7 @@ export function IntegrationsTab() {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-stone-100">
           <div className="p-8 space-y-8 max-w-3xl">
             {/* Description */}
             <p className="text-sm text-stone-600 leading-relaxed font-medium border-l-2 border-stone-200 pl-4">
@@ -460,8 +454,8 @@ export function IntegrationsTab() {
             )}
 
             {/* ── Section: Credentials & Connection ── */}
-            <section className="space-y-4">
-              <h3 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
+            <section className="kc-float p-6 space-y-4">
+              <h3 className="kc-label text-stone-400">
                 {selected === "shopify" ? "Store Connection" : selected === "razorpay" ? "Razorpay Credentials" : "Shiprocket Credentials"}
               </h3>
 
@@ -535,7 +529,7 @@ export function IntegrationsTab() {
                         value={srEmail}
                         onChange={(e) => { setSrEmail(e.target.value); setError(""); }}
                         disabled={isConnected}
-                        className="w-full px-3 py-2.5 text-xs text-stone-900 bg-white border border-stone-200 outline-none focus:border-stone-400 transition-colors disabled:text-stone-400 disabled:bg-stone-50"
+                        className="ds-input !text-xs disabled:text-stone-400 disabled:bg-stone-50"
                         placeholder="you@brand.com"
                       />
                     </div>
@@ -586,7 +580,7 @@ export function IntegrationsTab() {
                         value={keyId}
                         onChange={(e) => { setKeyId(e.target.value); setError(""); }}
                         disabled={isConnected}
-                        className="w-full px-3 py-2.5 text-xs text-stone-900 bg-white border border-stone-200 outline-none focus:border-stone-400 transition-colors disabled:text-stone-400 disabled:bg-stone-50"
+                        className="ds-input !text-xs disabled:text-stone-400 disabled:bg-stone-50"
                         placeholder="rzp_live_..."
                       />
                     </div>
@@ -629,7 +623,7 @@ export function IntegrationsTab() {
                     <button
                       type="button"
                       onClick={handleOAuthConnect}
-                      className="flex items-center gap-2.5 px-5 py-2.5 bg-[#96bf48] text-white text-[9px] font-black tracking-widest uppercase border border-[#96bf48] hover:bg-[#7ea33e] hover:border-[#7ea33e] transition-colors cursor-pointer"
+                      className="ds-btn ds-btn-primary"
                     >
                       <Link2 className="w-3.5 h-3.5" />
                       Connect via Shopify (1-Click Install)
@@ -640,7 +634,7 @@ export function IntegrationsTab() {
                       type="button"
                       onClick={handleConnect}
                       disabled={connecting}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-stone-950 text-white text-[9px] font-black tracking-widest uppercase hover:bg-stone-800 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                      className="ds-btn ds-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {connecting ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -658,8 +652,7 @@ export function IntegrationsTab() {
                         type="button"
                         onClick={handleSync}
                         disabled={syncing}
-                        className="flex items-center gap-2 px-5 py-2.5 text-white text-[9px] font-black tracking-widest uppercase transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                        style={{ backgroundColor: "#96bf48" }}
+                        className="ds-btn ds-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {syncing ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -673,7 +666,7 @@ export function IntegrationsTab() {
                       type="button"
                       onClick={handleDisconnect}
                       disabled={disconnecting}
-                      className="flex items-center gap-2 px-4 py-2.5 text-stone-500 border border-stone-200 text-[9px] font-black tracking-widest uppercase hover:text-red-600 hover:border-red-200 transition-colors disabled:opacity-50 cursor-pointer"
+                      className="ds-btn ds-btn-danger disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {disconnecting ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -707,7 +700,7 @@ export function IntegrationsTab() {
 
             {/* ── Section: How to get your token (Developer Mode Only) ── */}
             {!isConnected && manualMode && selected === "shopify" && (
-              <section className="animate-fade-in border border-stone-200 bg-white">
+              <section className="kc-float animate-fade-in overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setGuideOpen((v) => !v)}
@@ -753,10 +746,10 @@ export function IntegrationsTab() {
 
             {/* ── Section: Webhooks Details ── */}
             {selected === "shopify" && (
-              <section className="pt-4 border-t border-stone-200">
+              <section className="kc-float p-6">
                 {/* Webhook Receiver */}
                 <div className="space-y-2">
-                  <h4 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
+                  <h4 className="kc-label text-stone-400">
                     Webhook Receiver URL
                   </h4>
                   <div className="flex items-stretch border border-stone-200 bg-stone-50 focus-within:border-stone-400 transition-colors">
@@ -784,15 +777,15 @@ export function IntegrationsTab() {
 
             {/* ── Section: Active Webhooks ── */}
             {isConnected && integration?.webhookUrl && selected === "shopify" && (
-              <section className="space-y-3">
-                <h4 className="text-[9px] font-black tracking-[0.15em] uppercase text-stone-400">
+              <section className="kc-float p-6 space-y-3">
+                <h4 className="kc-label text-stone-400">
                   Active Webhook Subscriptions
                 </h4>
                 <div className="grid sm:grid-cols-3 gap-3">
                   {WEBHOOK_TOPICS.map((item) => (
                     <div
                       key={item.topic}
-                      className="border border-stone-200 bg-white p-3 flex items-start gap-2.5"
+                      className="ds-card-flat p-3 flex items-start gap-2.5"
                     >
                       <CheckCircle2 className="w-4 h-4 text-[#96bf48] shrink-0 mt-0.5" />
                       <div>

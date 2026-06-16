@@ -27,18 +27,19 @@ import {
 } from "lucide-react";
 import { useApp, Message } from "@/shared/context/AppContext";
 import { notify } from "@/shared/lib/toast";
+import { parseSystemEventString } from "@/shared/lib/parseSystemEventString";
 import { useSession } from "next-auth/react";
 
 export const InboxTab: React.FC = () => {
   const params = useParams();
   const orgId = params.orgId as string;
   const { data: session } = useSession();
-  const { 
-    contacts, 
-    chatHistory, 
-    activeContactId, 
-    setActiveContactId, 
-    sendLiveChatMessage, 
+  const {
+    contacts,
+    chatHistory,
+    activeContactId,
+    setActiveContactId,
+    sendLiveChatMessage,
     updateContact,
     deleteContact,
     members,
@@ -132,7 +133,7 @@ export const InboxTab: React.FC = () => {
       setShowCannedPicker(false);
     }
   }, [inputText]);
-  
+
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Active contact details
@@ -161,7 +162,7 @@ export const InboxTab: React.FC = () => {
   // Scroll to bottom on new message
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    
+
     // Mark as read when active contact is loaded
     if (activeContactId && activeContact && (activeContact.unreadCount || 0) > 0) {
       updateContact(activeContactId, { unreadCount: 0 });
@@ -194,8 +195,8 @@ export const InboxTab: React.FC = () => {
       await fetch("/api/whatsapp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          to: phone, 
+        body: JSON.stringify({
+          to: phone,
           text,
           contactId: activeContactId,
           orgId: orgId
@@ -310,15 +311,23 @@ export const InboxTab: React.FC = () => {
   const renderMessageStatus = (status: Message["status"]) => {
     if (!status) return null;
     if (status === "sent") {
-      return <Check className="w-3.5 h-3.5 text-stone-400" />;
+      return <Check className="w-3.5 h-3.5 text-stone-500" />;
     }
     if (status === "delivered") {
-      return <CheckCheck className="w-3.5 h-3.5 text-stone-500" />;
+      return <CheckCheck className="w-3.5 h-3.5 text-stone-600" />;
     }
     if (status === "read") {
-      return <CheckCheck className="w-3.5 h-3.5 text-stone-900" />;
+      return <CheckCheck className="w-3.5 h-3.5 text-wa-green" />;
     }
     return null;
+  };
+
+  // Hash-based avatar background color
+  const avatarBg = (name: string) => {
+    const palette = ["bg-violet-500","bg-blue-500","bg-teal-500","bg-amber-500","bg-red-500","bg-pink-500","bg-indigo-500","bg-emerald-600"];
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+    return palette[Math.abs(h) % palette.length];
   };
 
   // ─── Determine which mobile pane to show ────────────────────────
@@ -327,16 +336,17 @@ export const InboxTab: React.FC = () => {
   const mobileShowChat = !!activeContactId;
 
   return (
-    <div className="flex-1 flex h-full overflow-hidden animate-slide-up relative bg-[#fafaf9]">
+    <div className="flex-1 flex h-full overflow-hidden animate-slide-up relative bg-stone-100">
       <style>{`
         @media (max-width: 1023px) {
           .inbox-contact-list-pane[data-mobile-hidden="true"] { display: none !important; }
           .inbox-chat-pane[data-mobile-hidden="true"] { display: none !important; }
           .inbox-profile-drawer {
-            transform: translateX(100%) !important;
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in-out;
           }
           .inbox-profile-drawer[data-mobile-open="true"] {
-            transform: translateX(0) !important;
+            transform: translateX(0);
           }
         }
       `}</style>
@@ -347,127 +357,159 @@ export const InboxTab: React.FC = () => {
           Mobile: visible only when NO contact is selected
        ═══════════════════════════════════════════════════════════════ */}
       <div
-        className="w-full lg:w-80 border-r border-stone-200 flex flex-col h-full bg-white shrink-0 inbox-contact-list-pane"
+        className="w-full lg:w-72 border-r border-stone-200 flex flex-col h-full bg-[#fafaf9] shrink-0 inbox-contact-list-pane"
         data-mobile-hidden={mobileShowChat ? "true" : "false"}
         style={{ display: mobileShowChat ? undefined : "flex" }}
       >
-          {/* Search Header */}
-          <div className="p-4 border-b border-stone-200 shrink-0 space-y-3 bg-[#fafaf9]">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-stone-900 text-xs tracking-wider uppercase">Active Conversations</h3>
-              <button
-                onClick={() => setAutoRefresh((p) => !p)}
-                className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                  autoRefresh
-                    ? "bg-stone-950 text-white border-stone-950"
-                    : "bg-white text-stone-400 border-stone-200 hover:border-stone-950 hover:text-stone-950"
-                }`}
-                title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
-              >
-                {autoRefresh ? "Live" : "Paused"}
-              </button>
+        {/* ── Header ── */}
+        <div className="px-4 pt-4 pb-3 shrink-0 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-black text-stone-900 tracking-tight">Inbox</h3>
+              <p className="text-[10px] text-stone-400 font-medium mt-0.5">{filteredContacts.length} conversation{filteredContacts.length !== 1 ? "s" : ""}</p>
             </div>
-            <div className="relative">
-              <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search contacts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-lg py-2.5 pl-9 pr-4 text-xs font-medium focus:outline-none focus:border-stone-900 focus:bg-white transition-all placeholder:text-stone-400"
-              />
-            </div>
+            <button
+              onClick={() => setAutoRefresh((p) => !p)}
+              className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                autoRefresh
+                  ? "bg-wa-green/10 text-wa-green border-wa-green/30"
+                  : "bg-white text-stone-400 border-stone-200 hover:border-stone-300"
+              }`}
+              title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${autoRefresh ? "bg-wa-green animate-pulse" : "bg-stone-300"}`} />
+              {autoRefresh ? "Live" : "Paused"}
+            </button>
           </div>
 
-          {/* Inbox filter tabs */}
-          <div className="flex border-b border-stone-200 shrink-0">
+          {/* Search */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by name, phone or tag…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white border border-stone-200 rounded-xl pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-wa-green transition-colors shadow-sm placeholder:text-stone-400"
+            />
+          </div>
+
+          {/* Filter pills */}
+          <div className="flex items-center gap-1 bg-stone-200/60 rounded-xl p-1">
             {(["all", "mine", "unassigned", "bot"] as const).map((f) => {
-              const labels: Record<string, string> = { all: "All", mine: "Mine", unassigned: "Open", bot: "Bot" };
+              const labels = { all: "All", mine: "Mine", unassigned: "Open", bot: "Bot" };
+              const counts: Record<string, number> = {
+                all: contacts.length,
+                mine: contacts.filter(c => c.assignedAgent === agentName).length,
+                unassigned: contacts.filter(c => c.assignedAgent === "None").length,
+                bot: contacts.filter(c => c.assignedAgent === "Bot").length,
+              };
               return (
                 <button
                   key={f}
                   onClick={() => setInboxFilter(f)}
-                  className={`flex-1 py-2 text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 ${
                     inboxFilter === f
-                      ? "text-stone-950 border-b-2 border-stone-950 bg-white"
-                      : "text-stone-400 hover:text-stone-700 bg-[#fafaf9]"
+                      ? "bg-white text-stone-900 shadow-sm"
+                      : "text-stone-500 hover:text-stone-700"
                   }`}
                 >
                   {labels[f]}
+                  {counts[f] > 0 && (
+                    <span className={`text-[9px] font-black px-1 rounded-full leading-tight ${
+                      inboxFilter === f ? "text-wa-green" : "text-stone-400"
+                    }`}>
+                      {counts[f]}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
+        </div>
 
-          {/* Contacts Stream */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {filteredContacts.length === 0 ? (
-              <div className="p-8 text-center text-xs text-stone-400 font-bold uppercase tracking-wider">
-                No matching contacts found
+        {/* ── Contact List ── */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-2 space-y-0.5">
+          {filteredContacts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-stone-100 flex items-center justify-center">
+                <Search className="w-5 h-5 text-stone-300" />
               </div>
-            ) : (
-              filteredContacts.map((c) => {
-                const isSelected = c.id === activeContactId;
-                const hasUnread = (c.unreadCount || 0) > 0 && !isSelected;
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => setActiveContactId(c.id)}
-                    className={`w-full p-4 flex items-start gap-3 transition-all duration-150 hover:bg-stone-50 text-left relative border-b border-stone-100 ${
-                      isSelected ? "bg-stone-50" : ""
-                    }`}
-                  >
-                    {/* Avatar */}
-                    <div className="relative shrink-0 mt-0.5">
-                      <div className="w-11 h-11 bg-stone-100 text-stone-700 flex items-center justify-center font-bold text-sm rounded-full">
-                        {c.name.split(" ").map(n => n[0]).join("")}
-                      </div>
-                      <span className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${
-                        c.status === "Active" ? "bg-emerald-500" : "bg-stone-300"
-                      }`} />
-                    </div>
+              <p className="text-xs text-stone-400 font-medium">No conversations match your filter</p>
+            </div>
+          ) : (
+            filteredContacts.map((c) => {
+              const isSelected = c.id === activeContactId;
+              const hasUnread = (c.unreadCount || 0) > 0 && !isSelected;
+              const initials = c.name.split(" ").map(n => n[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold truncate text-stone-900">{c.name}</h4>
-                        <span className="text-[10px] text-stone-400 font-medium shrink-0 ml-2">{c.lastMessageTime}</span>
-                      </div>
-                      <p className="text-xs text-stone-500 truncate leading-normal">
-                        {c.lastMessage || "No messages yet"}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                        <span className="text-[8px] font-bold text-stone-500 uppercase tracking-wider bg-stone-100 border border-stone-200 px-1.5 py-0.5 rounded-full leading-none shrink-0">
-                          {c.source.includes("Shopify") ? "Shopify" : c.source.includes("Woo") ? "Woo" : "Ad"}
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setActiveContactId(c.id)}
+                  className={`w-full px-3 py-3 flex items-center gap-3 rounded-xl transition-all duration-150 text-left relative group ${
+                    isSelected
+                      ? "bg-white shadow-sm border border-stone-200"
+                      : "hover:bg-white/70 border border-transparent"
+                  }`}
+                >
+                  {/* Avatar */}
+                  <div className="relative shrink-0">
+                    <div className={`w-10 h-10 flex items-center justify-center font-black text-xs rounded-2xl text-white ring-2 transition-all ${
+                      isSelected ? "bg-wa-green ring-wa-green/20" : `${avatarBg(c.name)} ring-transparent`
+                    }`}>
+                      {initials}
+                    </div>
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 border-2 border-[#fafaf9] rounded-full ${
+                      c.status === "Active" ? "bg-emerald-500" : "bg-stone-300"
+                    }`} />
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <h4 className={`text-xs font-bold truncate ${isSelected ? "text-wa-green" : "text-stone-900"}`}>
+                        {c.name}
+                      </h4>
+                      <span className="text-[10px] text-stone-400 shrink-0 tabular-nums">{c.lastMessageTime}</span>
+                    </div>
+                    <p className="text-[11px] text-stone-500 truncate leading-normal">
+                      {c.lastMessage || <span className="italic text-stone-300">No messages yet</span>}
+                    </p>
+                    {/* Source + tag chips — only show if assigned agent is notable */}
+                    {c.assignedAgent && c.assignedAgent !== "None" && (
+                      <div className="flex items-center gap-1 mt-1.5">
+                        <span className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
+                          c.assignedAgent === "Bot"
+                            ? "bg-violet-50 text-violet-600 border-violet-200"
+                            : "bg-stone-100 text-stone-500 border-stone-200"
+                        }`}>
+                          {c.assignedAgent === "Bot" ? "🤖 Bot" : `👤 ${c.assignedAgent}`}
                         </span>
                         {c.tags.slice(0, 1).map((t, idx) => (
-                          <span key={idx} className="text-[9px] font-semibold bg-stone-100 text-stone-700 px-2 py-0.5 border border-stone-200 leading-none truncate max-w-[80px] rounded-full">
+                          <span key={idx} className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-wa-green/10 text-wa-green border border-wa-green/20 truncate max-w-[64px]">
                             {t}
                           </span>
                         ))}
                         {c.tags.length > 1 && (
-                          <span className="text-[9px] text-stone-400 font-medium">+{c.tags.length - 1}</span>
+                          <span className="text-[9px] text-stone-400">+{c.tags.length - 1}</span>
                         )}
                       </div>
-                    </div>
-
-                    {/* Unread badge */}
-                    {hasUnread && (
-                      <span className="bg-emerald-600 text-white text-[9px] font-bold min-w-[20px] h-5 rounded-full flex items-center justify-center shrink-0 mt-1.5 px-1.5">
-                        {c.unreadCount}
-                      </span>
                     )}
+                  </div>
 
-                    {/* Active indicator */}
-                    {isSelected && (
-                      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-stone-950 rounded-r-full" />
-                    )}
-                  </button>
-                );
-              })
-            )}
-          </div>
+                  {/* Unread badge */}
+                  {hasUnread && (
+                    <span className="w-5 h-5 rounded-full bg-wa-green text-white text-[9px] font-black flex items-center justify-center shrink-0">
+                      {c.unreadCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          )}
         </div>
+      </div>
 
       {/* ═══════════════════════════════════════════════════════════════
           COLUMN 2 — Chat Stream
@@ -492,7 +534,7 @@ export const InboxTab: React.FC = () => {
                   <ArrowLeft className="w-5 h-5" />
                 </button>
 
-                <div className="w-9 h-9 bg-gradient-to-br from-stone-700 to-stone-900 text-white flex items-center justify-center font-bold text-xs shrink-0 uppercase rounded-full">
+                <div className={`w-9 h-9 text-white flex items-center justify-center font-bold text-xs shrink-0 uppercase rounded-full ${avatarBg(activeContact.name)}`}>
                   {activeContact.name.split(" ").map(n => n[0]).join("")}
                 </div>
                 <div className="min-w-0">
@@ -511,7 +553,7 @@ export const InboxTab: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowSimulate(!showSimulate)}
-                    className="text-[9px] px-2.5 py-1.5 bg-stone-950 text-white hover:bg-stone-800 border border-stone-950 font-bold uppercase tracking-wider flex items-center gap-1.5 select-none transition-all shrink-0 cursor-pointer rounded-lg"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 rounded-lg transition-all cursor-pointer select-none shrink-0"
                     title="Simulate Inbound Customer Message"
                   >
                     <Bot className="w-3.5 h-3.5" />
@@ -520,9 +562,9 @@ export const InboxTab: React.FC = () => {
                 )}
 
                 {/* Agent badge — desktop */}
-                <span className="max-sm:hidden text-[9px] px-3 py-1.5 bg-stone-50 text-stone-500 font-bold flex items-center gap-1.5 shrink-0 border border-stone-200 uppercase tracking-wider rounded-lg">
-                  <Laptop className="w-3.5 h-3.5 text-stone-400" />
-                  Agent: <span className="font-bold text-stone-800">{activeContact.assignedAgent}</span>
+                <span className="max-sm:hidden inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold bg-stone-100 text-stone-600 border border-stone-200 rounded-lg shrink-0">
+                  <Laptop className="w-3 h-3" />
+                  Agent: <strong className="text-stone-800">{activeContact.assignedAgent}</strong>
                 </span>
 
                 {/* Assign to me quick-action */}
@@ -530,15 +572,15 @@ export const InboxTab: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => updateContact(activeContact.id, { assignedAgent: agentName })}
-                    className="max-sm:hidden text-[9px] px-2.5 py-1.5 bg-white text-stone-600 hover:bg-stone-50 border border-stone-200 hover:border-stone-400 font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0 cursor-pointer rounded-lg transition-all"
+                    className="max-sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 rounded-lg transition-all cursor-pointer shrink-0"
                     title="Assign this conversation to yourself"
                   >
                     <UserCheck className="w-3.5 h-3.5" />
                     <span>Claim</span>
                   </button>
                 )}
-                
-                {/* Profile panel toggle — mobile only */}
+
+                {/* Profile panel toggle — mobile only (desktop panel is always visible) */}
                 <button
                   type="button"
                   onClick={openMobileProfile}
@@ -571,7 +613,7 @@ export const InboxTab: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleSimulateInbound}
-                    className="bg-stone-950 text-white border border-stone-950 font-bold text-[9px] tracking-wider uppercase px-3 py-2 rounded-lg transition-all cursor-pointer shrink-0 hover:bg-stone-800"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold bg-stone-900 hover:bg-stone-800 text-white rounded-lg transition-all cursor-pointer shrink-0"
                   >
                     Send
                   </button>
@@ -587,7 +629,7 @@ export const InboxTab: React.FC = () => {
             )}
 
             {/* ─── Live Message History ─── */}
-            <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-4 space-y-3 custom-scrollbar relative bg-[#fafaf9]">
+            <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-4 space-y-3 custom-scrollbar relative bg-[#f0ece4]">
               {activeChat.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center text-xs text-stone-500 gap-2.5">
                   <Bot className="w-8 h-8 text-stone-300" />
@@ -599,7 +641,7 @@ export const InboxTab: React.FC = () => {
                     return (
                       <div key={msg.id} className="flex justify-center my-3 animate-slide-up select-none">
                         <div className="bg-stone-100 text-[10px] font-medium text-stone-500 px-3.5 py-1.5 rounded-full max-w-[85%] text-center border border-stone-200">
-                          {msg.text}
+                          {parseSystemEventString(msg.text) || msg.text}
                         </div>
                       </div>
                     );
@@ -608,18 +650,18 @@ export const InboxTab: React.FC = () => {
                   const isAgent = msg.sender === "agent";
 
                   return (
-                    <div 
-                      key={msg.id} 
+                    <div
+                      key={msg.id}
                       className={`flex ${isAgent ? "justify-end" : "justify-start"} animate-slide-up`}
                     >
                       <div className={`max-w-[75%] px-4 py-3 text-[13px] leading-relaxed relative ${
-                        isAgent 
-                          ? "bg-stone-900 text-stone-50 rounded-2xl rounded-br-sm shadow-md" 
+                        isAgent
+                          ? "bg-[#dcf8c6] text-stone-900 border border-[#b7e5a0] rounded-2xl rounded-br-sm shadow-sm"
                           : "bg-white text-stone-900 border border-stone-200 rounded-2xl rounded-bl-sm shadow-sm"
                       }`}>
                         {/* Text */}
-                        <p className="whitespace-pre-line select-text">{msg.text}</p>
-                        
+                        <p className="whitespace-pre-line select-text">{parseSystemEventString(msg.text) || msg.text}</p>
+
                         {/* Interactive Buttons (e.g. CTA Quick Replies) */}
                         {msg.buttons && msg.buttons.length > 0 && (
                           <div className="mt-3 border-t border-stone-200/30 pt-2.5 space-y-1.5 select-none">
@@ -628,19 +670,19 @@ export const InboxTab: React.FC = () => {
                                 key={bIdx}
                                 onClick={() => {
                                   sendLiveChatMessage(
-                                    activeContact.id, 
-                                    `Clicked action button: "${btn}"`, 
+                                    activeContact.id,
+                                    `Clicked action button: "${btn}"`,
                                     "system"
                                   );
                                   setTimeout(() => {
                                     sendLiveChatMessage(
-                                      activeContact.id, 
-                                      `Simulated choice response regarding: ${btn}`, 
+                                      activeContact.id,
+                                      `Simulated choice response regarding: ${btn}`,
                                       "user"
                                     );
                                   }, 1500);
                                 }}
-                                className="w-full flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl bg-white/10 border border-stone-200/30 hover:bg-white/20 text-current font-semibold transition-all text-[10px] uppercase tracking-wider"
+                                className="w-full flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl bg-white/10 border border-stone-200/30 hover:bg-white/20 text-current font-semibold transition-all text-[10px] uppercase tracking-wider cursor-pointer"
                               >
                                 <span>{btn}</span>
                                 <ExternalLink className="w-3 h-3 opacity-50" />
@@ -688,34 +730,34 @@ export const InboxTab: React.FC = () => {
               <div ref={chatEndRef} />
             </div>
 
-            {/* AI Reply Suggestions Bar */}
-            <div className="px-4 py-2 bg-stone-50 border-t border-stone-200 flex items-center gap-3 shrink-0 relative z-10 overflow-x-auto custom-scrollbar select-none">
-              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex items-center gap-1 shrink-0">
-                <Sparkles className="w-3 h-3 text-emerald-600 animate-pulse" />
-                AI Assist:
-              </span>
-              {loadingSuggestions ? (
-                <div className="flex gap-1.5 items-center">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "300ms" }} />
-                  <span className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider">Drafting Suggestions...</span>
-                </div>
-              ) : replySuggestions.length === 0 ? (
-                <span className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider">No suggestions available</span>
-              ) : (
-                replySuggestions.map((sug, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setInputText(sug)}
-                    className="text-xs font-semibold bg-white hover:bg-stone-100 border border-stone-200 px-3.5 py-1.5 whitespace-nowrap cursor-pointer rounded-lg text-stone-700 transition-all hover:border-stone-300 shadow-sm active:scale-95 shrink-0"
-                  >
-                    {sug}
-                  </button>
-                ))
-              )}
-            </div>
+            {/* AI Reply Suggestions Bar — only shown when loading or suggestions exist */}
+            {(loadingSuggestions || replySuggestions.length > 0) && (
+              <div className="px-4 py-2 bg-stone-50 border-t border-stone-200 flex items-center gap-3 shrink-0 relative z-10 overflow-x-auto custom-scrollbar select-none">
+                <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex items-center gap-1 shrink-0">
+                  <Sparkles className="w-3 h-3 text-emerald-600 animate-pulse" />
+                  AI Assist:
+                </span>
+                {loadingSuggestions ? (
+                  <div className="flex gap-1.5 items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <span className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider">Drafting Suggestions...</span>
+                  </div>
+                ) : (
+                  replySuggestions.map((sug, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setInputText(sug)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 rounded-lg transition-all cursor-pointer shrink-0 whitespace-nowrap active:scale-95"
+                    >
+                      {sug}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
 
             {/* ─── Canned Replies Picker ─── */}
             {showCannedPicker && (
@@ -757,67 +799,50 @@ export const InboxTab: React.FC = () => {
             )}
 
             {/* ─── Input Bar ─── */}
-            <form
-              onSubmit={handleSendMessage}
-              className={`p-3 lg:p-4 border-t flex items-center gap-2.5 shrink-0 relative z-10 transition-colors ${
+            <form onSubmit={handleSendMessage}
+              className={`px-4 py-3 border-t flex items-end gap-2 shrink-0 relative z-10 transition-colors ${
                 noteMode ? "bg-amber-50 border-amber-200" : "bg-white border-stone-200"
-              }`}
-            >
-              {/* Canned replies trigger */}
-              <button
-                type="button"
-                onClick={() => setShowCannedPicker((p) => !p)}
-                className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-stone-100 text-stone-400 hover:text-amber-600 cursor-pointer transition-colors shrink-0"
-                title="Canned replies (or type / to search)"
-              >
+              }`}>
+              <button type="button" onClick={() => setShowCannedPicker(p => !p)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-stone-100 text-stone-400 hover:text-amber-600 cursor-pointer transition-colors shrink-0 mb-1"
+                title="Canned replies">
                 <Zap className="w-4 h-4" />
               </button>
-
-              <input
-                type="text"
-                placeholder={noteMode ? "Write internal note (only visible to team)…" : "Type a message…"}
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                className={`flex-1 border rounded-2xl py-3 px-4 text-sm font-medium focus:outline-none transition-all placeholder:text-stone-400 ${
-                  noteMode
-                    ? "bg-amber-50 border-amber-300 focus:border-amber-500 text-amber-900"
-                    : "bg-stone-50 border-stone-200 focus:border-stone-400"
+              <div className="flex-1 relative">
+                <textarea
+                  rows={1}
+                  placeholder={noteMode ? "Write internal note…" : "Type a message…"}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as unknown as React.FormEvent); } }}
+                  className={`w-full border rounded-2xl py-2.5 px-4 text-sm font-medium focus:outline-none transition-all placeholder:text-stone-400 resize-none max-h-32 overflow-y-auto ${
+                    noteMode ? "bg-amber-50 border-amber-300 focus:border-amber-500 text-amber-900" : "bg-stone-50 border-stone-200 focus:border-stone-400"
+                  }`}
+                />
+              </div>
+              <button type="button" onClick={() => setNoteMode(p => !p)}
+                className={`w-8 h-8 rounded-xl flex items-center justify-center cursor-pointer transition-colors shrink-0 mb-1 ${
+                  noteMode ? "bg-amber-500 text-white" : "hover:bg-stone-100 text-stone-400 hover:text-amber-600"
                 }`}
-              />
-
-              {/* Note mode toggle */}
-              <button
-                type="button"
-                onClick={() => setNoteMode((p) => !p)}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-colors shrink-0 ${
-                  noteMode
-                    ? "bg-amber-500 text-white"
-                    : "hover:bg-stone-100 text-stone-400 hover:text-amber-600"
-                }`}
-                title={noteMode ? "Switch to message mode" : "Switch to note mode (internal only)"}
-              >
+                title="Toggle note mode">
                 <StickyNote className="w-4 h-4" />
               </button>
-
-              <button
-                type="submit"
-                disabled={!inputText.trim()}
-                className={`w-11 h-11 rounded-full flex items-center justify-center disabled:opacity-30 transition-all shadow-sm cursor-pointer shrink-0 active:scale-95 ${
-                  noteMode ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-stone-950 hover:bg-stone-800 text-white"
-                }`}
-              >
-                {noteMode ? <StickyNote className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+              <button type="submit" disabled={!inputText.trim()}
+                className={`w-9 h-9 rounded-full flex items-center justify-center disabled:opacity-30 transition-all cursor-pointer shrink-0 mb-0.5 shadow-sm ${
+                  noteMode ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-wa-green hover:bg-wa-green-dark text-white"
+                }`}>
+                <Send className="w-4 h-4" />
               </button>
             </form>
           </>
         ) : (
           /* ─── Empty State ─── */
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-4 select-none">
-            <div className="w-16 h-16 bg-stone-100 border border-stone-200 flex items-center justify-center text-stone-400 rounded-2xl">
+            <div className="w-16 h-16 bg-stone-100 rounded-2xl flex items-center justify-center text-stone-300">
               <MessageSquareOff className="w-7 h-7" />
             </div>
             <div>
-              <h4 className="font-bold text-stone-900 text-sm">No Conversation Selected</h4>
+              <h4 className="font-black text-stone-900 text-sm">No Conversation Selected</h4>
               <p className="text-stone-500 text-xs mt-1.5 max-w-[280px] leading-relaxed">Select a contact from the list to view their conversation.</p>
             </div>
           </div>
@@ -825,16 +850,16 @@ export const InboxTab: React.FC = () => {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          COLUMN 3 — CRM Profile Panel / Drawer
-          Desktop: static sidebar (w-72, always visible)
-          Mobile: full-screen overlay drawer, toggled via showMobileProfile
+          COLUMN 3 — CRM Profile Panel
+          ALWAYS a fixed overlay drawer (slide from right), all screen sizes.
+          Triggered via showMobileProfile state on the profile button in chat header.
        ═══════════════════════════════════════════════════════════════ */}
       {activeContact && (
         <>
-          {/* Mobile backdrop overlay */}
+          {/* Backdrop overlay — mobile only */}
           {showMobileProfile && (
-            <div 
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] lg:hidden animate-fade-in"
+            <div
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] animate-fade-in lg:hidden"
               onClick={closeMobileProfile}
               role="button"
               tabIndex={0}
@@ -842,35 +867,17 @@ export const InboxTab: React.FC = () => {
             />
           )}
 
-          {/* Profile panel container */}
+          {/* Profile drawer — fixed overlay on all screen sizes */}
           <div
-            className="lg:relative lg:z-auto"
-            style={{
-              // Desktop: render inline as a static sidebar
-              // Mobile: render as a fixed overlay drawer
-            }}
+            data-mobile-open={showMobileProfile ? "true" : "false"}
+            className="max-lg:fixed max-lg:inset-y-0 max-lg:right-0 max-lg:z-[70] max-lg:shadow-2xl max-lg:w-[85%] lg:static lg:w-72 lg:shrink-0 flex flex-col h-full bg-white border-l border-stone-200 overflow-y-auto custom-scrollbar inbox-profile-drawer"
           >
-            <div
-              data-mobile-open={showMobileProfile ? "true" : "false"}
-              className={[
-                // Desktop: static sidebar
-                "max-lg:fixed max-lg:inset-y-0 max-lg:right-0 max-lg:z-[70]",
-                "lg:static lg:flex",
-                // Sizing
-                "w-[85%] sm:w-96 lg:w-72",
-                // Common styling
-                "flex flex-col h-full bg-white border-l border-stone-200 overflow-y-auto custom-scrollbar shrink-0",
-                // Mobile transition
-                "transition-transform duration-300 ease-in-out",
-                "inbox-profile-drawer",
-                "lg:translate-x-0",
-              ].join(" ")}
-            >
-              {/* ─── Drawer Content ─── */}
-              <div className="p-6 space-y-6">
+            {/* ─── Drawer Content ─── */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              <div className="p-4 space-y-4">
 
-                {/* Mobile close header */}
-                <div className="flex items-center justify-between lg:hidden">
+                {/* Drawer close header */}
+                <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-stone-400">Customer Profile</span>
                   <button
                     type="button"
@@ -882,19 +889,24 @@ export const InboxTab: React.FC = () => {
                 </div>
 
                 {/* Profile avatar & status */}
-                <div className="text-center pb-4 border-b border-stone-100 select-none">
-                  <div className="w-20 h-20 bg-gradient-to-br from-stone-700 to-stone-900 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-3 rounded-full shadow-lg">
-                    {activeContact.name.split(" ").map(n => n[0]).join("")}
+                <div className="rounded-2xl overflow-hidden border border-stone-100 shadow-sm select-none">
+                  <div className={`${avatarBg(activeContact.name)} rounded-t-2xl px-4 py-5 flex items-center gap-3`}>
+                    <div className="w-14 h-14 bg-white/20 text-white flex items-center justify-center text-lg font-black rounded-xl ring-2 ring-white/30 shrink-0">
+                      {activeContact.name.split(" ").map(n => n[0]).join("")}
+                    </div>
+                    <div className="text-left min-w-0">
+                      <h3 className="font-black text-white text-sm truncate">{activeContact.name}</h3>
+                      <p className="text-[10px] text-white/60 font-medium mt-0.5 truncate">{activeContact.phone}</p>
+                      <span className={`inline-flex items-center px-2 py-0.5 mt-1.5 text-[9px] font-bold rounded-md border ${activeContact.status === "Active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-stone-100 text-stone-500 border-stone-200"}`}>
+                        {activeContact.status} lead
+                      </span>
+                    </div>
                   </div>
-                  <h3 className="font-bold text-stone-900 text-sm">{activeContact.name}</h3>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider bg-stone-50 text-stone-700 px-3 py-1 border border-stone-200 mt-2 inline-block rounded-full">
-                    {activeContact.status} lead
-                  </span>
                 </div>
 
-                 {/* Lead Metadata */}
-                <div className="space-y-4">
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Lead Metadata</h4>
+                {/* Lead Metadata */}
+                <div className="p-4 rounded-2xl space-y-3 border border-stone-100 bg-stone-50/50">
+                  <h4 className="text-[9px] font-black uppercase tracking-widest text-stone-400">Lead Metadata</h4>
                   <div className="space-y-3 text-xs font-medium text-stone-600 select-text">
                     <div className="flex items-center gap-3">
                       <Phone className="w-4 h-4 text-stone-400 shrink-0" />
@@ -913,11 +925,11 @@ export const InboxTab: React.FC = () => {
 
                 {/* Form Submissions / Custom Attributes */}
                 {activeContact.attributes && Object.keys(activeContact.attributes).length > 0 && (
-                  <div className="space-y-2.5 pt-1">
-                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 select-none">
+                  <div className="p-4 rounded-2xl space-y-3 border border-stone-100 bg-stone-50/50">
+                    <h4 className="text-[9px] font-black uppercase tracking-widest text-stone-400 select-none">
                       Form Submissions
                     </h4>
-                    <div className="bg-stone-50 border border-stone-200 p-3 space-y-2.5 rounded-xl select-text text-xs">
+                    <div className="space-y-2.5 select-text text-xs">
                       {Object.entries(activeContact.attributes).map(([key, val]) => (
                         <div key={key} className="flex justify-between items-start">
                           <span className="font-bold text-stone-500 uppercase text-[9px] tracking-wider pt-0.5 truncate max-w-[120px]">
@@ -931,13 +943,13 @@ export const InboxTab: React.FC = () => {
                     </div>
                   </div>
                 )}
-                
+
                 {/* Unified E-Commerce Integration Panel (Shopify + WhatsApp Marketplace) */}
                 {(() => {
-                  const attrs = (activeContact.attributes as Record<string, any>) || {};
+                  const attrs = (activeContact.attributes as Record<string, unknown>) || {};
                   const isWhatsAppCart = activeContact.tags.includes("WhatsApp-Cart");
                   const isShopifyCart = activeContact.tags.includes("Shopify-Cart");
-                  const checkoutUrl = attrs.shopify_checkout_url || attrs.cart_checkout_url || "";
+                  const checkoutUrl = String(attrs.shopify_checkout_url || attrs.cart_checkout_url || "");
                   const isCartAbandoned = (isShopifyCart || isWhatsAppCart) && checkoutUrl && !attrs.cart_recovered;
                   const cartSource = isWhatsAppCart ? "WhatsApp Marketplace" : "Shopify";
                   const customerOrders = (orders || []).filter(
@@ -947,8 +959,8 @@ export const InboxTab: React.FC = () => {
                   if (!isCartAbandoned && customerOrders.length === 0) return null;
 
                   return (
-                    <div className="space-y-4 pt-1">
-                      <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 select-none flex items-center gap-1">
+                    <div className="p-4 rounded-2xl space-y-3 border border-stone-100 bg-stone-50/50">
+                      <h4 className="text-[9px] font-black uppercase tracking-widest text-stone-400 select-none flex items-center gap-1">
                         <ShoppingBag className="w-3.5 h-3.5 text-stone-400" />
                         E-Commerce
                       </h4>
@@ -962,16 +974,16 @@ export const InboxTab: React.FC = () => {
                               🛒 {cartSource} Cart
                             </span>
                             <span className="text-[10px] font-bold text-stone-900">
-                              ₹{attrs.cart_total || "0.00"}
+                              ₹{String(attrs.cart_total || "0.00")}
                             </span>
                           </div>
-                          
+
                           <div className="text-[11px] text-stone-600 font-medium">
-                            <p className="font-bold text-stone-850 truncate max-w-[220px]" title={attrs.cart_items}>
-                              {attrs.cart_items || "Line items missing"}
+                            <p className="font-bold text-stone-850 truncate max-w-[220px]" title={String(attrs.cart_items || "")}>
+                              {String(attrs.cart_items || "Line items missing")}
                             </p>
                             <p className="text-[9px] text-stone-400 mt-1 uppercase tracking-wide">
-                              Abandoned: {attrs.cart_abandoned_at || "Recent"}
+                              Abandoned: {String(attrs.cart_abandoned_at || "Recent")}
                             </p>
                           </div>
 
@@ -997,7 +1009,7 @@ export const InboxTab: React.FC = () => {
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({
                                       to: phoneNum,
-                                      text: `Hi ${activeContact.name}, we noticed you left some items in your cart (total value: ₹${attrs.cart_total}). You can complete your checkout here: ${checkoutUrl}`,
+                                      text: `Hi ${activeContact.name}, we noticed you left some items in your cart (total value: ₹${String(attrs.cart_total)}). You can complete your checkout here: ${checkoutUrl}`,
                                       contactId: activeContact.id,
                                       orgId: orgId,
                                     }),
@@ -1024,7 +1036,7 @@ export const InboxTab: React.FC = () => {
                             Recent Orders ({customerOrders.length})
                           </span>
                           <div className="space-y-2 max-h-44 overflow-y-auto pr-1 custom-scrollbar">
-                            {customerOrders.map((order: any) => {
+                            {customerOrders.map((order: { id: string; orderId: string; status: string; createdAt: string; total: number; contactId?: string; phone?: string }) => {
                               const orderStatus = order.status || "pending";
                               let badgeColor = "bg-stone-50 text-stone-600 border-stone-200";
                               if (orderStatus === "confirmed") badgeColor = "bg-indigo-50 text-indigo-700 border-indigo-200";
@@ -1060,12 +1072,12 @@ export const InboxTab: React.FC = () => {
                 })()}
 
                 {/* Agent Assignment */}
-                <div className="space-y-2 select-none">
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Assigned Agent</h4>
+                <div className="p-4 rounded-2xl space-y-2.5 border border-stone-100 bg-stone-50/50 select-none">
+                  <h4 className="text-[9px] font-black uppercase tracking-widest text-stone-400">Assigned Agent</h4>
                   <select
                     value={activeContact.assignedAgent}
                     onChange={handleAgentChange}
-                    className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs font-semibold focus:outline-none focus:border-stone-900 transition-all"
+                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none focus:border-wa-green transition-colors cursor-pointer"
                   >
                     {members.map((m) => (
                       <option key={m.id} value={m.name}>{m.name}</option>
@@ -1076,27 +1088,27 @@ export const InboxTab: React.FC = () => {
                 </div>
 
                 {/* Segmentation Tags */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 flex items-center gap-2 select-none">
+                <div className="p-4 rounded-2xl space-y-3 border border-stone-100 bg-stone-50/50">
+                  <h4 className="text-[9px] font-black uppercase tracking-widest text-stone-400 flex items-center gap-2 select-none">
                     <Tag className="w-3.5 h-3.5" />
                     Segmentation Tags
                   </h4>
-                  
+
                   <div className="flex flex-wrap gap-2 select-none">
                     {activeContact.tags.length === 0 ? (
                       <span className="text-xs text-stone-400 font-medium">No tags yet</span>
                     ) : (
                       activeContact.tags.map((t, idx) => (
-                        <span 
-                          key={idx} 
-                          className="text-[11px] font-semibold bg-stone-50 text-stone-700 pl-3 pr-2 py-1.5 flex items-center gap-1.5 border border-stone-200 rounded-full hover:bg-stone-100 transition-colors"
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:opacity-80 transition-opacity cursor-default"
                         >
                           <span>{t}</span>
-                          <button 
+                          <button
                             onClick={() => handleRemoveTag(t)}
-                            className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-stone-200 cursor-pointer transition-colors"
+                            className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-emerald-100 cursor-pointer transition-colors"
                           >
-                            <X className="w-3 h-3 text-stone-500" />
+                            <X className="w-3 h-3 text-emerald-600" />
                           </button>
                         </span>
                       ))
@@ -1110,11 +1122,11 @@ export const InboxTab: React.FC = () => {
                       placeholder="Create tag..."
                       value={newTagInput}
                       onChange={(e) => setNewTagInput(e.target.value)}
-                      className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-medium focus:outline-none focus:border-stone-900 placeholder:text-stone-400"
+                      className="flex-1 bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-wa-green transition-colors"
                     />
                     <button
                       type="submit"
-                      className="bg-stone-950 text-white border border-stone-950 rounded-xl px-3 py-2.5 transition-all cursor-pointer shrink-0 flex items-center justify-center hover:bg-stone-800 active:scale-95"
+                      className="w-9 h-9 flex items-center justify-center bg-wa-green hover:bg-wa-green-dark text-white rounded-xl transition-all cursor-pointer shrink-0"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -1128,7 +1140,7 @@ export const InboxTab: React.FC = () => {
                       deleteContact(activeContact.id);
                       closeMobileProfile();
                     }}
-                    className="w-full text-center py-3 text-xs font-bold text-red-500 hover:bg-red-50 border border-red-200 rounded-xl transition-all duration-200 cursor-pointer active:scale-[0.98]"
+                    className="w-full flex items-center justify-center px-4 py-2.5 text-xs font-bold border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl transition-all cursor-pointer"
                   >
                     Delete Lead Profile
                   </button>

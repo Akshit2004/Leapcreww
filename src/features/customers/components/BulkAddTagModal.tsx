@@ -45,17 +45,17 @@ export const BulkAddTagModal: React.FC<BulkAddTagModalProps> = ({
         onClick={onClose}
       />
       
-      {/* Modal Dialog (Material Design Inspired Elevation & Radius) */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up sm:scale-100">
-        
-        <div className="px-6 py-5 border-b border-stone-100 flex items-center justify-between">
+      {/* Modal Dialog */}
+      <div className="relative kc-float rounded-2xl w-full max-w-sm overflow-hidden animate-slide-up sm:scale-100">
+
+        <div className="border-b border-stone-100 px-6 py-4 flex items-center justify-between">
           <h3 className="text-lg font-bold text-stone-900 flex items-center gap-2 tracking-tight">
             <Tag className="w-5 h-5 text-wa-green" />
             Add Tag
           </h3>
-          <button 
+          <button
             onClick={onClose}
-            className="text-stone-400 hover:text-stone-600 hover:bg-stone-100 p-1.5 rounded-full transition-colors"
+            className="ds-btn ds-btn-ghost ds-btn-sm !p-1.5"
           >
             <X className="w-4 h-4" />
           </button>
@@ -63,9 +63,9 @@ export const BulkAddTagModal: React.FC<BulkAddTagModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-6">
           <p className="text-sm text-stone-500 mb-4 font-medium">
-            Enter a tag to assign to the <strong className="text-stone-800">{selectedCount}</strong> selected customer{selectedCount !== 1 ? 's' : ''}.
+            Enter a tag to assign to the <strong className="text-stone-800">{selectedCount}</strong> selected customer{selectedCount !== 1 ? "s" : ""}.
           </p>
-          
+
           <div className="mb-6">
             <input
               autoFocus
@@ -73,22 +73,22 @@ export const BulkAddTagModal: React.FC<BulkAddTagModalProps> = ({
               placeholder="e.g. VIP, Lead, Needs Follow-up"
               value={tagValue}
               onChange={(e) => setTagValue(e.target.value)}
-              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-wa-green/20 focus:border-wa-green transition-all shadow-sm placeholder:text-stone-400 font-medium"
+              className="ds-input"
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3">
+          <div className="border-t border-stone-100 pt-4 flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl text-sm font-bold text-stone-600 hover:bg-stone-100 transition-colors"
+              className="ds-btn ds-btn-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!tagValue.trim() || isSubmitting}
-              className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-wa-green hover:bg-wa-green-dark shadow-md shadow-wa-green/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="ds-btn ds-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? "Adding..." : "Add Tag"}
             </button>

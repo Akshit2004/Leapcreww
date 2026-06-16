@@ -62,7 +62,7 @@ export const CustomersTable: React.FC<CustomersTableProps> = ({
   if (contacts.length === 0) {
     const isZeroTotal = totalContacts === 0;
     return (
-      <div className="flex flex-col items-center justify-center h-64 bg-white border-stone-200 space-y-4 p-12 text-center">
+      <div className="flex flex-col items-center justify-center h-64 space-y-4 p-12 text-center">
         <User className="w-10 h-10 text-stone-300 mx-auto" />
         {isZeroTotal ? (
           <>
@@ -72,7 +72,7 @@ export const CustomersTable: React.FC<CustomersTableProps> = ({
             </div>
             <button
               onClick={() => dispatchQuickAction("customers")}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-stone-950 text-white text-xs font-bold uppercase tracking-wider hover:bg-stone-800 transition-colors cursor-pointer"
+              className="ds-btn ds-btn-primary"
             >
               <Plus className="w-3.5 h-3.5" />
               Add First Contact
@@ -89,7 +89,7 @@ export const CustomersTable: React.FC<CustomersTableProps> = ({
   }
 
   return (
-    <div className="bg-white border border-stone-200/60 rounded-2xl shadow-sm overflow-hidden animate-fade-in flex flex-col">
+    <div className="overflow-hidden animate-fade-in flex flex-col h-full">
       <div className="overflow-x-auto flex-1 custom-scrollbar">
         <table className="w-full text-left border-collapse min-w-[800px]">
           <thead>
@@ -233,15 +233,15 @@ export const CustomersTable: React.FC<CustomersTableProps> = ({
                   </td>
                   <td className="p-4">
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                      className={`ds-badge ${
                         contact.status === "Active"
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-stone-50 text-stone-600 border border-stone-200"
+                          ? "ds-badge-success"
+                          : "ds-badge-muted"
                       }`}
                     >
                       <span
                         className={`w-1.5 h-1.5 rounded-full ${
-                          contact.status === "Active" ? "bg-emerald-500" : "bg-stone-400"
+                          contact.status === "Active" ? "bg-green-600" : "bg-stone-400"
                         }`}
                       />
                       {contact.status}

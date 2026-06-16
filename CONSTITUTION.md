@@ -99,7 +99,23 @@ SKIP_ENV_VALIDATION=1 npx next build   # compiles, all routes generate
 - AI features (copilot, template auditor, ad/flow generation) MUST degrade gracefully when `GROQ_API_KEY` is absent — never crash a request path.
 - When building new AI features, default to the latest, most capable models and confirm provider/model details against current docs rather than memory.
 
-## Article VIII — Git & Commits
+## Article VIII — E2E Testing (Playwright)
+
+**Every new feature MUST ship with a Playwright spec covering its critical paths.**
+
+**MUST**
+- New features MUST add or extend a spec in `tests/e2e/` following the numbered file convention (e.g. `23-ai-workspace.spec.ts`).
+- The spec MUST cover: the happy path (create / use the feature end-to-end), key interactive controls (toggles, modals, tabs), and at least one error / empty-state path.
+- Tests that depend on Groq/AI MUST be gated with `requireAI()` (env var `E2E_RUN_AI=1`). Tests that depend on WhatsApp live numbers MUST be gated with `requireWhatsApp()`.
+- A change is **not done** until the relevant spec passes: `npx playwright test tests/e2e/<spec>` (with a running dev server at `E2E_BASE_URL`).
+- Flakey skips are acceptable (`test.skip`) when a precondition (org state, AI key) is unavailable — but the test must exist so it runs in CI.
+
+**MUST NOT**
+- No merging a feature that introduces a new tab or modal without a matching E2E spec.
+- No deleting or disabling an existing spec to "fix" a failing test — fix the feature or the fixture instead.
+- No assertions against raw Tailwind class names or internal implementation details — assert visible text, roles, and URLs.
+
+## Article IX — Git & Commits
 
 **MUST**
 - Branch off `main`; do not commit directly to `main` unless explicitly asked.
@@ -110,16 +126,17 @@ SKIP_ENV_VALIDATION=1 npx next build   # compiles, all routes generate
 - No committing build artifacts, `node_modules`, `.env`, or secrets.
 - No force-push to shared branches.
 
-## Article IX — UI Quality Bar
+## Article X — UI Quality Bar
 
 **MUST**
 - Honor the Swiss-editorial system: sharp borders (`rounded-none`), off-white surfaces (`bg-[#fafaf9]`), strict typography, the `wa-green` accent. Custom SVG and purposeful motion over generic SaaS components.
+- Toggle/tab active states MUST use `bg-wa-green text-white` — never `bg-stone-950` for an active/selected UI state.
 - Mobile-first: bottom nav, responsive tables/canvas, graceful degradation.
 
 **MUST NOT**
 - No generic "SaaS slop" (heavy drop shadows, soft rounded corners, default component-library look).
 
-## Article X — Amending the Constitution
+## Article XI — Amending the Constitution
 
 - This document may be changed, but a change to a rule MUST be a deliberate, explicit edit to this file with a one-line rationale — not silently bypassed in a feature PR.
 - When rules here conflict with `claude.md`, **this constitution wins**.
@@ -137,5 +154,6 @@ SKIP_ENV_VALIDATION=1 npx next build   # compiles, all routes generate
 [ ] Schema changes generated + docs §7 updated if applicable (Article V)
 [ ] Matches surrounding style; duplication consolidated; no dead code (Article VI)
 [ ] LLM calls go through shared/lib/groq and degrade gracefully (Article VII)
-[ ] UI honors the design system (Article IX)
+[ ] E2E spec added/updated for new feature; spec passes (Article VIII)
+[ ] UI honors the design system; active toggles use bg-wa-green (Article X)
 ```

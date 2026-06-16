@@ -16,6 +16,7 @@ export default defineConfig({
         "src/features/public-api/services/v1Service.ts",
         "src/features/recipes/services/recipeService.ts",
         "src/shared/lib/whatsapp.ts",
+        "src/shared/lib/parseSystemEventString.ts",
       ],
       reporter: ["text", "lcov"],
     },

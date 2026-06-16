@@ -23,6 +23,7 @@ import {
   Loader2,
   CheckCircle2,
   FilePlus2,
+  ChevronDown,
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { useParams, useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -503,52 +504,28 @@ export const CampaignsTab: React.FC = () => {
     return body;
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return (
-          <span className="text-[10px] font-bold text-stone-900 bg-stone-100 border border-stone-300 px-2.5 py-1 rounded-none flex items-center gap-1.5 self-start uppercase">
-            <CheckCircle className="w-3.5 h-3.5 text-stone-900" />
-            Completed
-          </span>
-        );
-      case "Sending":
-      case "Active":
-        return (
-          <span className="text-[10px] font-bold text-white bg-stone-950 border border-stone-950 px-2.5 py-1 rounded-none flex items-center gap-1.5 self-start uppercase">
-            <PlayCircle className="w-3.5 h-3.5 text-white" />
-            Sending
-          </span>
-        );
-      case "Scheduled":
-        return (
-          <span className="text-[10px] font-bold text-stone-600 bg-stone-50 border border-stone-200 px-2.5 py-1 rounded-none flex items-center gap-1.5 self-start uppercase">
-            <Calendar className="w-3.5 h-3.5 text-stone-500" />
-            Scheduled
-          </span>
-        );
-      case "PendingTemplate":
-        return (
-          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-none flex items-center gap-1.5 self-start uppercase">
-            <Clock className="w-3.5 h-3.5 text-amber-600" />
-            Awaiting Approval
-          </span>
-        );
-      case "Failed":
-        return (
-          <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-none flex items-center gap-1.5 self-start uppercase">
-            <AlertCircle className="w-3.5 h-3.5 text-red-600" />
-            Failed
-          </span>
-        );
-      default:
-        return (
-          <span className="text-[10px] font-bold text-stone-600 bg-stone-50 px-2.5 py-1 rounded-none border border-stone-200 flex items-center gap-1.5 self-start uppercase">
-            <Clock className="w-3.5 h-3.5 text-stone-500" />
-            {status}
-          </span>
-        );
-    }
+  const formatName = (name: string) =>
+    name.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+
+  const STATUS_CHIP_STYLE: Record<string, { cls: string; icon: React.ElementType }> = {
+    Completed:       { cls: "text-emerald-700 bg-emerald-50 border-emerald-200", icon: CheckCircle },
+    Sending:         { cls: "text-amber-700 bg-amber-50 border-amber-200",       icon: PlayCircle },
+    Active:          { cls: "text-amber-700 bg-amber-50 border-amber-200",       icon: PlayCircle },
+    Scheduled:       { cls: "text-blue-700 bg-blue-50 border-blue-200",          icon: Calendar },
+    PendingTemplate: { cls: "text-amber-700 bg-amber-50 border-amber-200",       icon: Clock },
+    Failed:          { cls: "text-red-700 bg-red-50 border-red-200",             icon: AlertCircle },
+  };
+
+  const getStatusChip = (status: string) => {
+    const cfg = STATUS_CHIP_STYLE[status] ?? { cls: "text-stone-500 bg-stone-100 border-stone-200", icon: Clock };
+    const Icon = cfg.icon;
+    const label = status === "PendingTemplate" ? "Awaiting Approval" : status === "Active" ? "Sending" : status;
+    return (
+      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 border rounded-full ${cfg.cls}`}>
+        <Icon className="w-3 h-3" />
+        {label}
+      </span>
+    );
   };
 
   // Find active selected campaign for report drawer
@@ -564,63 +541,49 @@ export const CampaignsTab: React.FC = () => {
   });
 
   return (
-    <div className={`flex-1 p-4 sm:p-8 custom-scrollbar space-y-6 sm:space-y-8 animate-slide-up bg-[#fafaf9] ${
-      isModalOpen ? "overflow-hidden" : "overflow-y-auto"
-    }`}>
+    <div className="flex-1 overflow-y-auto custom-scrollbar animate-slide-up bg-stone-100">
 
-      {/* Tab Header */}
-      <div className="flex max-sm:flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-6">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-stone-900 uppercase">Campaigns & Broadcasts</h2>
-          <p className="text-stone-500 text-xs mt-1">Broadcast WhatsApp bulk templates, track dynamic click metrics, and filter target leads.</p>
+      {/* ── Sticky header ─────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-4 sm:px-8">
+        <div className="flex items-center justify-between py-4 gap-3">
+          <div className="min-w-0">
+            <h2 className="text-xl font-black tracking-tight text-stone-900">Campaigns & Broadcasts</h2>
+            <p className="text-stone-500 text-xs mt-0.5">Broadcast WhatsApp templates · track delivery & click metrics</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => setIsStrategistOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 border border-stone-200 bg-white text-stone-700 hover:border-wa-green hover:text-wa-green rounded-lg transition-all cursor-pointer whitespace-nowrap">
+              <Sparkles className="w-3.5 h-3.5" />
+              AI Campaign Strategist
+            </button>
+            <button onClick={() => setIsModalOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 bg-wa-green hover:bg-wa-green-dark text-white rounded-lg transition-colors cursor-pointer whitespace-nowrap">
+              <Megaphone className="w-4 h-4" />
+              Launch Broadcast
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setIsStrategistOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2.5 rounded-none flex items-center gap-2 cursor-pointer border border-emerald-600 transition-all shadow-md shadow-emerald-600/10"
-          >
-            <Sparkles className="w-4 h-4" />
-            AI CAMPAIGN STRATEGIST
-          </button>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-stone-950 hover:bg-stone-900 text-white font-bold text-xs px-4 py-2.5 rounded-none flex items-center gap-2 cursor-pointer border border-stone-950 transition-all"
-          >
-            <Megaphone className="w-4 h-4" />
-            LAUNCH BROADCAST
-          </button>
-        </div>
-      </div>
-
-      {/* Filter Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 pb-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-stone-500 text-[10px] font-bold uppercase tracking-wider mr-2 flex items-center gap-1">
-            <Filter className="w-3.5 h-3.5 text-stone-400" />
-            Filter Status:
-          </span>
+        <div className="flex items-center gap-1.5 pb-3">
           {(["all", "Sending", "Completed", "Scheduled"] as const).map((status) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-none border transition-all cursor-pointer ${
+              className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
                 statusFilter === status
-                  ? "bg-stone-950 text-white border-stone-950"
-                  : "text-stone-500 border-transparent hover:bg-stone-100"
+                  ? "bg-wa-green text-white border-wa-green"
+                  : "text-stone-500 border-stone-300 hover:border-stone-500 bg-white"
               }`}
             >
-              {status === "all" ? "All Broadcasts" : status}
+              {status === "all" ? "All" : status}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Campaigns Listing Grid */}
-      <div className="space-y-6">
-        <h3 className="font-bold text-xs uppercase tracking-wider text-stone-900">Recent Broadcast Activity</h3>
+      {/* ── Content grid ─────────────────────────────────────────────────── */}
+      <div className="px-4 sm:px-8 py-6">
+        <h3 className="kc-label text-stone-500 mb-4">Recent Broadcast Activity</h3>
 
         {filteredCampaigns.length === 0 ? (
-          <div className="p-12 text-center rounded-none space-y-4 bg-white border border-stone-200">
+          <div className="p-12 text-center rounded-none space-y-4 bg-white border border-stone-200 kc-float">
             <Send className="w-10 h-10 text-stone-300 mx-auto" />
             {campaigns.length === 0 ? (
               <>
@@ -630,7 +593,7 @@ export const CampaignsTab: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-stone-950 text-white text-xs font-bold uppercase tracking-wider hover:bg-stone-800 transition-colors cursor-pointer"
+                  className="ds-btn ds-btn-primary ds-btn-sm"
                 >
                   <Send className="w-3.5 h-3.5" />
                   Create First Campaign
@@ -644,103 +607,103 @@ export const CampaignsTab: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCampaigns.map((camp) => {
               const delRate = camp.sent > 0 ? Math.round((camp.delivered / camp.sent) * 100) : 0;
               const readRate = camp.delivered > 0 ? Math.round((camp.read / camp.delivered) * 100) : 0;
               const clickRate = camp.read > 0 ? Math.round((camp.clicked / camp.read) * 100) : 0;
 
+              const accentColor =
+                camp.status === "Sending" || camp.status === "Active" ? "#059669" :
+                camp.status === "Completed" ? "#0891b2" :
+                camp.status === "Scheduled" ? "#d97706" : "#9ca3af";
+
               return (
-                <div key={camp.id} className="p-6 rounded-none flex flex-col justify-between space-y-6 bg-white border border-stone-200 relative overflow-hidden">
+                <div key={camp.id} className="bg-white border border-stone-200 flex flex-col overflow-hidden rounded-xl shadow-sm hover:shadow-md transition-shadow">
 
-                  {(camp.status === "Sending" || camp.status === "Active") && (
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-stone-950" />
-                  )}
+                  {/* Colored top accent bar — matches status */}
+                  <div className="h-1 shrink-0" style={{ background: accentColor }} />
 
-                  {/* Header Row */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1 flex-1">
-                      <h4 className="font-bold text-sm text-stone-900 leading-none">{camp.name}</h4>
-                      <span className="text-[10px] text-stone-500 block mt-1">Template: {camp.templateName}</span>
+                  {/* Card header — name + mono slug + delete */}
+                  <div className="px-5 pt-4 pb-3 flex items-start justify-between gap-3 border-b border-stone-100">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-black text-sm text-stone-900 leading-tight truncate">{formatName(camp.name)}</h4>
+                      <p className="text-[10px] text-stone-400 font-mono mt-0.5 truncate">{camp.name}</p>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {getStatusBadge(camp.status)}
-                      <button
-                        onClick={async () => {
-                          if (await confirm({
-                            title: "Delete this campaign?",
-                            description: "This permanently removes the campaign and its delivery logs. This can't be undone.",
-                            tone: "danger",
-                            confirmLabel: "Delete campaign",
-                          })) {
-                            await deleteCampaign(camp.id);
-                          }
-                        }}
-                        className="p-1.5 rounded-none text-stone-400 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer border border-transparent"
-                        title="Delete Campaign"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={async () => {
+                        if (await confirm({
+                          title: "Delete this campaign?",
+                          description: "This permanently removes the campaign and its delivery logs. This can't be undone.",
+                          tone: "danger",
+                          confirmLabel: "Delete campaign",
+                        })) {
+                          await deleteCampaign(camp.id);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer shrink-0"
+                      title="Delete Campaign"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
 
-                  {/* Audience Meta */}
-                  <div className="grid grid-cols-2 gap-4 bg-stone-50 p-3 rounded-none border border-stone-200 text-[11px] text-stone-500 font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5 text-stone-400" />
-                      <span>
-                        {camp.segment ? "Target Segment: " : "Target Tag: "}
-                        <strong className="text-stone-800">
-                          {camp.segment ? (camp.segment as any).name : camp.targetTag}
-                        </strong>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 justify-end">
-                      <TrendingUp className="w-3.5 h-3.5 text-stone-400" />
-                      <span>Fired: <strong className="text-stone-800">{camp.sent} recipients</strong></span>
-                    </div>
+                  {/* Chips row — status + audience + fired (mirrors template chips row) */}
+                  <div className="px-5 py-2.5 flex flex-wrap items-center gap-1.5 border-b border-stone-100">
+                    {getStatusChip(camp.status)}
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-stone-500 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-full">
+                      <Users className="w-3 h-3" />
+                      {camp.segment ? (camp.segment as any).name : camp.targetTag}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-stone-500 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-full">
+                      <TrendingUp className="w-3 h-3" />
+                      {camp.sent} fired
+                    </span>
+                    <span className="text-[10px] text-stone-400 font-mono ml-auto">
+                      {camp.templateName}
+                    </span>
                   </div>
 
-                  {/* Delivery Metrics Funnel */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-stone-500">Delivery Status ({delRate}%)</span>
-                      <span className="font-bold text-stone-800">{camp.delivered} / {camp.sent}</span>
+                  {/* Delivery funnel — compact */}
+                  <div className="px-5 py-3.5 flex-1">
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span className="text-stone-500 font-medium">Delivery Rate</span>
+                      <span className="font-black text-stone-800">{delRate}% <span className="font-normal text-stone-400">({camp.delivered}/{camp.sent})</span></span>
                     </div>
-                    <div className="h-1.5 w-full bg-stone-100 rounded-none overflow-hidden">
-                      <div className="h-full bg-stone-900 transition-all duration-500" style={{ width: `${delRate}%` }} />
+                    <div className="h-1 w-full bg-stone-100 rounded-full overflow-hidden mb-3">
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${delRate}%`, background: accentColor }} />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-3 pt-1">
-                      <div className="bg-stone-50 p-2.5 rounded-none border border-stone-200">
-                        <div className="text-[10px] text-stone-500 font-semibold uppercase">Read rate</div>
-                        <div className="text-xs font-bold text-stone-800 mt-0.5">{readRate}% <span className="text-[10px] text-stone-400 font-normal">({camp.read} read)</span></div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-stone-400">Read</span>
+                        <span className="text-[11px] font-black text-stone-700">{readRate}% <span className="text-[10px] text-stone-400 font-normal">({camp.read})</span></span>
                       </div>
-                      <div className="bg-stone-50 p-2.5 rounded-none border border-stone-200">
-                        <div className="text-[10px] text-stone-500 font-semibold uppercase">CTR rate</div>
-                        <div className="text-xs font-bold text-stone-800 mt-0.5">{clickRate}% <span className="text-[10px] text-stone-400 font-normal">({camp.clicked} clicked)</span></div>
+                      <div className="w-px h-3 bg-stone-200" />
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-stone-400">CTR</span>
+                        <span className="text-[11px] font-black text-stone-700">{clickRate}% <span className="text-[10px] text-stone-400 font-normal">({camp.clicked})</span></span>
                       </div>
                     </div>
                   </div>
 
                   {/* Footer */}
-                  <div className="border-t border-stone-200 pt-4 flex justify-between items-center gap-2">
+                  <div className="px-5 pb-3.5 pt-2.5 border-t border-stone-100 flex justify-between items-center gap-2">
                     <span className="text-[10px] text-stone-400 flex items-center gap-1 shrink-0">
                       <Calendar className="w-3 h-3" />
                       {camp.date}
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => {
                           setSelectedCampaignId(camp.id);
                           setReportInitialTab("setup");
                           setReportDrawerOpen(true);
                         }}
-                        className="text-[10px] font-bold text-stone-600 bg-white border border-stone-300 hover:bg-stone-100 px-3 py-1.5 rounded-none flex items-center gap-1 transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 border border-stone-200 bg-white text-stone-600 hover:border-wa-green hover:text-wa-green rounded-lg transition-all cursor-pointer whitespace-nowrap"
                         title="View read-only campaign setup"
                       >
-                        <Eye className="w-3.5 h-3.5" />
-                        View Setup
+                        <Eye className="w-3 h-3" />
+                        Setup
                       </button>
                       <button
                         onClick={() => {
@@ -748,11 +711,10 @@ export const CampaignsTab: React.FC = () => {
                           setReportInitialTab("analytics");
                           setReportDrawerOpen(true);
                         }}
-                        className="text-[10px] font-bold text-stone-900 bg-stone-100 border border-stone-300 hover:bg-stone-200 px-3 py-1.5 rounded-none flex items-center gap-1 transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 border border-stone-200 bg-white text-stone-600 hover:border-wa-green hover:text-wa-green rounded-lg transition-all cursor-pointer whitespace-nowrap"
                       >
-                        <BarChart4 className="w-3.5 h-3.5" />
-                        View Analytics
-                        <Maximize2 className="w-3 h-3 text-stone-500" />
+                        <BarChart4 className="w-3 h-3" />
+                        Analytics
                       </button>
                     </div>
                   </div>
@@ -762,24 +724,24 @@ export const CampaignsTab: React.FC = () => {
             })}
           </div>
         )}
-      </div>
+      </div>{/* end content grid */}
 
       {/* Launch Campaign Wizard Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-xl rounded-none flex flex-col overflow-hidden animate-slide-up bg-white border border-stone-300">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="w-full max-w-xl rounded-t-2xl sm:rounded-2xl flex flex-col overflow-hidden animate-slide-up bg-white shadow-2xl border border-stone-200">
 
             {/* Header */}
-            <div className="p-6 border-b border-stone-200 flex items-center justify-between shrink-0 bg-stone-50">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-stone-900 flex items-center gap-2">
-                <Megaphone className="w-5 h-5 text-stone-900" />
-                Launch New WhatsApp Broadcast
-              </h3>
+            <div className="px-6 py-5 border-b border-stone-100 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="font-black text-base text-stone-900 tracking-tight">Launch Broadcast</h3>
+                <p className="text-[11px] text-stone-400 mt-0.5">Configure and send a WhatsApp campaign</p>
+              </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-none hover:bg-stone-200 text-stone-500 transition-colors border border-transparent"
+                className="p-2 rounded-xl hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
@@ -788,26 +750,26 @@ export const CampaignsTab: React.FC = () => {
 
               {/* Campaign Name */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Campaign Name</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Campaign Name</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Black Friday discount drop"
                   value={campaignName}
                   onChange={(e) => setCampaignName(e.target.value)}
-                  className="w-full bg-white text-stone-900 placeholder:text-stone-400 border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900"
+                  className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-wa-green transition-colors"
                 />
               </div>
 
               {/* Broadcast Mode Toggle */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Broadcast Mode</label>
-                <div className="flex gap-2 bg-stone-50 p-1 rounded-none border border-stone-200">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Broadcast Mode</label>
+                <div className="flex gap-1.5 bg-stone-100 p-1 rounded-xl">
                   <button
                     type="button"
                     onClick={() => setBroadcastMode("template")}
-                    className={`flex-1 py-2 text-center text-[10px] font-bold rounded-none cursor-pointer transition-all ${
-                      broadcastMode === "template" ? "bg-stone-950 text-white" : "text-stone-500 hover:text-stone-900"
+                    className={`flex-1 py-2 text-center text-[11px] font-bold rounded-lg cursor-pointer transition-all ${
+                      broadcastMode === "template" ? "bg-wa-green text-white shadow-sm" : "text-stone-500 hover:text-stone-800"
                     }`}
                   >
                     Template Broadcast
@@ -815,102 +777,118 @@ export const CampaignsTab: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setBroadcastMode("session")}
-                    className={`flex-1 py-2 text-center text-[10px] font-bold rounded-none cursor-pointer transition-all ${
-                      broadcastMode === "session" ? "bg-stone-950 text-white" : "text-stone-500 hover:text-stone-900"
+                    className={`flex-1 py-2 text-center text-[11px] font-bold rounded-lg cursor-pointer transition-all ${
+                      broadcastMode === "session" ? "bg-wa-green text-white shadow-sm" : "text-stone-500 hover:text-stone-800"
                     }`}
                   >
-                    Free-Form Session (24h window)
+                    Free-Form (24h window)
                   </button>
                 </div>
                 {broadcastMode === "session" && (
-                  <div className="flex items-center gap-1.5 mt-1 text-[10px] text-stone-700 font-semibold bg-stone-50 px-2.5 py-1.5 rounded-none border border-stone-200">
-                    <span>No template needed — sends within 24h customer-initiated window.</span>
-                  </div>
+                  <p className="text-[11px] text-stone-500 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 mt-1">
+                    No template needed — sends within 24h customer-initiated window.
+                  </p>
                 )}
               </div>
 
-              {/* Tag Targeting */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600 flex justify-between">
-                  <span>Target Audience segment</span>
-                  <span className="text-[10px] text-stone-500 font-normal normal-case">Match: {targetAudienceSize} leads</span>
-                </label>
-                <select
-                  value={selectedSegmentId}
-                  onChange={(e) => setSelectedSegmentId(e.target.value)}
-                  className="w-full bg-white text-stone-900 border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
-                >
-                  <option value="all_contacts">All Contacts</option>
-                  {segments.map((seg) => (
-                    <option key={seg.id} value={seg.id}>{seg.name}</option>
-                  ))}
-                </select>
-                {targetAudienceSize === 0 && (
-                  <div className="text-[10px] text-stone-900 font-semibold flex items-center gap-1.5 mt-1 bg-stone-50 px-2.5 py-1.5 rounded-none border border-stone-300">
-                    <AlertCircle className="w-3.5 h-3.5 text-stone-900" />
-                    No active CRM contacts match this segment. Fired broadcasts will be sent to 0 users.
-                  </div>
-                )}
-              </div>
+              {/* Audience section */}
+              <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-3.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" /> Audience
+                </p>
 
-              {/* Exclude Tag Targeting */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 flex justify-between">
-                  <span>Exclude Audience segment</span>
-                </label>
-                <select
-                  value={excludeTag}
-                  onChange={(e) => setExcludeTag(e.target.value)}
-                  className="w-full bg-white text-stone-900 border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
-                >
-                  <option value="None">-- No Exclusion --</option>
-                  {allUniqueTags.map((tag) => (
-                    <option key={tag} value={tag}>{tag}</option>
-                  ))}
-                </select>
+                {/* Target Audience */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-stone-600">Target Segment</label>
+                    <span className="text-[10px] font-bold text-wa-green-dark bg-wa-green/10 border border-wa-green/20 px-2 py-0.5 rounded-full">
+                      {targetAudienceSize} leads matched
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={selectedSegmentId}
+                      onChange={(e) => setSelectedSegmentId(e.target.value)}
+                      className="w-full appearance-none bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 focus:outline-none focus:border-wa-green transition-colors cursor-pointer pr-9"
+                    >
+                      <option value="all_contacts">All Contacts</option>
+                      {segments.map((seg) => (
+                        <option key={seg.id} value={seg.id}>{seg.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                  {targetAudienceSize === 0 && (
+                    <div className="text-[11px] text-amber-700 font-semibold flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      No contacts match this segment — broadcast will fire to 0 users.
+                    </div>
+                  )}
+                </div>
+
+                {/* Exclude Audience */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-stone-600">Exclude Tag</label>
+                  <div className="relative">
+                    <select
+                      value={excludeTag}
+                      onChange={(e) => setExcludeTag(e.target.value)}
+                      className="w-full appearance-none bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 focus:outline-none focus:border-wa-green transition-colors cursor-pointer pr-9"
+                    >
+                      <option value="None">No exclusion</option>
+                      {allUniqueTags.map((tag) => (
+                        <option key={tag} value={tag}>{tag}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
               </div>
 
               {broadcastMode === "template" ? (
                 <>
-                  {/* Approved Templates list */}
+                  {/* Template selector */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 flex justify-between items-center">
-                      <span>Pre-approved message template</span>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Template</label>
                       <button
                         type="button"
                         onClick={() => setIsCreateTemplateOpen(true)}
-                        className="flex items-center gap-1 text-[10px] font-bold text-stone-900 hover:text-stone-600 transition-colors cursor-pointer normal-case tracking-normal"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-wa-green hover:text-wa-green-dark transition-colors cursor-pointer"
                       >
                         <FilePlus2 className="w-3.5 h-3.5" />
                         New Template
                       </button>
-                    </label>
+                    </div>
                     {templates.length === 0 ? (
                       <button
                         type="button"
                         onClick={() => setIsCreateTemplateOpen(true)}
-                        className="w-full border border-dashed border-stone-300 bg-white py-3 px-4 text-xs text-stone-500 hover:border-stone-900 hover:text-stone-900 transition-colors cursor-pointer flex items-center justify-center gap-1.5 rounded-none"
+                        className="w-full border-2 border-dashed border-stone-200 bg-stone-50 hover:border-wa-green hover:bg-wa-green/5 py-4 px-4 text-xs text-stone-400 hover:text-wa-green transition-colors cursor-pointer flex items-center justify-center gap-1.5 rounded-xl"
                       >
                         <FilePlus2 className="w-4 h-4" />
-                        No templates yet — create your first one
+                        No templates yet — create your first
                       </button>
                     ) : (
-                      <select
-                        value={templateName}
-                        onChange={(e) => setTemplateName(e.target.value)}
-                        className="w-full bg-white text-stone-900 border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
-                      >
-                        {templates.map((t) => (
-                          <option key={t.id} value={t.name}>{t.name} ({t.category})</option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <select
+                          value={templateName}
+                          onChange={(e) => setTemplateName(e.target.value)}
+                          className="w-full appearance-none bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 focus:outline-none focus:border-wa-green transition-colors cursor-pointer pr-9"
+                        >
+                          {templates.map((t) => (
+                            <option key={t.id} value={t.name}>{formatName(t.name)} ({t.category})</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
                     )}
                   </div>
 
                   {/* Dynamic Media Input */}
                   {activeTemplate && activeTemplate.mediaType && activeTemplate.mediaType !== "none" && (
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
                         {activeTemplate.mediaType} Media URL
                       </label>
                       <div className="flex gap-2 items-center">
@@ -919,7 +897,7 @@ export const CampaignsTab: React.FC = () => {
                           placeholder={`https://example.com/media.${activeTemplate.mediaType === 'image' ? 'jpg' : 'mp4'}`}
                           value={mediaUrl}
                           onChange={(e) => setMediaUrl(e.target.value)}
-                          className="flex-1 bg-white text-stone-900 placeholder:text-stone-400 border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-900"
+                          className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-wa-green transition-colors flex-1"
                         />
                         <UploadButton
                           endpoint="mediaUploader"
@@ -933,7 +911,7 @@ export const CampaignsTab: React.FC = () => {
                             notify.error("Upload failed", error.message);
                           }}
                           appearance={{
-                            button: "bg-stone-900 hover:bg-stone-850 text-white rounded-none text-xs font-bold px-3 py-2 cursor-pointer h-9 shrink-0 flex items-center justify-center border border-stone-900 transition-all",
+                            button: "bg-wa-green hover:bg-wa-green-dark text-white rounded-xl text-xs font-bold px-4 py-2.5 cursor-pointer shrink-0 flex items-center justify-center border-0 transition-all",
                             allowedContent: "hidden"
                           }}
                         />
@@ -941,76 +919,62 @@ export const CampaignsTab: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Dynamic Variables Mapping Form */}
+                  {/* Parameter Mappings */}
                   {activeTemplate && Object.keys(variablesMapping).length > 0 && (
-                    <div className="bg-stone-50 p-4 rounded-none border border-stone-200 space-y-4">
-                      <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 flex items-center gap-1.5">
-                        <Settings2 className="w-4 h-4 text-stone-900" />
-                        Template Parameter Mappings
+                    <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-3">
+                      <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 flex items-center gap-1.5">
+                        <Settings2 className="w-3.5 h-3.5" />
+                        Template Variables
                       </h5>
-
-                      <div className="space-y-3">
+                      <div className="space-y-2.5">
                         {Object.keys(variablesMapping).map((variable) => {
                           const current = variablesMapping[variable];
-
                           return (
-                            <div key={variable} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center bg-white p-3 rounded-none border border-stone-200">
-                              <div className="text-xs font-bold text-stone-600 flex items-center gap-1.5">
-                                <span className="bg-stone-100 text-stone-800 text-[10px] px-1.5 py-0.5 rounded-none border border-stone-300">
+                            <div key={variable} className="bg-white border border-stone-200 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-center">
+                              <div className="flex items-center gap-2">
+                                <span className="bg-stone-900 text-white text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
                                   {variable}
                                 </span>
-                                Parameter
                               </div>
-
-                              <div>
+                              <div className="relative">
                                 <select
                                   value={current.type}
                                   onChange={(e) => {
                                     const nextType = e.target.value as "contact_field" | "static";
                                     setVariablesMapping((prev) => ({
                                       ...prev,
-                                      [variable]: {
-                                        type: nextType,
-                                        value: nextType === "contact_field" ? "name" : ""
-                                      }
+                                      [variable]: { type: nextType, value: nextType === "contact_field" ? "name" : "" }
                                     }));
                                   }}
-                                  className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none"
+                                  className="w-full appearance-none bg-stone-50 border border-stone-200 rounded-lg px-3 py-1.5 text-[11px] text-stone-800 focus:outline-none focus:border-wa-green cursor-pointer pr-7"
                                 >
-                                  <option value="contact_field">CRM Contact Field</option>
-                                  <option value="static">Static Custom Text</option>
+                                  <option value="contact_field">CRM Field</option>
+                                  <option value="static">Custom Text</option>
                                 </select>
+                                <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                               </div>
-
-                              <div>
+                              <div className="relative">
                                 {current.type === "contact_field" ? (
-                                  <select
-                                    value={current.value}
-                                    onChange={(e) => {
-                                      setVariablesMapping((prev) => ({
-                                        ...prev,
-                                        [variable]: { type: "contact_field", value: e.target.value }
-                                      }));
-                                    }}
-                                    className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none"
-                                  >
-                                    <option value="name">Contact Name (name)</option>
-                                    <option value="email">Contact Email (email)</option>
-                                    <option value="phone">Contact Phone (phone)</option>
-                                  </select>
+                                  <>
+                                    <select
+                                      value={current.value}
+                                      onChange={(e) => setVariablesMapping((prev) => ({ ...prev, [variable]: { type: "contact_field", value: e.target.value } }))}
+                                      className="w-full appearance-none bg-stone-50 border border-stone-200 rounded-lg px-3 py-1.5 text-[11px] text-stone-800 focus:outline-none focus:border-wa-green cursor-pointer pr-7"
+                                    >
+                                      <option value="name">Contact Name</option>
+                                      <option value="email">Email</option>
+                                      <option value="phone">Phone</option>
+                                    </select>
+                                    <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                  </>
                                 ) : (
                                   <input
                                     type="text"
-                                    placeholder="Enter custom text..."
+                                    placeholder="Custom value…"
                                     required
                                     value={current.value}
-                                    onChange={(e) => {
-                                      setVariablesMapping((prev) => ({
-                                        ...prev,
-                                        [variable]: { type: "static", value: e.target.value }
-                                      }));
-                                    }}
-                                    className="w-full bg-white text-stone-900 placeholder:text-stone-400 border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none"
+                                    onChange={(e) => setVariablesMapping((prev) => ({ ...prev, [variable]: { type: "static", value: e.target.value } }))}
+                                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-1.5 text-[11px] text-stone-800 placeholder:text-stone-400 focus:outline-none focus:border-wa-green"
                                   />
                                 )}
                               </div>
@@ -1021,31 +985,30 @@ export const CampaignsTab: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Template Body Live Preview */}
+                  {/* Live Preview */}
                   {activeTemplate && (
-                    <div className="bg-stone-50 p-4 rounded-none border border-stone-200 space-y-3">
-                      <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-600 flex items-center gap-1.5">
-                        <Eye className="w-3.5 h-3.5 text-stone-600" />
-                        Interactive Mapped Preview
-                      </h5>
-                      <div className="bg-white border border-stone-200 rounded-none p-3.5 text-xs text-stone-700 leading-relaxed max-w-[95%]">
-                        {activeTemplate.mediaType && activeTemplate.mediaType !== "none" && (
-                          <div className="mb-2 px-2.5 py-1 rounded-none bg-stone-100 text-[10px] text-stone-800 font-bold uppercase inline-flex items-center gap-1.5 select-none leading-none border border-stone-300">
-                            <span>{activeTemplate.mediaType} Media Header</span>
-                          </div>
-                        )}
-                        <p className="whitespace-pre-wrap select-none font-medium">
-                          {compileLivePreview()}
-                        </p>
-                        {activeTemplate.buttons && activeTemplate.buttons.length > 0 && (
-                          <div className="mt-3.5 border-t border-stone-200 pt-2.5 space-y-1 text-center font-bold text-stone-900">
-                            {activeTemplate.buttons.map((btn, idx) => (
-                              <div key={idx} className="py-1 bg-stone-50 rounded-none border border-stone-300 text-[11px] mb-1">
-                                {btn}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400 flex items-center gap-1.5">
+                        <Eye className="w-3.5 h-3.5" /> Live Preview
+                      </label>
+                      <div className="bg-[#e5ddd5] rounded-xl p-4">
+                        <div className="bg-[#dcf8c6] rounded-xl rounded-tl-sm p-3.5 text-xs text-stone-800 leading-relaxed shadow-sm max-w-[90%]">
+                          {activeTemplate.mediaType && activeTemplate.mediaType !== "none" && (
+                            <div className="mb-2 inline-flex items-center gap-1 bg-white/60 text-stone-600 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border border-stone-200/50">
+                              {activeTemplate.mediaType} header
+                            </div>
+                          )}
+                          <p className="whitespace-pre-wrap font-medium">{compileLivePreview()}</p>
+                          {activeTemplate.buttons && activeTemplate.buttons.length > 0 && (
+                            <div className="mt-3 pt-2.5 border-t border-stone-300/40 flex flex-wrap gap-1.5">
+                              {activeTemplate.buttons.map((btn, idx) => (
+                                <span key={idx} className="text-[11px] font-semibold border border-[#53bdeb] text-[#0a7abf] bg-white px-3 py-1 rounded-full">
+                                  {btn}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1054,39 +1017,37 @@ export const CampaignsTab: React.FC = () => {
                 <>
                   {/* Session Broadcast Text */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Free-Form Message</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Free-Form Message</label>
                     <textarea
                       required
                       rows={5}
-                      placeholder="Write your message here — no template needed. Only contacts active in the last 24 hours will receive it."
+                      placeholder="Write your message — no template needed. Only contacts active in the last 24h will receive it."
                       value={sessionText}
                       onChange={(e) => setSessionText(e.target.value)}
-                      className="w-full bg-white text-stone-900 placeholder:text-stone-400 border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900 resize-none"
+                      className="w-full bg-white border border-stone-200 rounded-xl py-2.5 px-3.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-wa-green resize-none transition-colors"
                     />
-                    <div className="flex items-start gap-2 bg-stone-50 border border-stone-200 rounded-none p-3 text-[10px] text-stone-700 leading-relaxed font-semibold">
-                      <span>📱 Only contacts who messaged in the last 24h will receive this. No Meta template approval needed.</span>
-                    </div>
+                    <p className="text-[11px] text-stone-500 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2">
+                      Only contacts who messaged in the last 24h will receive this. No Meta approval needed.
+                    </p>
                   </div>
                 </>
               )}
 
-              {/* Scheduling and Delay Controls */}
-              <div className="border border-stone-200 rounded-none p-4 bg-stone-50 space-y-4">
-                <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 flex items-center gap-1.5 border-b border-stone-200 pb-2">
-                  <Sliders className="w-4 h-4 text-stone-900" />
-                  Advanced Delivery Controls
-                </h5>
+              {/* Delivery Controls */}
+              <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5" /> Delivery
+                </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Immediate vs Scheduled Run Mode */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase text-stone-600">Launch Timeline</label>
-                    <div className="flex gap-2 bg-white p-1 rounded-none border border-stone-200">
+                    <label className="text-[11px] font-semibold text-stone-600">Send timing</label>
+                    <div className="flex gap-1.5 bg-white p-1 rounded-xl border border-stone-200">
                       <button
                         type="button"
                         onClick={() => setRunMode("immediate")}
-                        className={`flex-1 py-1.5 text-center text-[10px] font-bold rounded-none cursor-pointer transition-all ${
-                          runMode === "immediate" ? "bg-stone-950 text-white" : "text-stone-500 hover:text-stone-900"
+                        className={`flex-1 py-1.5 text-center text-[11px] font-bold rounded-lg cursor-pointer transition-all ${
+                          runMode === "immediate" ? "bg-wa-green text-white shadow-sm" : "text-stone-500 hover:text-stone-800"
                         }`}
                       >
                         Send Now
@@ -1094,21 +1055,20 @@ export const CampaignsTab: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setRunMode("scheduled")}
-                        className={`flex-1 py-1.5 text-center text-[10px] font-bold rounded-none cursor-pointer transition-all ${
-                          runMode === "scheduled" ? "bg-stone-950 text-white" : "text-stone-500 hover:text-stone-900"
+                        className={`flex-1 py-1.5 text-center text-[11px] font-bold rounded-lg cursor-pointer transition-all ${
+                          runMode === "scheduled" ? "bg-wa-green text-white shadow-sm" : "text-stone-500 hover:text-stone-800"
                         }`}
                       >
-                        Schedule Later
+                        Schedule
                       </button>
                     </div>
                   </div>
 
-                  {/* Delay Spacing Parameter */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase text-stone-600 flex justify-between">
-                      <span>Anti-Spam Spacing Delay</span>
-                      <span className="text-stone-900 font-bold">{sendDelay}s / msg</span>
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-semibold text-stone-600">Anti-spam delay</label>
+                      <span className="text-[11px] font-black text-wa-green-dark">{sendDelay}s / msg</span>
+                    </div>
                     <input
                       type="range"
                       min="0.5"
@@ -1116,32 +1076,31 @@ export const CampaignsTab: React.FC = () => {
                       step="0.5"
                       value={sendDelay}
                       onChange={(e) => setSendDelay(parseFloat(e.target.value))}
-                      className="w-full h-1.5 bg-stone-200 rounded-none appearance-none cursor-pointer accent-stone-950"
+                      className="w-full h-1.5 bg-stone-200 rounded-full appearance-none cursor-pointer accent-wa-green mt-3"
                     />
                   </div>
                 </div>
 
-                {/* Conditional Scheduled inputs */}
                 {runMode === "scheduled" && (
-                  <div className="grid grid-cols-2 gap-3 pt-2 animate-slide-up">
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold uppercase text-stone-600">Target Date</label>
+                  <div className="grid grid-cols-2 gap-3 pt-1 animate-slide-up">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-stone-600">Date</label>
                       <input
                         type="date"
                         required
                         value={scheduledDate}
                         onChange={(e) => setScheduledDate(e.target.value)}
-                        className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-2 text-xs focus:outline-none focus:border-stone-900"
+                        className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-stone-900 focus:outline-none focus:border-wa-green transition-colors"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold uppercase text-stone-600">Target Time</label>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-stone-600">Time</label>
                       <input
                         type="time"
                         required
                         value={scheduledTime}
                         onChange={(e) => setScheduledTime(e.target.value)}
-                        className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-2 text-xs focus:outline-none focus:border-stone-900"
+                        className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-stone-900 focus:outline-none focus:border-wa-green transition-colors"
                       />
                     </div>
                   </div>
@@ -1159,21 +1118,21 @@ export const CampaignsTab: React.FC = () => {
               )}
 
               {/* Footer CTA */}
-              <div className="flex justify-end gap-2.5 pt-4 border-t border-stone-200">
+              <div className="flex justify-end gap-2.5 pt-2 border-t border-stone-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-300"
+                  className="inline-flex items-center gap-1.5 text-sm font-bold px-4 py-2.5 border border-stone-200 bg-white text-stone-700 hover:border-stone-300 rounded-xl transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={targetAudienceSize === 0 || !campaignName.trim()}
-                  className="px-4 py-2 bg-stone-950 hover:bg-stone-900 border border-stone-950 disabled:opacity-40 disabled:hover:bg-stone-950 text-white font-bold text-xs rounded-none cursor-pointer flex items-center gap-1.5 transition-all"
+                  className="inline-flex items-center gap-1.5 text-sm font-bold px-5 py-2.5 bg-wa-green hover:bg-wa-green-dark text-white rounded-xl transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  {runMode === "scheduled" ? "SCHEDULE BROADCAST TRIGGER" : "LAUNCH LIVE BROADCAST"}
+                  <Send className="w-4 h-4" />
+                  {runMode === "scheduled" ? "Schedule Broadcast" : "Launch Broadcast"}
                 </button>
               </div>
             </form>
@@ -1197,15 +1156,18 @@ export const CampaignsTab: React.FC = () => {
 
       {/* AI Campaign Strategist Modal */}
       {isStrategistOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl rounded-none flex flex-col overflow-hidden bg-white border border-stone-300 shadow-2xl h-[90vh]">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="w-full max-w-2xl rounded-t-2xl sm:rounded-2xl flex flex-col overflow-hidden bg-white border border-stone-200 shadow-2xl h-[92vh] sm:h-[90vh] animate-slide-up">
             {/* Header */}
-            <div className="p-6 border-b border-stone-200 flex items-center justify-between shrink-0 bg-[#fafaf9]">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-emerald-600 animate-pulse" />
-                <h3 className="font-bold text-xs uppercase tracking-wider text-stone-950">
-                  AI Campaign Strategist & Copywriter
-                </h3>
+            <div className="px-6 py-5 border-b border-stone-100 flex items-start justify-between shrink-0">
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <div className="w-7 h-7 rounded-lg bg-wa-green/10 flex items-center justify-center">
+                    <Sparkles className="w-3.5 h-3.5 text-wa-green" />
+                  </div>
+                  <h3 className="text-base font-black text-stone-900">AI Campaign Strategist</h3>
+                </div>
+                <p className="text-xs text-stone-500 mt-1">Generate a complete campaign — template, audience, schedule & drip sequence</p>
               </div>
               <button
                 onClick={() => {
@@ -1219,7 +1181,7 @@ export const CampaignsTab: React.FC = () => {
                   setShowTemplatePicker(false);
                   setStrategistError("");
                 }}
-                className="p-1 rounded-none hover:bg-stone-200 text-stone-500 transition-colors border border-transparent cursor-pointer"
+                className="p-2 rounded-xl hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1229,100 +1191,97 @@ export const CampaignsTab: React.FC = () => {
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
 
               {strategistResult ? (
-                /* Result Screen — shown after apply succeeds */
-                <div className="max-w-2xl mx-auto py-6 space-y-6">
+                /* Result Screen */
+                <div className="max-w-xl mx-auto py-6 space-y-5">
                   {/* Hero */}
-                  <div className="text-center space-y-3 pb-6 border-b border-stone-100">
-                    <div className="w-16 h-16 bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center mx-auto">
-                      <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                  <div className="text-center space-y-2 pb-5 border-b border-stone-100">
+                    <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-center mx-auto">
+                      <CheckCircle2 className="w-7 h-7 text-emerald-600" />
                     </div>
-                    <div>
-                      <h3 className="text-2xl font-black text-stone-950 tracking-tight">Campaign Built</h3>
-                      <p className="text-sm text-stone-500 mt-1.5 leading-relaxed">
-                        {strategistResult.templateApproved
-                          ? "Your campaign is live. Contacts have been enrolled and will receive the broadcast."
-                          : "Strategy saved. The campaign will launch automatically once Meta approves the template."}
-                      </p>
-                    </div>
+                    <h3 className="text-xl font-black text-stone-900 tracking-tight">Campaign Built!</h3>
+                    <p className="text-sm text-stone-500 leading-relaxed max-w-xs mx-auto">
+                      {strategistResult.templateApproved
+                        ? "Your campaign is live. Contacts have been enrolled and will receive the broadcast."
+                        : "Strategy saved. The campaign will launch automatically once Meta approves the template."}
+                    </p>
                   </div>
 
-                  {/* 4 stat cards */}
+                  {/* Stat cards */}
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
-                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Template</div>
-                      <div className="font-black text-stone-950 text-sm leading-snug break-words">{strategistResult.templateName}</div>
-                      <div className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 ${strategistResult.templateApproved ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-amber-100 text-amber-700 border border-amber-200"}`}>
+                    <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-2">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Template</div>
+                      <div className="font-black text-stone-900 text-sm leading-snug break-words">{strategistResult.templateName}</div>
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${strategistResult.templateApproved ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
                         {strategistResult.templateApproved ? "Approved & Live" : "Pending Meta Review"}
-                      </div>
+                      </span>
                     </div>
 
-                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
-                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">
+                    <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-1">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
                         {strategistResult.templateApproved ? "Enrolled" : "Queued"}
                       </div>
-                      <div className="text-3xl font-black text-stone-950">{strategistResult.enrolledCount.toLocaleString()}</div>
+                      <div className="text-3xl font-black text-stone-900">{strategistResult.enrolledCount.toLocaleString()}</div>
                       <div className="text-xs text-stone-500">contacts</div>
                     </div>
 
-                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
-                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Broadcast Time</div>
-                      <div className="font-bold text-stone-950 text-sm">
+                    <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-1">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Broadcast Time</div>
+                      <div className="font-bold text-stone-900 text-sm">
                         {strategistResult.scheduledAt
                           ? new Date(strategistResult.scheduledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
                           : "Immediate"}
                       </div>
                     </div>
 
-                    <div className="bg-stone-50 border border-stone-200 p-4 space-y-2">
-                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Follow-Up Drip</div>
-                      <div className="text-3xl font-black text-stone-950">{strategistResult.steps.length}</div>
+                    <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-1">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Follow-Up Drip</div>
+                      <div className="text-3xl font-black text-stone-900">{strategistResult.steps.length}</div>
                       <div className="text-xs text-stone-500">automated steps</div>
                     </div>
                   </div>
 
-                  {/* Message body preview */}
-                  <div className="bg-stone-950 p-5 space-y-2">
-                    <div className="text-[9px] font-black uppercase tracking-wider text-stone-500">Message Preview</div>
-                    <p className="text-sm leading-relaxed text-stone-100 whitespace-pre-wrap">{strategistResult.templateBody}</p>
+                  {/* Message preview */}
+                  <div className="bg-[#e5ddd5] rounded-xl p-4 space-y-2">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Message Preview</div>
+                    <div className="bg-[#dcf8c6] rounded-xl rounded-tl-sm p-3.5 shadow-sm">
+                      <p className="text-sm leading-relaxed text-stone-800 whitespace-pre-wrap">{strategistResult.templateBody}</p>
+                    </div>
                   </div>
 
-                  {/* Drip sequence timeline */}
+                  {/* Drip timeline */}
                   {strategistResult.steps.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="text-[9px] font-black uppercase tracking-wider text-stone-400">Drip Sequence</div>
-                      <div className="space-y-2">
-                        {strategistResult.steps.map((step, i) => (
-                          <div key={i} className="flex gap-3 items-start">
-                            <div className="w-5 h-5 bg-stone-950 text-white text-[9px] font-black flex items-center justify-center shrink-0 mt-0.5">
-                              {i + 1}
-                            </div>
-                            <div className="flex-1 bg-stone-50 border border-stone-100 p-3">
-                              <div className="text-[10px] font-bold text-stone-400 mb-1">
-                                {step.delayMinutes === 0
-                                  ? "Immediate"
-                                  : step.delayMinutes < 60
-                                  ? `After ${step.delayMinutes} min`
-                                  : `After ${Math.round(step.delayMinutes / 60)}h`}
-                              </div>
-                              <p className="text-xs text-stone-700 leading-snug">
-                                {step.message.length > 140 ? step.message.slice(0, 140) + "…" : step.message}
-                              </p>
-                            </div>
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Drip Sequence</div>
+                      {strategistResult.steps.map((step, i) => (
+                        <div key={i} className="flex gap-3 items-start">
+                          <div className="w-6 h-6 bg-wa-green text-white text-[10px] font-black rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                            {i + 1}
                           </div>
-                        ))}
-                      </div>
+                          <div className="flex-1 bg-stone-50 border border-stone-200 rounded-xl p-3">
+                            <div className="text-[10px] font-bold text-stone-400 mb-1">
+                              {step.delayMinutes === 0 ? "Immediate" : step.delayMinutes < 60 ? `After ${step.delayMinutes} min` : `After ${Math.round(step.delayMinutes / 60)}h`}
+                            </div>
+                            <p className="text-xs text-stone-700 leading-snug">
+                              {step.message.length > 140 ? step.message.slice(0, 140) + "…" : step.message}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
               ) : !strategistStrategy ? (
                 /* Prompt State */
-                <div className="max-w-xl mx-auto py-12 space-y-6 text-center">
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-light text-stone-950 uppercase tracking-wide">
-                      What are you selling / promoting?
+                <div className="max-w-xl mx-auto py-10 space-y-6">
+                  <div className="text-center space-y-2">
+                    <div className="w-14 h-14 rounded-2xl bg-wa-green/10 flex items-center justify-center mx-auto mb-4">
+                      <Sparkles className="w-7 h-7 text-wa-green" />
+                    </div>
+                    <h4 className="text-xl font-black text-stone-900 tracking-tight">
+                      What are you selling or promoting?
                     </h4>
-                    <p className="text-xs text-stone-500">
-                      LeapCreww AI will draft a complete marketing template, target segment, broadcast schedule, and a 3-step follow-up drip sequence.
+                    <p className="text-sm text-stone-500 leading-relaxed max-w-sm mx-auto">
+                      Describe your goal and the AI will generate a complete campaign — template, audience, schedule, and drip sequence.
                     </p>
                   </div>
 
@@ -1331,12 +1290,12 @@ export const CampaignsTab: React.FC = () => {
                       placeholder="e.g. It's Diwali, I sell handwoven Banarasi sarees. Give a 15% discount code DIWALI15 to past buyers."
                       value={strategistPrompt}
                       onChange={(e) => setStrategistPrompt(e.target.value)}
-                      className="w-full bg-[#fafaf9] border border-stone-200 rounded-none p-4 text-xs font-semibold focus:outline-none focus:border-stone-950 resize-none min-h-[120px] text-stone-850 placeholder:text-stone-400 focus:bg-white transition-all shadow-inner"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-xl p-4 text-sm focus:outline-none focus:border-wa-green resize-none min-h-[120px] text-stone-800 placeholder:text-stone-400 focus:bg-white transition-all"
                       disabled={isGeneratingStrategy}
                     />
 
                     {strategistError && (
-                      <div className="p-4 bg-red-50 text-red-600 rounded-none text-xs border border-red-150 font-semibold text-left">
+                      <div className="p-4 bg-red-50 text-red-600 rounded-xl text-xs border border-red-200 font-semibold text-left">
                         {strategistError}
                       </div>
                     )}
@@ -1345,17 +1304,17 @@ export const CampaignsTab: React.FC = () => {
                       type="button"
                       disabled={isGeneratingStrategy || !strategistPrompt.trim()}
                       onClick={() => handleGenerateStrategy(strategistPrompt)}
-                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold text-xs rounded-none cursor-pointer flex items-center justify-center gap-2 border border-emerald-600 transition-all shadow-md shadow-emerald-600/20"
+                      className="w-full py-3 bg-wa-green hover:bg-wa-green-dark text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {isGeneratingStrategy ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          <Loader2 className="w-4 h-4 animate-spin" />
                           <span>{loadingStepText}</span>
                         </>
                       ) : (
                         <>
                           <Sparkles className="w-4 h-4" />
-                          <span>GENERATE CAMPAIGN STRATEGY</span>
+                          <span>Generate Campaign Strategy</span>
                         </>
                       )}
                     </button>
@@ -1386,10 +1345,10 @@ export const CampaignsTab: React.FC = () => {
 
                   {/* WA not connected */}
                   {!organization?.whatsappConnected && (
-                    <div className="ml-12 bg-red-50 border border-red-200 px-4 py-2.5 flex items-center justify-between gap-3">
+                    <div className="ml-12 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3">
                       <p className="text-[11px] text-red-700 font-bold">WhatsApp not connected — required to broadcast.</p>
                       <button type="button" onClick={launchEmbeddedSignup} disabled={connectingWaba}
-                        className="bg-[#1877F2] text-white font-bold text-[10px] px-3 py-1.5 flex items-center gap-1 cursor-pointer shrink-0 disabled:opacity-50">
+                        className="bg-[#1877F2] text-white font-bold text-[10px] px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer shrink-0 disabled:opacity-50">
                         {connectingWaba ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Connect
                       </button>
                     </div>
@@ -1414,7 +1373,7 @@ export const CampaignsTab: React.FC = () => {
                       )}
 
                       {showTemplatePicker && (
-                        <div className="border border-stone-200 bg-white max-h-40 overflow-y-auto divide-y divide-stone-100">
+                        <div className="border border-stone-200 bg-white rounded-xl max-h-40 overflow-y-auto divide-y divide-stone-100">
                           {templates.filter(t => t.metaStatus === "approved").map(t => (
                             <button key={t.name} type="button"
                               onClick={() => { setStrategistStrategy({ ...strategistStrategy, template: { ...strategistStrategy.template, name: t.name, body: t.body, buttons: t.buttons || [] } }); setShowTemplatePicker(false); }}
@@ -1428,8 +1387,7 @@ export const CampaignsTab: React.FC = () => {
                       {/* WhatsApp message preview card */}
                       <div
                         onClick={() => setChatEditSection(s => s === "template" ? null : "template")}
-                        className="bg-white border border-stone-200 overflow-hidden shadow-sm cursor-pointer hover:border-stone-400 transition-colors"
-                        style={{borderRadius: 12}}>
+                        className="bg-white border border-stone-200 overflow-hidden shadow-sm cursor-pointer hover:border-stone-400 transition-colors rounded-xl">
                         {/* Phone-style header */}
                         <div className="bg-[#075E54] px-4 py-2.5 flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-emerald-400 flex items-center justify-center text-white text-[10px] font-black">LC</div>
@@ -1449,7 +1407,7 @@ export const CampaignsTab: React.FC = () => {
                               />
                               <textarea rows={4} value={strategistStrategy.template.body}
                                 onChange={(e) => setStrategistStrategy({ ...strategistStrategy, template: { ...strategistStrategy.template, body: e.target.value } })}
-                                className="w-full bg-white/80 text-sm font-medium leading-relaxed text-stone-800 p-2 focus:outline-none resize-none border border-stone-200"
+                                className="w-full bg-white/80 text-sm font-medium leading-relaxed text-stone-800 p-2 focus:outline-none resize-none border border-stone-200 rounded-lg"
                               />
                             </div>
                           ) : (
@@ -1499,8 +1457,7 @@ export const CampaignsTab: React.FC = () => {
                     <div className="w-9 shrink-0" />
                     <div
                       onClick={() => setChatEditSection(s => s === "audience" ? null : "audience")}
-                      className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden cursor-pointer hover:border-stone-400 transition-colors"
-                      style={{borderRadius: 12}}>
+                      className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden cursor-pointer hover:border-stone-400 transition-colors rounded-xl">
                       <div className="px-4 py-3 space-y-2">
                         {chatEditSection === "audience" ? (
                           <div className="space-y-2" onClick={e => e.stopPropagation()}>
@@ -1525,7 +1482,7 @@ export const CampaignsTab: React.FC = () => {
                             <p className="font-black text-sm text-stone-950">{strategistStrategy.segment.name}</p>
                             <div className="flex flex-wrap gap-1.5">
                               {strategistStrategy.segment.rules.all?.map((rule: any, rIdx: number) => (
-                                <span key={rIdx} className="bg-stone-100 border border-stone-200 px-2 py-0.5 text-[10px] font-bold text-stone-600">
+                                <span key={rIdx} className="bg-stone-100 border border-stone-200 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-stone-600">
                                   {rule.field} = <strong className="text-stone-900">{rule.value}</strong>
                                 </span>
                               ))}
@@ -1556,8 +1513,7 @@ export const CampaignsTab: React.FC = () => {
                     <div className="w-9 shrink-0" />
                     <div
                       onClick={() => setChatEditSection(s => s === "schedule" ? null : "schedule")}
-                      className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden cursor-pointer hover:border-stone-400 transition-colors"
-                      style={{borderRadius: 12}}>
+                      className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden cursor-pointer hover:border-stone-400 transition-colors rounded-xl">
                       <div className="px-4 py-3 space-y-2">
                         {chatEditSection === "schedule" ? (
                           <div className="space-y-2" onClick={e => e.stopPropagation()}>
@@ -1604,7 +1560,7 @@ export const CampaignsTab: React.FC = () => {
                   {/* ── DRIP SEQUENCE ── */}
                   <div className="flex gap-3 items-end">
                     <div className="w-9 shrink-0" />
-                    <div className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden" style={{borderRadius: 12}}>
+                    <div className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden rounded-xl">
                       <div className="px-4 py-3 flex items-center justify-between">
                         <div>
                           <p className="text-[11px] font-black text-stone-950">Follow-up Drip</p>
@@ -1626,13 +1582,13 @@ export const CampaignsTab: React.FC = () => {
                         <div className="border-t border-stone-100 px-4 py-3 space-y-2 bg-stone-50">
                           {strategistStrategy.sequence.steps.map((step: any, sIdx: number) => (
                             <div key={sIdx} className="flex gap-2 items-start">
-                              <span className="bg-stone-950 text-white text-[9px] font-black px-2 py-0.5 shrink-0 mt-0.5">
+                              <span className="bg-stone-900 text-white text-[9px] font-black px-2 py-0.5 rounded-full shrink-0 mt-0.5">
                                 {step.delayMinutes === 0 ? "Now" : step.delayMinutes < 60 ? `+${step.delayMinutes}m` : `+${Math.round(step.delayMinutes / 60)}h`}
                               </span>
                               {chatEditSection === "sequence" ? (
                                 <textarea rows={2} value={step.message}
                                   onChange={(e) => { const ns = [...strategistStrategy.sequence.steps]; ns[sIdx].message = e.target.value; setStrategistStrategy({ ...strategistStrategy, sequence: { ...strategistStrategy.sequence, steps: ns } }); }}
-                                  className="flex-1 bg-white border border-stone-200 p-2 text-[11px] font-medium text-stone-700 focus:outline-none focus:border-stone-950 resize-none"
+                                  className="flex-1 bg-white border border-stone-200 rounded-lg p-2 text-[11px] font-medium text-stone-700 focus:outline-none focus:border-wa-green resize-none"
                                 />
                               ) : (
                                 <p className="flex-1 text-[11px] text-stone-600 font-medium leading-snug">{step.message.length > 100 ? step.message.slice(0, 100) + "…" : step.message}</p>
@@ -1647,7 +1603,7 @@ export const CampaignsTab: React.FC = () => {
                   {/* ── LEAD QUALIFIER ── */}
                   <div className="flex gap-3 items-end">
                     <div className="w-9 shrink-0" />
-                    <div className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden" style={{borderRadius: 12}}>
+                    <div className="flex-1 bg-white border border-stone-200 shadow-sm overflow-hidden rounded-xl">
                       <div className="px-4 py-3 flex items-center justify-between">
                         <div>
                           <p className="text-[11px] font-black text-stone-950">Lead Qualifier</p>
@@ -1678,7 +1634,7 @@ export const CampaignsTab: React.FC = () => {
                         <div className="border-t border-stone-100 px-4 py-3 flex items-center justify-between bg-stone-50">
                           <span className="text-[10px] text-stone-400">Could not auto-generate</span>
                           <button type="button" onClick={generateQualifier}
-                            className="flex items-center gap-1 text-[10px] font-black bg-stone-950 text-white px-3 py-1.5 cursor-pointer hover:bg-stone-800">
+                            className="flex items-center gap-1 text-[10px] font-black bg-wa-green hover:bg-wa-green-dark text-white px-3 py-1.5 rounded-lg cursor-pointer">
                             <Sparkles className="w-3 h-3" /> Generate
                           </button>
                         </div>
@@ -1747,7 +1703,7 @@ export const CampaignsTab: React.FC = () => {
             </div>
 
             {/* Footer */}
-            <div className="p-6 border-t border-stone-200 flex justify-between items-center shrink-0 bg-[#fafaf9] select-none">
+            <div className="px-6 py-4 border-t border-stone-100 flex justify-between items-center shrink-0 select-none">
               {strategistResult ? (
                 <>
                   <button
@@ -1758,7 +1714,7 @@ export const CampaignsTab: React.FC = () => {
                       setStrategistPrompt("");
                       setStrategistError("");
                     }}
-                    className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-300"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 rounded-xl transition-all cursor-pointer"
                   >
                     Build Another
                   </button>
@@ -1771,7 +1727,7 @@ export const CampaignsTab: React.FC = () => {
                         setStrategistResult(null);
                         setStrategistError("");
                       }}
-                      className="px-4 py-2 bg-white hover:bg-stone-50 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-200"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 rounded-xl transition-all cursor-pointer"
                     >
                       Done
                     </button>
@@ -1784,7 +1740,7 @@ export const CampaignsTab: React.FC = () => {
                         setStrategistError("");
                         router.push(`${pathname}?tab=campaigns`, { scroll: false });
                       }}
-                      className="px-5 py-2 bg-stone-950 hover:bg-stone-800 text-white font-black text-xs rounded-none cursor-pointer flex items-center gap-1.5 border border-stone-950"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold px-5 py-2.5 bg-wa-green hover:bg-wa-green-dark text-white rounded-xl transition-colors cursor-pointer"
                     >
                       View Campaigns
                       <TrendingUp className="w-3.5 h-3.5" />
@@ -1798,7 +1754,7 @@ export const CampaignsTab: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => { setStrategistStrategy(null); setStrategistQualifier(null); setQualifierEnabled(true); setSequenceEnabled(true); setChatEditSection(null); setShowTemplatePicker(false); }}
-                    className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-300"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 rounded-xl transition-all cursor-pointer"
                   >
                     Start Over
                   </button>
@@ -1812,7 +1768,7 @@ export const CampaignsTab: React.FC = () => {
                     setStrategistStrategy(null);
                     setStrategistError("");
                   }}
-                  className="px-4 py-2 bg-white hover:bg-stone-50 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-200"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 rounded-xl transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1856,17 +1812,17 @@ export const CampaignsTab: React.FC = () => {
                         setIsApplyingStrategy(false);
                       }
                     }}
-                    className="px-5 py-2 bg-stone-950 hover:bg-stone-900 border border-stone-950 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-none cursor-pointer flex items-center gap-1.5 transition-all shadow-md"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold px-5 py-2.5 bg-wa-green hover:bg-wa-green-dark text-white rounded-xl transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {isApplyingStrategy ? (
                       <>
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        {strategistStrategy.templateExists ? "Applying Strategy..." : "Registering Template..."}
+                        {strategistStrategy.templateExists ? "Applying…" : "Registering…"}
                       </>
                     ) : (
                       <>
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        {strategistStrategy.templateExists ? "Approve & Launch Strategy" : "Approve & Register New Template"}
+                        {strategistStrategy.templateExists ? "Approve & Launch" : "Approve & Register"}
                       </>
                     )}
                   </button>

@@ -27,6 +27,7 @@ const instrumentSerif = Instrument_Serif({
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-jakarta-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -45,7 +46,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} ${plusJakartaSans.variable} h-full antialiased scroll-smooth`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-amber-50 text-stone-900">
+      <body className="min-h-full flex flex-col bg-stone-100 text-slate-800">
         <AuthProvider>
           <AppProvider>
             <ConfirmProvider>

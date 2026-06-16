@@ -224,7 +224,7 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
                 This is a read-only snapshot of how the broadcast was configured. It cannot be edited after launch.
               </div>
 
-              <div className="bg-white rounded-none border border-stone-200 overflow-hidden flex flex-col p-6 space-y-5">
+              <div className="bg-white rounded-none border border-stone-200 kc-float overflow-hidden flex flex-col p-6 space-y-5">
                 <h4 className="font-bold text-xs uppercase tracking-wider text-stone-900 flex items-center gap-1.5 border-b border-stone-200 pb-2">
                   <Settings2 className="w-4 h-4 text-stone-900" />
                   Broadcast Configuration
@@ -282,7 +282,7 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
               </div>
 
               {/* Template payload */}
-              <div className="bg-white rounded-none border border-stone-200 overflow-hidden flex flex-col p-6 space-y-4">
+              <div className="bg-white rounded-none border border-stone-200 kc-float overflow-hidden flex flex-col p-6 space-y-4">
                 <h4 className="font-bold text-xs uppercase tracking-wider text-stone-900 flex items-center gap-1.5 border-b border-stone-200 pb-2">
                   <Layers className="w-4 h-4 text-stone-900" />
                   Message Template
@@ -347,28 +347,28 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
             <>
               {/* Metrics Grid Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-none border border-stone-200 shadow-none relative overflow-hidden">
+                <div className="bg-white p-4 rounded-none border border-stone-200 kc-float relative overflow-hidden">
                   <span className="text-[9px] uppercase tracking-wider font-bold text-stone-400 block">Total Target</span>
                   <span className="text-xl font-extrabold text-stone-900 mt-1 block">{sent}</span>
                   <span className="text-[10px] text-stone-500 mt-1 block">Leads Segmented</span>
                   <div className="absolute right-3 bottom-3 text-stone-100"><Users className="w-8 h-8" /></div>
                 </div>
 
-                <div className="bg-white p-4 rounded-none border border-stone-200 shadow-none relative overflow-hidden">
+                <div className="bg-white p-4 rounded-none border border-stone-200 kc-float relative overflow-hidden">
                   <span className="text-[9px] uppercase tracking-wider font-bold text-stone-400 block">Delivered</span>
                   <span className="text-xl font-extrabold text-stone-900 mt-1 block">{delivered}</span>
                   <span className="text-[10px] text-stone-800 font-bold mt-1 block">{delRate}% Delivery Rate</span>
                   <div className="absolute right-3 bottom-3 text-stone-100"><CheckCircle className="w-8 h-8" /></div>
                 </div>
 
-                <div className="bg-white p-4 rounded-none border border-stone-200 shadow-none relative overflow-hidden">
+                <div className="bg-white p-4 rounded-none border border-stone-200 kc-float relative overflow-hidden">
                   <span className="text-[9px] uppercase tracking-wider font-bold text-stone-400 block">Reads</span>
                   <span className="text-xl font-extrabold text-stone-900 mt-1 block">{read}</span>
                   <span className="text-[10px] text-stone-800 font-bold mt-1 block">{readRate}% Open Rate</span>
                   <div className="absolute right-3 bottom-3 text-stone-100"><Activity className="w-8 h-8" /></div>
                 </div>
 
-                <div className="bg-white p-4 rounded-none border border-stone-200 shadow-none relative overflow-hidden">
+                <div className="bg-white p-4 rounded-none border border-stone-200 kc-float relative overflow-hidden">
                   <span className="text-[9px] uppercase tracking-wider font-bold text-stone-400 block">Clicks</span>
                   <span className="text-xl font-extrabold text-stone-900 mt-1 block">{clicked}</span>
                   <span className="text-[10px] text-stone-900 font-bold mt-1 block">{clickRate}% Click-to-Read</span>
@@ -377,7 +377,7 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
               </div>
 
               {/* SVG Conversion Funnel Section */}
-              <div className="bg-white p-6 rounded-none border border-stone-200 shadow-none space-y-4">
+              <div className="bg-white p-6 rounded-none border border-stone-200 kc-float space-y-4">
                 <h4 className="font-bold text-xs uppercase tracking-wider text-stone-900 flex items-center gap-1.5 border-b border-stone-200 pb-2">
                   <Layers className="w-4 h-4 text-stone-900" />
                   Conversion Funnel Visualization
@@ -501,7 +501,7 @@ export const CampaignReportDrawer: React.FC<CampaignReportDrawerProps> = ({
               </div>
 
               {/* Tabbed CRM Recipients Listing & Action logs */}
-              <div className="bg-white rounded-none border border-stone-200 shadow-none overflow-hidden flex flex-col">
+              <div className="bg-white rounded-none border border-stone-200 kc-float overflow-hidden flex flex-col">
                 
                 {/* Tabs Selector Header */}
                 <div className="flex border-b border-stone-200 bg-stone-50 shrink-0">

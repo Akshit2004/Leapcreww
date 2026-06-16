@@ -9,6 +9,8 @@ import {
   HelpCircle,
   ThumbsUp,
   Loader,
+  ChevronDown,
+  Plus,
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 import { notify } from "@/shared/lib/toast";
@@ -240,89 +242,86 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-filter backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl rounded-none flex flex-col overflow-hidden animate-slide-up bg-white border border-stone-300 max-h-[92vh]">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="w-full max-w-2xl rounded-t-2xl sm:rounded-2xl flex flex-col overflow-hidden animate-slide-up bg-white shadow-2xl border border-stone-200 max-h-[92vh]">
 
         {/* Header */}
-        <div className="p-6 border-b border-stone-200 flex items-center justify-between shrink-0 bg-stone-50">
-          <h3 className="font-bold text-xs uppercase tracking-wider text-stone-900 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-stone-900" />
-            Create WhatsApp compliant template
-          </h3>
+        <div className="px-6 py-5 border-b border-stone-100 flex items-center justify-between shrink-0">
+          <div>
+            <h3 className="font-black text-base text-stone-900 tracking-tight">New Template</h3>
+            <p className="text-[11px] text-stone-400 mt-0.5">Build a Meta-compliant WhatsApp message</p>
+          </div>
           <button
             onClick={handleClose}
-            className="p-1 rounded-none hover:bg-stone-200 text-stone-500 transition-colors border border-transparent cursor-pointer"
+            className="p-2 rounded-xl hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmitTemplate} className="p-6 space-y-5 flex-1 overflow-y-auto custom-scrollbar">
 
+          {/* Name + Category */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Template Name */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Template Name</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Template Name</label>
               <input
                 type="text"
                 required
                 placeholder="e.g. black_friday_discount"
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value.toLowerCase().replace(/\s+/g, "_"))}
-                className="w-full bg-white border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900"
+                className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-wa-green transition-colors"
               />
-              <span className="text-[9px] text-stone-400 block font-semibold">Forces lowercase snake_case (e.g. coupon_100)</span>
+              <span className="text-[10px] text-stone-400 font-medium">Saved as lowercase snake_case</span>
             </div>
 
-            {/* Category Selection */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Compliance Category</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-white border border-stone-200 rounded-none py-2.5 px-4 text-xs font-semibold focus:outline-none focus:border-stone-900"
-              >
-                <option value="Marketing">Marketing (Offers, updates)</option>
-                <option value="Utility">Utility (Transactions, budgets)</option>
-                <option value="Authentication">Authentication (OTPs, codes)</option>
-              </select>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Compliance Category</label>
+              <div className="relative">
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full appearance-none bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 focus:outline-none focus:border-wa-green transition-colors cursor-pointer pr-9"
+                >
+                  <option value="Marketing">Marketing (Offers, updates)</option>
+                  <option value="Utility">Utility (Transactions, alerts)</option>
+                  <option value="Authentication">Authentication (OTPs, codes)</option>
+                </select>
+                <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
           </div>
 
-          {/* Media Header Selector */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Optional Media Header</label>
-            <div className="flex gap-2">
+          {/* Media Header */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Media Header (optional)</label>
+            <div className="flex gap-1.5 bg-stone-100 p-1 rounded-xl">
               {["none", "image", "video", "document"].map((type) => (
                 <button
                   key={type}
                   type="button"
-                  onClick={() => {
-                    setMediaType(type);
-                    if (type === "none") setMediaUrl("");
-                  }}
-                  className={`flex-1 py-2 text-center text-xs font-bold rounded-none border capitalize cursor-pointer transition-all ${
+                  onClick={() => { setMediaType(type); if (type === "none") setMediaUrl(""); }}
+                  className={`flex-1 py-2 text-center text-[11px] font-bold rounded-lg capitalize cursor-pointer transition-all ${
                     mediaType === type
-                      ? "bg-stone-950 text-white border-stone-950"
-                      : "bg-white border-stone-200 text-stone-600 hover:bg-stone-100"
+                      ? "bg-wa-green text-white shadow-sm"
+                      : "text-stone-500 hover:text-stone-800"
                   }`}
                 >
                   {type}
                 </button>
               ))}
             </div>
-
-            {/* Sample media URL — required by Meta to register a media header */}
             {mediaType !== "none" && (
-              <div className="space-y-1.5 pt-1">
+              <div className="space-y-1.5">
                 <div className="flex gap-2 items-center">
                   <input
                     type="url"
                     placeholder={`Sample ${mediaType} URL — e.g. https://cdn.mysite.com/banner.${mediaType === "image" ? "jpg" : mediaType === "video" ? "mp4" : "pdf"}`}
                     value={mediaUrl}
                     onChange={(e) => setMediaUrl(e.target.value)}
-                    className="flex-1 bg-white border border-stone-200 rounded-none py-2 px-3 text-xs focus:outline-none focus:border-stone-900"
+                    className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-wa-green transition-colors flex-1"
                   />
                   <UploadButton
                     endpoint="mediaUploader"
@@ -336,54 +335,50 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
                       notify.error("Upload failed", error.message);
                     }}
                     appearance={{
-                      button: "bg-stone-900 hover:bg-stone-800 text-white rounded-none text-xs font-bold px-3 py-2 cursor-pointer h-9 shrink-0 flex items-center justify-center border border-stone-900 transition-all",
+                      button: "bg-wa-green hover:bg-wa-green-dark text-white rounded-xl text-xs font-bold px-4 py-2.5 cursor-pointer shrink-0 flex items-center justify-center border-0 transition-all",
                       allowedContent: "hidden",
                     }}
                   />
                 </div>
-                <span className="text-[9px] text-stone-400 block font-semibold flex items-center gap-1">
+                <p className="text-[10px] text-stone-400 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3 shrink-0" />
                   Meta uploads this sample to approve the header. Each broadcast can override the actual {mediaType}.
-                </span>
+                </p>
               </div>
             )}
           </div>
 
-          {/* Template Body Copy Textarea */}
+          {/* Body text */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600 flex justify-between items-center">
-              <span>Template Text body</span>
-              <span className="flex items-center gap-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Message Body</label>
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => { setShowGenerator((v) => !v); setGenError(null); }}
-                  className="flex items-center gap-1 text-[10px] font-bold text-stone-900 hover:text-stone-600 transition-colors cursor-pointer normal-case tracking-normal"
+                  className="inline-flex items-center gap-1 text-[10px] font-bold text-wa-green hover:text-wa-green-dark transition-colors cursor-pointer"
                 >
                   <Sparkles className="w-3 h-3" />
                   Generate with AI
                 </button>
-                <span className="text-[9px] text-stone-400">{bodyText.length} / 1024 characters</span>
-              </span>
-            </label>
+                <span className="text-[10px] text-stone-400">{bodyText.length} / 1024</span>
+              </div>
+            </div>
 
-            {/* Brand-Aware AI generator popover */}
+            {/* AI Generator panel */}
             {showGenerator && (
-              <div className="border border-stone-300 rounded-none bg-stone-50 p-4 space-y-3">
+              <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h6 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" />
+                  <h6 className="text-[10px] font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-wa-green" />
                     Brand-Aware AI Generator
                   </h6>
-                  <button
-                    type="button"
-                    onClick={() => setShowGenerator(false)}
-                    className="text-stone-400 hover:text-stone-900 cursor-pointer"
-                  >
+                  <button type="button" onClick={() => setShowGenerator(false)} className="text-stone-400 hover:text-stone-700 cursor-pointer p-1 rounded-lg hover:bg-stone-200 transition-colors">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <p className="text-[9px] text-stone-500 leading-relaxed">
-                  Uses your saved Brand Profile (Settings) to write copy in your brand&apos;s tone.
+                <p className="text-[10px] text-stone-500 leading-relaxed">
+                  Uses your Brand Profile (Settings) to write copy in your brand&apos;s tone.
                 </p>
                 <div className="space-y-2">
                   <input
@@ -391,39 +386,29 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
                     placeholder="Topic / offer — e.g. 50% off Diwali Sale"
                     value={genTopic}
                     onChange={(e) => setGenTopic(e.target.value)}
-                    className="w-full bg-white border border-stone-200 rounded-none px-3 py-2 text-xs focus:outline-none focus:border-stone-900"
+                    className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-wa-green transition-colors"
                   />
                   <input
                     type="text"
-                    placeholder="URL to embed (optional) — e.g. https://mysite.com/sale"
+                    placeholder="URL to embed (optional)"
                     value={genUrl}
                     onChange={(e) => setGenUrl(e.target.value)}
-                    className="w-full bg-white border border-stone-200 rounded-none px-3 py-2 text-xs focus:outline-none focus:border-stone-900"
+                    className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-wa-green transition-colors"
                   />
                 </div>
                 {genError && (
-                  <div className="text-[10px] text-red-600 font-semibold flex items-start gap-1.5">
+                  <div className="text-[11px] text-red-600 font-semibold flex items-start gap-1.5 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
                     <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    <span>{genError}</span>
+                    {genError}
                   </div>
                 )}
                 <button
                   type="button"
                   disabled={!genTopic.trim() || generating}
                   onClick={handleGenerateWithAI}
-                  className="w-full px-4 py-2 bg-stone-950 hover:bg-stone-900 disabled:opacity-40 text-white text-xs font-bold rounded-none border border-stone-950 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-1.5 text-sm font-bold py-2.5 bg-wa-green hover:bg-wa-green-dark text-white rounded-xl transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {generating ? (
-                    <>
-                      <Loader className="w-3.5 h-3.5 animate-spin" />
-                      Writing in your brand voice...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Generate Copy
-                    </>
-                  )}
+                  {generating ? <><Loader className="w-3.5 h-3.5 animate-spin" /> Writing in your brand voice…</> : <><Sparkles className="w-3.5 h-3.5" /> Generate Copy</>}
                 </button>
               </div>
             )}
@@ -431,40 +416,40 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
             <textarea
               required
               rows={4}
-              placeholder="Type your WhatsApp message copy. You can add dynamic variables like: 'Hey {{1}}, here is your code {{2}}' to map CRM details dynamically."
+              placeholder="Hey {{1}}, here is your discount code {{2}} — valid today only!"
               value={bodyText}
               onChange={(e) => setBodyText(e.target.value)}
-              className="w-full bg-white border border-stone-200 rounded-none py-2.5 px-4 text-xs focus:outline-none focus:border-stone-900"
+              className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-wa-green transition-colors resize-none"
             />
           </div>
 
-          {/* Buttons Builder */}
+          {/* Quick Reply Buttons */}
           <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Meta Call-To-Action Quick Replies</label>
-
-            <div className="flex flex-wrap gap-1.5">
-              {buttonsList.map((btn, index) => (
-                <span
-                  key={index}
-                  className="text-[10px] font-bold bg-stone-100 text-stone-800 pl-3 pr-1 py-1 rounded-none border border-stone-300 flex items-center gap-1.5"
-                >
-                  <span>{btn}</span>
-                  <button
-                    type="button"
-                    onClick={() => setButtonsList((prev) => prev.filter((_, idx) => idx !== index))}
-                    className="hover:bg-stone-200 p-0.5 rounded-none text-stone-700"
+            <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Quick Reply Buttons (optional, max 3)</label>
+            {buttonsList.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {buttonsList.map((btn, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold border border-[#53bdeb] text-[#0a7abf] bg-white pl-3 pr-2 py-1 rounded-full"
                   >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-
+                    {btn}
+                    <button
+                      type="button"
+                      onClick={() => setButtonsList((prev) => prev.filter((_, idx) => idx !== index))}
+                      className="hover:text-red-500 transition-colors cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             {buttonsList.length < 3 ? (
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Add quick reply button text..."
+                  placeholder="Button label — e.g. Shop Now"
                   value={newButtonText}
                   onChange={(e) => setNewButtonText(e.target.value)}
                   onKeyDown={(e) => {
@@ -475,7 +460,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
                       setNewButtonText("");
                     }
                   }}
-                  className="flex-1 bg-white border border-stone-200 rounded-none px-3 py-1.5 text-xs focus:outline-none focus:border-stone-900"
+                  className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-wa-green transition-colors flex-1"
                 />
                 <button
                   type="button"
@@ -484,134 +469,110 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
                     setButtonsList((prev) => [...prev, newButtonText.trim()]);
                     setNewButtonText("");
                   }}
-                  className="bg-stone-950 hover:bg-stone-900 text-white rounded-none border border-stone-950 px-3 py-1.5 text-xs font-bold cursor-pointer"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 border border-stone-200 bg-white text-stone-700 hover:border-stone-300 rounded-xl transition-all cursor-pointer shrink-0 whitespace-nowrap"
                 >
-                  Add Button
+                  <Plus className="w-3.5 h-3.5" /> Add
                 </button>
               </div>
             ) : (
-              <span className="text-[10px] text-stone-400 block italic">Max limits of 3 Quick Replies reached.</span>
+              <p className="text-[10px] text-stone-400 italic">Max 3 quick replies reached.</p>
             )}
           </div>
 
-          {/* Compliance Scanning Card Panel */}
-          <div className="border border-stone-200 rounded-none p-4 bg-stone-50 space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-200 pb-2">
-              <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-900 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-stone-900" />
-                AI Template Approval Compliance Auditor
+          {/* AI Compliance Auditor */}
+          <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-3.5">
+            <div className="flex items-center justify-between">
+              <h5 className="text-[10px] font-bold uppercase tracking-wider text-stone-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-wa-green" />
+                AI Compliance Auditor
               </h5>
-
-              {/* Real-time score indicator */}
               {complianceScore !== null && (
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-none border ${
+                <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${
                   complianceScore > 85
-                    ? "bg-stone-900 text-white border-stone-950"
-                    : "bg-white text-stone-500 border-stone-300"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-amber-50 text-amber-700 border-amber-200"
                 }`}>
-                  Meta Approval Probability: {complianceScore}%
+                  {complianceScore}% approval probability
                 </span>
               )}
             </div>
 
-            {/* Warnings Section */}
             {clientWarnings.length > 0 && (
               <div className="space-y-1.5">
                 {clientWarnings.map((w, idx) => (
-                  <div key={idx} className="text-[10px] text-stone-900 font-semibold flex items-start gap-1.5 bg-white p-2 rounded-none border border-stone-300">
-                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-stone-900" />
-                    <span>{w}</span>
+                  <div key={idx} className="text-[11px] text-amber-700 font-semibold flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    {w}
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Category Suggestion Banner */}
             {suggestedCategory && suggestedCategory !== category && !categoryApplied && (
-              <div className="bg-white border border-stone-300 rounded-none p-3 space-y-2">
-                <div className="flex items-center gap-1.5 text-stone-900 font-bold text-[10px] uppercase">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  AI Suggests: <span className="underline">{suggestedCategory}</span>
+              <div className="bg-white border border-stone-200 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center gap-1.5 text-stone-800 font-black text-[11px]">
+                  <Sparkles className="w-3.5 h-3.5 text-wa-green" />
+                  AI suggests: <span className="text-wa-green-dark">{suggestedCategory}</span>
                 </div>
-                {categoryReasoning && (
-                  <p className="text-[10px] text-stone-600 leading-relaxed">{categoryReasoning}</p>
-                )}
-                <div className="text-[9px] text-stone-500 font-semibold uppercase">
-                  Utility templates get approved 2-3x faster than Marketing.
-                </div>
+                {categoryReasoning && <p className="text-[11px] text-stone-500 leading-relaxed">{categoryReasoning}</p>}
+                <p className="text-[10px] text-stone-400 font-semibold">Utility templates get approved 2–3× faster than Marketing.</p>
                 <button
                   type="button"
-                  onClick={() => {
-                    setCategory(suggestedCategory);
-                    setCategoryApplied(true);
-                  }}
-                  className="text-[10px] font-bold bg-stone-950 hover:bg-stone-900 text-white px-3 py-1.5 rounded-none border border-stone-950 transition-all cursor-pointer uppercase"
+                  onClick={() => { setCategory(suggestedCategory); setCategoryApplied(true); }}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 bg-wa-green hover:bg-wa-green-dark text-white rounded-lg transition-colors cursor-pointer"
                 >
-                  Apply &quot;{suggestedCategory}&quot; Category
+                  Apply &quot;{suggestedCategory}&quot;
                 </button>
               </div>
             )}
 
-            {/* Copilot feedback logs */}
             {complianceFeedback.length > 0 && (
-              <div className="space-y-1.5 bg-white p-3 rounded-none border border-stone-200 text-[10px] text-stone-600 leading-relaxed max-h-36 overflow-y-auto custom-scrollbar">
-                <div className="font-bold text-stone-800 flex items-center gap-1 mb-1">
-                  <CheckCircle className="w-3.5 h-3.5 text-stone-900" />
-                  AI Optimization feedback logs:
+              <div className="bg-white border border-stone-200 rounded-xl p-3 space-y-1.5 text-[11px] text-stone-600 leading-relaxed max-h-32 overflow-y-auto custom-scrollbar">
+                <div className="font-bold text-stone-700 flex items-center gap-1 mb-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  AI feedback
                 </div>
                 {complianceFeedback.map((fb, idx) => (
-                  <div key={idx} className="flex items-start gap-1.5 pl-1.5">
-                    <span className="text-stone-900 font-bold shrink-0">•</span>
-                    <span>{fb}</span>
+                  <div key={idx} className="flex items-start gap-1.5">
+                    <span className="text-wa-green font-bold shrink-0">•</span>
+                    {fb}
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Actions AI Optimizer */}
-            <div className="flex items-center justify-between gap-4 pt-1.5">
-              <div className="text-[9px] text-stone-500 flex items-center gap-1 leading-none select-none">
-                <HelpCircle className="w-3.5 h-3.5 text-stone-500" />
-                Our AI compiler verifies copy structures to promise zero meta reject rates.
-              </div>
-
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-[10px] text-stone-400 flex items-center gap-1 leading-relaxed">
+                <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+                Verifies copy to promise zero Meta rejection rates.
+              </p>
               <button
                 type="button"
                 disabled={!bodyText.trim() || aiOptimizing}
                 onClick={handleAIOptimize}
-                className="px-4 py-2 bg-stone-950 hover:bg-stone-900 disabled:opacity-40 text-white text-xs font-bold rounded-none border border-stone-950 flex items-center gap-1.5 transition-all cursor-pointer select-none shrink-0"
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 bg-wa-green hover:bg-wa-green-dark text-white rounded-xl transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0 whitespace-nowrap"
               >
-                {aiOptimizing ? (
-                  <>
-                    <Loader className="w-3.5 h-3.5 animate-spin" />
-                    AI Hardening Compliance...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5" />
-                    AI Optimize Template
-                  </>
-                )}
+                {aiOptimizing ? <><Loader className="w-3.5 h-3.5 animate-spin" /> Auditing…</> : <><Sparkles className="w-3.5 h-3.5" /> AI Audit</>}
               </button>
             </div>
           </div>
 
-          {/* Footer CTA */}
-          <div className="flex justify-end gap-2.5 pt-4 border-t border-stone-200">
+          {/* Footer */}
+          <div className="flex justify-end gap-2.5 pt-2 border-t border-stone-100">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-300"
+              className="inline-flex items-center gap-1.5 text-sm font-bold px-4 py-2.5 border border-stone-200 bg-white text-stone-700 hover:border-stone-300 rounded-xl transition-all cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting || clientWarnings.length > 0 || !templateName.trim() || !bodyText.trim() || (mediaType !== "none" && !mediaUrl.trim())}
-              className="px-5 py-2 bg-stone-950 hover:bg-stone-900 disabled:opacity-40 text-white font-semibold text-xs rounded-none border border-stone-950 cursor-pointer flex items-center gap-1.5 transition-all"
+              className="inline-flex items-center gap-1.5 text-sm font-bold px-5 py-2.5 bg-wa-green hover:bg-wa-green-dark text-white rounded-xl transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {submitting ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <ThumbsUp className="w-3.5 h-3.5" />}
-              Submit Meta Approval
+              {submitting ? <Loader className="w-4 h-4 animate-spin" /> : <ThumbsUp className="w-4 h-4" />}
+              Submit for Meta Approval
             </button>
           </div>
         </form>

@@ -464,6 +464,7 @@ export const AICopilotSidebar: React.FC<AICopilotSidebarProps> = ({
   };
 
   if (!isOpen) {
+    if (activeTab === "ai-workspace") return null;
     return (
       <button
         onClick={() => setIsOpen(true)}

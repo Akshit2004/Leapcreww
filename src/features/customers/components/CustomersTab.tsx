@@ -7,7 +7,8 @@ import { CustomersTable } from "./CustomersTable";
 import { BulkAddTagModal } from "./BulkAddTagModal";
 import { AddCustomerModal } from "./AddCustomerModal";
 import { WinBackModal } from "./WinBackModal";
-import { Users, Search, Tag, Filter, Plus, Trash2, X, AlertCircle, Flame } from "lucide-react";
+import { CSVImporterModal } from "@/features/inbox/components/CSVImporterModal";
+import { Users, Search, Tag, Filter, Plus, Trash2, X, AlertCircle, Flame, ChevronDown, Upload, RefreshCw, ShoppingBag, MessageCircle } from "lucide-react";
 import { Contact } from "@/shared/context/types";
 import { SegmentRule, SegmentRules, evaluateSegmentRules } from "@/shared/lib/segmentMatch";
 
@@ -25,6 +26,10 @@ export const CustomersTab: React.FC = () => {
   const [isBulkTagging, setIsBulkTagging] = useState(false);
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
   const [isWinBackModalOpen, setIsWinBackModalOpen] = useState(false);
+  const [isCSVModalOpen, setIsCSVModalOpen] = useState(false);
+  const [isImportDropdownOpen, setIsImportDropdownOpen] = useState(false);
+  const [isSyncingShopify, setIsSyncingShopify] = useState(false);
+  const [isSyncingWhatsapp, setIsSyncingWhatsapp] = useState(false);
 
   // Quick Action FAB
   useEffect(() => {
@@ -215,7 +220,7 @@ export const CustomersTab: React.FC = () => {
       prev.map((r, i) => {
         if (i !== index) return r;
         const next = { ...r, ...updates } as SegmentRule;
-        
+
         // Reset operator and key/value if field type changes
         if (updates.field) {
           if (updates.field === "tags") {
@@ -270,7 +275,7 @@ export const CustomersTab: React.FC = () => {
         setSegments((prev) => [data.segment, ...prev]);
         setSelectedSegmentId(data.segment.id);
         setSelectedTag(null); // Clear tag selection when segment active
-        
+
         // Reset states
         setNewSegmentName("");
         setNewRules([{ field: "tags", op: "in", value: "" }]);
@@ -297,180 +302,304 @@ export const CustomersTab: React.FC = () => {
     return contacts.filter((c) => evaluateSegmentRules(c as any, draftRules)).length;
   }, [contacts, rulesLogic, newRules]);
 
-  return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-[#fafaf9] relative animate-fade-in p-4 lg:p-8 items-stretch justify-start text-left select-none">
-      {/* Header */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 w-full text-left items-start md:items-center shrink-0 border-b border-stone-200 pb-6">
-        <div className="flex flex-col items-start text-left">
-          <div className="flex items-center gap-2 mb-1">
-            <Users className="w-6 h-6 text-wa-green animate-pulse" />
-            <h2 className="text-xl font-bold tracking-tight text-stone-900 uppercase">
-              Customers & CRM
-            </h2>
-          </div>
-          <p className="text-stone-500 text-xs font-medium text-left">
-            Manage your contacts, apply custom segment queries, and broadcast variables.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 justify-start md:justify-end">
-          <button
-            onClick={() => setIsWinBackModalOpen(true)}
-            className="flex items-center gap-2 bg-white border border-[#D05E3C] text-[#D05E3C] hover:bg-[#D05E3C] hover:text-white px-4 py-2 text-xs font-bold transition-all cursor-pointer rounded-none active:scale-95"
-          >
-            <Flame className="w-4 h-4" />
-            WIN-BACK
-          </button>
-          <button
-            onClick={() => setIsAddCustomerModalOpen(true)}
-            className="flex items-center gap-2 bg-stone-950 hover:bg-stone-900 border border-stone-950 text-white px-4 py-2 text-xs font-bold transition-all cursor-pointer rounded-none active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            ADD CUSTOMER
-          </button>
-        </div>
-      </header>
+  const handleSyncShopify = async () => {
+    setIsSyncingShopify(true);
+    setIsImportDropdownOpen(false);
+    try {
+      const res = await fetch(`/api/org/${orgId}/integrations/shopify/sync-contacts`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Sync failed");
+      notify.success(`Shopify sync complete — ${data.synced} new contacts imported`);
+    } catch (err: any) {
+      notify.error("Shopify sync failed", err.message);
+    } finally {
+      setIsSyncingShopify(false);
+    }
+  };
 
-      <div className="flex-1 flex gap-6 min-h-0 overflow-hidden">
-        {/* Left Sidebar - Saved Segments + Tag smart folders */}
-        <div className="max-lg:hidden lg:flex flex-col w-64 shrink-0 gap-4 overflow-y-auto pr-1">
-          {/* Segments widget */}
-          <div className="bg-white border border-stone-200 rounded-none p-4">
-            <div className="text-[10px] font-black uppercase text-stone-400 tracking-wider mb-3 px-2 flex items-center justify-between">
-              <span>Saved Segments</span>
-              <button 
-                onClick={() => setIsSegmentBuilderOpen(true)}
-                className="text-stone-900 hover:bg-stone-100 p-0.5 rounded transition-all cursor-pointer border border-transparent"
-                title="Create Smart Segment"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-            
-            <div className="space-y-1">
+  const handleSyncWhatsapp = async () => {
+    setIsSyncingWhatsapp(true);
+    setIsImportDropdownOpen(false);
+    try {
+      const res = await fetch(`/api/org/${orgId}/contacts/sync-whatsapp`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Sync failed");
+      notify.success(`WhatsApp sync complete — ${data.refreshed} contacts refreshed`);
+    } catch (err: any) {
+      notify.error("WhatsApp sync failed", err.message);
+    } finally {
+      setIsSyncingWhatsapp(false);
+    }
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-stone-100 animate-slide-up">
+
+      {/* ── Sticky header ── */}
+      <div className="shrink-0 bg-white border-b border-stone-200 px-4 sm:px-8">
+        <div className="flex items-center justify-between py-4 gap-3">
+          <div className="min-w-0">
+            <h2 className="text-xl font-black tracking-tight text-stone-900">Customers & CRM</h2>
+            <p className="text-stone-500 text-xs mt-0.5">Manage contacts, smart segments, and broadcast variables</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setIsWinBackModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 border border-[#D05E3C]/40 bg-[#D05E3C]/5 text-[#D05E3C] hover:bg-[#D05E3C] hover:text-white rounded-xl transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Flame className="w-3.5 h-3.5" />
+              Win-Back
+            </button>
+
+            {/* Import / Sync dropdown */}
+            <div className="relative">
               <button
-                onClick={() => { setSelectedTag(null); setSelectedSegmentId(null); }}
-                className={`w-full text-left px-3 py-2 text-xs font-bold rounded-none transition-all flex items-center justify-between ${
-                  selectedTag === null && selectedSegmentId === null
-                    ? "bg-stone-100 text-stone-900 border-l-2 border-stone-900"
-                    : "text-stone-500 hover:bg-stone-50"
+                onClick={() => setIsImportDropdownOpen((v) => !v)}
+                className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 border rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                  isImportDropdownOpen
+                    ? "border-wa-green text-wa-green bg-wa-green/5"
+                    : "border-stone-200 bg-white text-stone-700 hover:border-wa-green hover:text-wa-green"
                 }`}
               >
-                <span>All Customers</span>
-                <span className="text-[10px] bg-stone-200/50 text-stone-600 px-1.5 py-0.5 rounded-none font-bold">
-                  {contacts.length}
-                </span>
+                <Upload className="w-3.5 h-3.5" />
+                Import
+                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isImportDropdownOpen ? "rotate-180" : ""}`} />
               </button>
 
-              {loadingSegments ? (
-                <div className="text-center py-2 text-xs text-stone-400">Loading segments...</div>
-              ) : segments.length === 0 ? (
-                <div className="text-center py-2 text-[10px] text-stone-400 italic">No smart segments saved.</div>
-              ) : (
-                segments.map((seg) => {
-                  const isSegSelected = selectedSegmentId === seg.id;
-                  const matchingCount = contacts.filter((c) =>
-                    evaluateSegmentRules(c as any, seg.rules as SegmentRules)
-                  ).length;
-                  return (
-                    <div key={seg.id} className="group flex items-center justify-between rounded-none hover:bg-stone-50 relative">
-                      <button
-                        onClick={() => { setSelectedTag(null); setSelectedSegmentId(seg.id); }}
-                        className={`flex-1 text-left px-3 py-2 text-xs font-bold rounded-none transition-all truncate pr-8 ${
-                          isSegSelected
-                            ? "bg-wa-green/10 text-wa-green border-l-2 border-wa-green font-bold"
-                            : "text-stone-500 hover:bg-stone-50"
-                        }`}
-                      >
-                        {seg.name}
-                      </button>
-                      <span className="absolute right-8 text-[10px] bg-stone-200/50 text-stone-600 px-1.5 py-0.5 rounded-none font-bold pointer-events-none group-hover:hidden">
-                        {matchingCount}
-                      </span>
-                      <button
-                        onClick={() => handleDeleteSegment(seg.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-stone-400 hover:text-stone-900 hover:bg-stone-100 rounded-none transition-all cursor-pointer mr-1 shrink-0 border border-transparent"
-                        title="Delete Segment"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+              {isImportDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setIsImportDropdownOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 z-20 w-64 bg-white border border-stone-200 rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
+
+                    {/* Header */}
+                    <div className="px-4 pt-3.5 pb-2.5 border-b border-stone-100 bg-stone-50">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-stone-400">Import & Sync</p>
                     </div>
-                  );
-                })
+
+                    {/* CSV */}
+                    <button
+                      onClick={() => { setIsImportDropdownOpen(false); setIsCSVModalOpen(true); }}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-stone-50 transition-colors cursor-pointer group border-b border-stone-100"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-stone-100 group-hover:bg-stone-200 flex items-center justify-center shrink-0 transition-colors">
+                        <Upload className="w-4 h-4 text-stone-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-stone-800">Upload CSV File</p>
+                        <p className="text-[11px] text-stone-400 mt-0.5">name · phone · email columns</p>
+                      </div>
+                    </button>
+
+                    {/* Shopify */}
+                    <button
+                      onClick={handleSyncShopify}
+                      disabled={isSyncingShopify}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-stone-50 transition-colors cursor-pointer group border-b border-stone-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-[#96BF48]/10 group-hover:bg-[#96BF48]/20 flex items-center justify-center shrink-0 transition-colors">
+                        {isSyncingShopify
+                          ? <RefreshCw className="w-4 h-4 text-[#96BF48] animate-spin" />
+                          : <ShoppingBag className="w-4 h-4 text-[#96BF48]" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-stone-800">{isSyncingShopify ? "Syncing…" : "Shopify Customers"}</p>
+                        <p className="text-[11px] text-stone-400 mt-0.5">Pulls from your connected store</p>
+                      </div>
+                    </button>
+
+                    {/* WhatsApp */}
+                    <button
+                      onClick={handleSyncWhatsapp}
+                      disabled={isSyncingWhatsapp}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-stone-50 transition-colors cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-wa-green/10 group-hover:bg-wa-green/20 flex items-center justify-center shrink-0 transition-colors">
+                        {isSyncingWhatsapp
+                          ? <RefreshCw className="w-4 h-4 text-wa-green animate-spin" />
+                          : <MessageCircle className="w-4 h-4 text-wa-green" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-stone-800">{isSyncingWhatsapp ? "Syncing…" : "WhatsApp History"}</p>
+                        <p className="text-[11px] text-stone-400 mt-0.5">From your conversation history</p>
+                      </div>
+                    </button>
+                  </div>
+                </>
               )}
+            </div>
+
+            <button
+              onClick={() => setIsAddCustomerModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 bg-wa-green hover:bg-wa-green-dark text-white rounded-xl transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              Add Customer
+            </button>
+          </div>
+        </div>
+
+        {/* Stats strip */}
+        <div className="flex items-center gap-4 pb-3 border-t border-stone-100 pt-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-black text-stone-900">{contacts.length}</span>
+            <span className="text-[11px] text-stone-400 font-medium">total contacts</span>
+          </div>
+          <div className="w-px h-3 bg-stone-200 shrink-0" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-black text-stone-900">{contacts.filter(c => c.status === "Active").length}</span>
+            <span className="text-[11px] text-stone-400 font-medium">active</span>
+          </div>
+          <div className="w-px h-3 bg-stone-200 shrink-0" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-black text-stone-900">{allTags.length}</span>
+            <span className="text-[11px] text-stone-400 font-medium">tag{allTags.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="w-px h-3 bg-stone-200 shrink-0" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-black text-stone-900">{filteredContacts.length}</span>
+            <span className="text-[11px] text-stone-400 font-medium">showing</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Body ── */}
+      <div className="flex-1 flex gap-5 px-4 sm:px-8 py-6 min-h-0 overflow-hidden">
+
+        {/* Left Sidebar */}
+        <div className="max-lg:hidden lg:flex flex-col w-56 shrink-0 gap-4 overflow-y-auto custom-scrollbar">
+
+          {/* Smart Segments */}
+          <div className="bg-white border border-stone-200 shadow-sm rounded-2xl overflow-hidden">
+            {/* Green accent bar */}
+            <div className="h-0.5 bg-gradient-to-r from-wa-green to-wa-green/30" />
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-black uppercase tracking-wider text-stone-500">Smart Segments</span>
+                <button
+                  onClick={() => setIsSegmentBuilderOpen(true)}
+                  className="w-6 h-6 rounded-lg bg-stone-100 hover:bg-wa-green/10 hover:text-wa-green flex items-center justify-center text-stone-400 transition-colors cursor-pointer"
+                  title="Create Smart Segment"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="space-y-0.5">
+                <button
+                  onClick={() => { setSelectedTag(null); setSelectedSegmentId(null); }}
+                  className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-between cursor-pointer ${
+                    selectedTag === null && selectedSegmentId === null
+                      ? "bg-wa-green/10 text-wa-green"
+                      : "text-stone-500 hover:bg-stone-50 hover:text-stone-800"
+                  }`}
+                >
+                  <span>All Customers</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${selectedTag === null && selectedSegmentId === null ? "bg-wa-green text-white" : "bg-stone-100 text-stone-500"}`}>
+                    {contacts.length}
+                  </span>
+                </button>
+                {loadingSegments ? (
+                  <div className="text-center py-2 text-[10px] text-stone-400">Loading…</div>
+                ) : segments.length === 0 ? (
+                  <div className="py-2 text-[10px] text-stone-400 italic px-3">No segments yet.</div>
+                ) : (
+                  segments.map((seg) => {
+                    const isSegSelected = selectedSegmentId === seg.id;
+                    const matchingCount = contacts.filter((c) => evaluateSegmentRules(c as any, seg.rules as SegmentRules)).length;
+                    return (
+                      <div key={seg.id} className="group flex items-center rounded-lg hover:bg-stone-50 relative">
+                        <button
+                          onClick={() => { setSelectedTag(null); setSelectedSegmentId(seg.id); }}
+                          className={`flex-1 text-left px-3 py-2 text-xs font-bold rounded-lg transition-all truncate pr-8 cursor-pointer ${
+                            isSegSelected ? "bg-wa-green/10 text-wa-green" : "text-stone-500 hover:text-stone-800"
+                          }`}
+                        >
+                          {seg.name}
+                        </button>
+                        <span className={`absolute right-7 text-[10px] px-1.5 py-0.5 rounded-full font-bold pointer-events-none group-hover:hidden ${isSegSelected ? "bg-wa-green text-white" : "bg-stone-100 text-stone-500"}`}>
+                          {matchingCount}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteSegment(seg.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-stone-400 hover:text-red-500 rounded-lg transition-all cursor-pointer shrink-0"
+                          title="Delete Segment"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Tags Smart Folders widget */}
-          <div className="bg-white border border-stone-200 rounded-none p-4 flex-1 overflow-y-auto custom-scrollbar">
-            <div className="text-[10px] font-black uppercase text-stone-400 tracking-wider mb-3 px-2 flex items-center justify-between">
-              <span>Smart Folders</span>
-              <Tag className="w-3.5 h-3.5 text-stone-400" />
-            </div>
-            {allTags.length === 0 ? (
-              <div className="text-xs text-stone-400 italic px-2">No tags created yet.</div>
-            ) : (
-              <div className="space-y-1">
-                {allTags.map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => { setSelectedSegmentId(null); setSelectedTag(tag); }}
-                    className={`w-full text-left px-3 py-2 text-xs font-bold rounded-none transition-all flex items-center justify-between ${
-                      selectedTag === tag
-                        ? "bg-stone-100 text-stone-900 border-l-2 border-stone-900 font-bold"
-                        : "text-stone-500 hover:bg-stone-50"
-                    }`}
-                  >
-                    <span className="truncate">{tag}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-none font-bold ${
-                        selectedTag === tag ? "bg-stone-200 text-stone-900" : "bg-stone-100 text-stone-500"
+          {/* Tag Folders */}
+          <div className="bg-white border border-stone-200 shadow-sm rounded-2xl overflow-hidden flex-1 flex flex-col min-h-0">
+            <div className="h-0.5 bg-gradient-to-r from-amber-400 to-amber-400/30" />
+            <div className="p-4 flex-1 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-black uppercase tracking-wider text-stone-500">Tag Folders</span>
+                <Tag className="w-3.5 h-3.5 text-amber-400" />
+              </div>
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-0.5">
+                {allTags.length === 0 ? (
+                  <p className="text-[10px] text-stone-400 italic px-1">No tags yet.</p>
+                ) : (
+                  allTags.map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => { setSelectedSegmentId(null); setSelectedTag(tag); }}
+                      className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-between cursor-pointer ${
+                        selectedTag === tag
+                          ? "bg-wa-green/10 text-wa-green"
+                          : "text-stone-500 hover:bg-stone-50 hover:text-stone-800"
                       }`}
                     >
-                      {contacts.filter((c) => c.tags?.includes(tag)).length}
-                    </span>
-                  </button>
-                ))}
+                      <span className="truncate">{tag}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${selectedTag === tag ? "bg-wa-green text-white" : "bg-stone-100 text-stone-500"}`}>
+                        {contacts.filter((c) => c.tags?.includes(tag)).length}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden gap-4">
+
+          {/* Toolbar */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by name, phone or email…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white border border-stone-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-wa-green transition-colors shadow-sm"
+              />
+            </div>
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-2 animate-slide-up">
+                <span className="inline-flex items-center px-2.5 py-1.5 rounded-full bg-stone-900 text-white text-[10px] font-bold whitespace-nowrap">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={handleBulkAddTag}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 border border-stone-200 bg-white text-stone-700 hover:border-wa-green hover:text-wa-green rounded-xl transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <Tag className="w-3.5 h-3.5" />
+                  Tag
+                </button>
               </div>
             )}
           </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col min-w-0 bg-transparent w-full text-left items-stretch overflow-hidden">
-          {/* Toolbar */}
-          <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 items-start sm:items-center shrink-0">
-            <div className="relative flex-1 max-w-md w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-              <input
-                type="text"
-                placeholder="Search customers by name, phone or email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white border border-stone-200 pl-10 pr-4 py-2 text-xs font-semibold focus:outline-none focus:border-stone-900 transition-all text-left placeholder:text-stone-400 rounded-none h-9"
-              />
-            </div>
-            
-            {/* Bulk Actions Bar */}
-            <div
-              className={`flex items-center gap-2 transition-all duration-300 origin-right ${
-                selectedIds.size > 0 ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none w-0 overflow-hidden"
-              }`}
-            >
-              <span className="text-[10px] font-bold text-stone-500 mr-2 shrink-0">
-                {selectedIds.size} selected
-              </span>
-              <button
-                onClick={handleBulkAddTag}
-                className="flex items-center gap-1.5 bg-white border border-stone-200 hover:border-stone-400 text-stone-700 px-3 py-1.5 rounded-none text-[10px] font-bold transition-all shadow-none shrink-0 cursor-pointer"
-              >
-                <Tag className="w-3.5 h-3.5" />
-                Add Tag
-              </button>
-            </div>
-          </div>
 
           {/* Table */}
-          <div className="flex-1 overflow-hidden min-h-0 bg-white border border-stone-200">
+          <div className="flex-1 overflow-hidden min-h-0 bg-white border border-stone-300 shadow-sm rounded-2xl">
             <CustomersTable
               contacts={filteredContacts}
               totalContacts={contacts.length}
@@ -483,6 +612,16 @@ export const CustomersTab: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <CSVImporterModal
+        isOpen={isCSVModalOpen}
+        onClose={() => setIsCSVModalOpen(false)}
+        orgId={orgId}
+        onSuccess={(count) => {
+          notify.success(`Imported ${count} contacts`);
+          setIsCSVModalOpen(false);
+        }}
+      />
 
       <BulkAddTagModal
         isOpen={isBulkAddModalOpen}
@@ -507,90 +646,92 @@ export const CustomersTab: React.FC = () => {
 
       {/* Smart Segment Builder Modal */}
       {isSegmentBuilderOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-white border border-stone-300 rounded-none shadow-xl flex flex-col max-h-[85vh] animate-slide-up">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="w-full max-w-2xl bg-white border border-stone-200 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[88vh] animate-slide-up">
+
             {/* Modal Header */}
-            <div className="p-5 border-b border-stone-200 bg-stone-50 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-stone-900 flex items-center gap-2">
-                <Filter className="w-4 h-4 text-stone-900" />
-                Create Smart Segment
-              </h3>
-              <button 
+            <div className="px-6 py-5 border-b border-stone-100 flex justify-between items-start shrink-0">
+              <div>
+                <h3 className="text-base font-black text-stone-900">Create Smart Segment</h3>
+                <p className="text-xs text-stone-500 mt-0.5">Build a reusable filter to target specific contacts</p>
+              </div>
+              <button
                 onClick={() => setIsSegmentBuilderOpen(false)}
-                className="p-1 text-stone-500 hover:bg-stone-200 rounded-none border border-transparent transition-colors cursor-pointer"
+                className="p-2 rounded-xl hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSaveSegment} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-              
+            <form onSubmit={handleSaveSegment} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
+
               {/* Segment Name */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Segment Name</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Segment Name</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. VIP Active Shopify Leads"
                   value={newSegmentName}
                   onChange={(e) => setNewSegmentName(e.target.value)}
-                  className="w-full bg-white text-stone-900 border border-stone-200 rounded-none py-2 px-3 text-xs font-semibold focus:outline-none focus:border-stone-900 placeholder:text-stone-400"
+                  className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-wa-green transition-colors"
                 />
               </div>
 
-              {/* Match logic logic toggle */}
+              {/* Match logic toggle */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Filter Logic Combination</label>
-                <div className="flex gap-2 bg-stone-50 p-1 border border-stone-200 rounded-none">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Filter Logic</label>
+                <div className="flex gap-1.5 bg-stone-100 p-1 rounded-xl">
                   <button
                     type="button"
                     onClick={() => setRulesLogic("all")}
-                    className={`flex-1 py-1.5 text-center text-[10px] font-bold rounded-none cursor-pointer transition-all ${
-                      rulesLogic === "all" ? "bg-stone-950 text-white" : "text-stone-500 hover:text-stone-900"
+                    className={`flex-1 py-2 text-center text-xs font-bold rounded-lg cursor-pointer transition-all ${
+                      rulesLogic === "all" ? "bg-white text-wa-green shadow-sm" : "text-stone-500 hover:text-stone-800"
                     }`}
                   >
-                    Match All Filters (AND)
+                    Match All (AND)
                   </button>
                   <button
                     type="button"
                     onClick={() => setRulesLogic("any")}
-                    className={`flex-1 py-1.5 text-center text-[10px] font-bold rounded-none cursor-pointer transition-all ${
-                      rulesLogic === "any" ? "bg-stone-950 text-white" : "text-stone-500 hover:text-stone-900"
+                    className={`flex-1 py-2 text-center text-xs font-bold rounded-lg cursor-pointer transition-all ${
+                      rulesLogic === "any" ? "bg-white text-wa-green shadow-sm" : "text-stone-500 hover:text-stone-800"
                     }`}
                   >
-                    Match Any Filter (OR)
+                    Match Any (OR)
                   </button>
                 </div>
               </div>
 
-              {/* Rules List Builder */}
+              {/* Rules List */}
               <div className="space-y-3">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600 flex justify-between">
-                  <span>Conditions</span>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500">Conditions</label>
                   <button
                     type="button"
                     onClick={handleAddRuleRow}
-                    className="text-[9px] text-stone-900 bg-stone-100 border border-stone-300 hover:bg-stone-200 px-2 py-0.5 font-bold transition-all rounded-none cursor-pointer"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-700 border border-stone-200 bg-stone-50 hover:bg-stone-100 hover:border-stone-300 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
                   >
-                    + ADD FILTER ROW
+                    <Plus className="w-3 h-3" />
+                    Add Filter
                   </button>
-                </label>
+                </div>
 
                 {newRules.length === 0 ? (
-                  <div className="text-center py-6 border border-dashed border-stone-350 text-xs text-stone-400">
-                    No matching filters added. Segment will match all contacts.
+                  <div className="text-center py-8 border border-dashed border-stone-200 rounded-xl text-xs text-stone-400">
+                    No conditions added — segment will match all contacts.
                   </div>
                 ) : (
-                  <div className="space-y-2.5">
+                  <div className="space-y-2">
                     {newRules.map((rule, idx) => (
-                      <div key={idx} className="flex gap-2 items-center bg-stone-50 border border-stone-200 p-3 rounded-none relative">
-                        {/* Field Selection */}
-                        <div className="flex-1 min-w-[100px]">
+                      <div key={idx} className="flex gap-2 items-center bg-stone-50 border border-stone-200 p-3 rounded-xl">
+                        {/* Field */}
+                        <div className="relative flex-1 min-w-[100px]">
                           <select
                             value={rule.field}
                             onChange={(e) => handleUpdateRule(idx, { field: e.target.value as any })}
-                            className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-1.5 text-[11px] font-bold focus:outline-none focus:border-stone-900"
+                            className="appearance-none w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-stone-800 focus:outline-none focus:border-wa-green pr-6 cursor-pointer"
                           >
                             <option value="tags">Tags</option>
                             <option value="status">Status</option>
@@ -598,9 +739,10 @@ export const CustomersTab: React.FC = () => {
                             <option value="attribute">Custom Attribute</option>
                             <option value="lastActive">Last Active</option>
                           </select>
+                          <ChevronDown className="w-3 h-3 text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                         </div>
 
-                        {/* Attribute Key Input (Conditional) */}
+                        {/* Attribute Key */}
                         {rule.field === "attribute" && (
                           <div className="flex-1 min-w-[80px]">
                             <input
@@ -609,60 +751,41 @@ export const CustomersTab: React.FC = () => {
                               placeholder="Key (e.g. city)"
                               value={rule.key || ""}
                               onChange={(e) => handleUpdateRule(idx, { key: e.target.value })}
-                              className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none focus:border-stone-900 placeholder:text-stone-400 font-semibold"
+                              className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-[11px] text-stone-800 focus:outline-none focus:border-wa-green placeholder:text-stone-400"
                             />
                           </div>
                         )}
 
-                        {/* Operator Dropdown */}
-                        <div className="flex-1 min-w-[90px]">
+                        {/* Operator */}
+                        <div className="relative flex-1 min-w-[100px]">
                           <select
                             value={rule.op}
                             onChange={(e) => handleUpdateRule(idx, { op: e.target.value as any })}
-                            className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none focus:border-stone-900"
+                            className="appearance-none w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-[11px] text-stone-800 focus:outline-none focus:border-wa-green pr-6 cursor-pointer"
                           >
-                            {rule.field === "tags" && (
-                              <>
-                                <option value="in">Contains Any Of</option>
-                                <option value="neq">Excludes Any Of</option>
-                              </>
-                            )}
-                            {rule.field === "status" && (
-                              <>
-                                <option value="eq">Equals</option>
-                                <option value="neq">Not Equals</option>
-                              </>
-                            )}
-                            {rule.field === "source" && (
-                              <>
-                                <option value="eq">Is Exactly</option>
-                                <option value="contains">Contains Word</option>
-                              </>
-                            )}
-                            {rule.field === "attribute" && (
-                              <>
-                                <option value="eq">Equals</option>
-                              </>
-                            )}
-                            {rule.field === "lastActive" && (
-                              <>
-                                <option value="active_within_days">Active Within Days</option>
-                              </>
-                            )}
+                            {rule.field === "tags" && (<><option value="in">Contains Any Of</option><option value="neq">Excludes Any Of</option></>)}
+                            {rule.field === "status" && (<><option value="eq">Equals</option><option value="neq">Not Equals</option></>)}
+                            {rule.field === "source" && (<><option value="eq">Is Exactly</option><option value="contains">Contains Word</option></>)}
+                            {rule.field === "attribute" && (<option value="eq">Equals</option>)}
+                            {rule.field === "lastActive" && (<option value="active_within_days">Active Within Days</option>)}
                           </select>
+                          <ChevronDown className="w-3 h-3 text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                         </div>
 
-                        {/* Value Input */}
-                        <div className="flex-1 min-w-[110px]">
+                        {/* Value */}
+                        <div className="relative flex-1 min-w-[110px]">
                           {rule.field === "status" ? (
-                            <select
-                              value={rule.value}
-                              onChange={(e) => handleUpdateRule(idx, { value: e.target.value })}
-                              className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none focus:border-stone-900 font-semibold"
-                            >
-                              <option value="Active">Active</option>
-                              <option value="Inactive">Inactive</option>
-                            </select>
+                            <>
+                              <select
+                                value={rule.value}
+                                onChange={(e) => handleUpdateRule(idx, { value: e.target.value })}
+                                className="appearance-none w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-stone-800 focus:outline-none focus:border-wa-green pr-6 cursor-pointer"
+                              >
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                              </select>
+                              <ChevronDown className="w-3 h-3 text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            </>
                           ) : rule.field === "lastActive" ? (
                             <input
                               type="number"
@@ -671,28 +794,26 @@ export const CustomersTab: React.FC = () => {
                               placeholder="e.g. 7"
                               value={rule.value}
                               onChange={(e) => handleUpdateRule(idx, { value: parseInt(e.target.value) || "" })}
-                              className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none focus:border-stone-900 font-semibold"
+                              className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-stone-800 focus:outline-none focus:border-wa-green"
                             />
                           ) : (
                             <input
                               type="text"
                               required
-                              placeholder="Value..."
+                              placeholder="Value…"
                               value={rule.value || ""}
                               onChange={(e) => handleUpdateRule(idx, { value: e.target.value })}
-                              className="w-full bg-white text-stone-900 border border-stone-200 rounded-none p-1.5 text-[11px] focus:outline-none focus:border-stone-900 placeholder:text-stone-400 font-semibold"
+                              className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-[11px] text-stone-800 focus:outline-none focus:border-wa-green placeholder:text-stone-400"
                             />
                           )}
                         </div>
 
-                        {/* Delete Row button */}
                         <button
                           type="button"
                           onClick={() => handleRemoveRuleRow(idx)}
-                          className="text-stone-450 hover:text-stone-900 p-1 rounded-none hover:bg-stone-200 border border-transparent transition-colors cursor-pointer shrink-0"
-                          title="Remove Rule"
+                          className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer shrink-0"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ))}
@@ -700,28 +821,32 @@ export const CustomersTab: React.FC = () => {
                 )}
               </div>
 
-              {/* Dynamic preview block */}
-              <div className="bg-stone-50 border border-stone-250 p-4 rounded-none flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-stone-800" />
+              {/* Audience Preview */}
+              <div className="bg-gradient-to-r from-wa-green/5 to-transparent border border-wa-green/20 rounded-xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-wa-green/10 flex items-center justify-center shrink-0">
+                    <Users className="w-4 h-4 text-wa-green" />
+                  </div>
                   <div>
-                    <span className="text-[10px] font-bold text-stone-600 block uppercase">Audience Size Preview</span>
-                    <span className="text-xs font-semibold text-stone-500">Live audience calculation based on active CRM leads.</span>
+                    <span className="text-[10px] font-bold text-stone-500 block uppercase tracking-wider">Live Preview</span>
+                    <span className="text-xs text-stone-500">Contacts matching these rules</span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-xl font-black text-stone-900 font-mono">{previewCountNum}</span>
-                  <span className="text-[10px] text-stone-400 block font-bold uppercase">Contacts Match</span>
+                  <span className={`text-2xl font-black font-mono ${previewCountNum > 0 ? "text-wa-green" : "text-stone-300"}`}>
+                    {previewCountNum}
+                  </span>
+                  <span className="text-[10px] text-stone-400 block font-bold uppercase">matches</span>
                 </div>
               </div>
             </form>
 
             {/* Modal Footer */}
-            <div className="p-5 border-t border-stone-200 bg-stone-50 flex justify-end gap-2.5 shrink-0">
+            <div className="border-t border-stone-100 px-6 py-4 flex justify-end gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsSegmentBuilderOpen(false)}
-                className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 font-semibold text-xs rounded-none cursor-pointer border border-stone-300 transition-all uppercase"
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 rounded-xl transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -729,7 +854,7 @@ export const CustomersTab: React.FC = () => {
                 type="submit"
                 onClick={handleSaveSegment}
                 disabled={isSavingSegment || !newSegmentName.trim()}
-                className="px-4 py-2 bg-stone-950 hover:bg-stone-900 disabled:opacity-40 text-white font-bold text-xs rounded-none cursor-pointer flex items-center gap-1.5 transition-all border border-stone-950 uppercase"
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-5 py-2.5 bg-wa-green hover:bg-wa-green-dark text-white rounded-xl transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Save Smart Segment
               </button>

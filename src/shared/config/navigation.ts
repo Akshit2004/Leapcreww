@@ -15,6 +15,7 @@ import {
   Truck,
   ShoppingBag,
   CalendarCheck,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -59,6 +60,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: "chatbot", label: "Chatbot", icon: Cpu, keywords: ["bot", "automation", "autoresponder"] },
       { id: "flows", label: "Flows", icon: Layers, keywords: ["builder", "nodes", "forms"] },
+      { id: "recipes", label: "Automations", icon: Zap, keywords: ["automation", "workflow", "use cases", "prebuilt", "recipes"] },
     ],
   },
   {
@@ -104,8 +106,11 @@ export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
 export const VALID_TAB_IDS = NAV_ITEMS.map((i) => i.id);
 
+/** Tab IDs that are valid routing destinations but not shown in the sidebar. */
+export const HIDDEN_VALID_TABS = ["ai-workspace"];
+
 export function isValidTab(tab: string | null | undefined): boolean {
-  return !!tab && VALID_TAB_IDS.includes(tab);
+  return !!tab && (VALID_TAB_IDS.includes(tab) || HIDDEN_VALID_TABS.includes(tab));
 }
 
 export type BusinessVertical = "ECOMMERCE" | "APPOINTMENT" | "GENERAL";
