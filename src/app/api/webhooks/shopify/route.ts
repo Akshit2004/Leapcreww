@@ -5,6 +5,7 @@ import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
 import { resolveAttribution } from "@/features/analytics/services/attribution";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
 import { verifyShopifyWebhookHmac } from "@/features/integrations/lib/shopifyAuth";
+import { checkAndFlagCodRisk } from "@/features/cod/services/codService";
 
 // Catalog synchronization lives at POST /api/org/[orgId]/integrations/shopify/sync.
 // This route receives Shopify push webhooks (HMAC-verified) including GDPR
@@ -238,6 +239,9 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
     const totalPriceInPaise = Math.round(parseFloat(payload.total_price || "0") * 100);
     const formattedPrice = (totalPriceInPaise / 100).toFixed(2);
     const shopifyOrderId = `SHPFY-${payload.order_number || payload.id}`;
+    // Raw Shopify numeric order ID — needed for Admin API calls (fulfillment hold,
+    // address write-back). payload.id is number | string depending on the topic.
+    const shopifyNumericId = payload.id != null ? String(payload.id) : undefined;
 
     // 1. Upsert contact
     const contact = await upsertShopifyContact(
@@ -249,9 +253,12 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       ["Shopify", "Shopify-Buyer"]
     );
 
-    // Mark cart as recovered and cancel any active abandoned-cart sequences
+    // Mark cart as recovered and cancel any active OR paused abandoned-cart sequences
     const contactAttributes = (contact.attributes as Record<string, unknown>) || {};
     contactAttributes.cart_recovered = true;
+    contactAttributes.cart_recovery_enrolled = false;
+    contactAttributes.cart_recovered_at = new Date().toISOString();
+    contactAttributes.last_order_id = shopifyOrderId;
 
     // For COD orders, store the details the confirmation sequence needs
     if (isCod) {
@@ -268,15 +275,15 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
       data: { attributes: contactAttributes as Prisma.InputJsonValue },
     });
 
-    const activeEnrollments = await prisma.sequenceEnrollment.findMany({
-      where: { contactId: contact.id, status: "active", sequence: { trigger: "cart_abandoned" } },
+    await prisma.sequenceEnrollment.updateMany({
+      where: {
+        contactId: contact.id,
+        organizationId: orgId,
+        status: { in: ["active", "paused"] },
+        sequence: { trigger: "cart_abandoned" },
+      },
+      data: { status: "completed", nextRunAt: null },
     });
-    for (const enrollment of activeEnrollments) {
-      await prisma.sequenceEnrollment.update({
-        where: { id: enrollment.id },
-        data: { status: "completed", nextRunAt: null },
-      });
-    }
 
     // 2. Create order record
     const attribution = await resolveAttribution(orgId, contact);
@@ -290,6 +297,7 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
         codStatus: isCod ? "pending" : null,
         phone: phone,
         organizationId: orgId,
+        shopifyNumericId: shopifyNumericId ?? null,
         ...attribution,
       },
     });
@@ -328,8 +336,21 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
     const { emitEvent } = await import("@/features/webhooks/services/webhookDeliveryService");
 
     if (isCod) {
-      // COD path: enroll in confirmation sequence (sends the yes/no template).
-      // Skip the direct order_confirmation send — the sequence handles outreach.
+      // Score risk before enrolling. Address verification fires via the
+      // order_placed trigger (the address_verification recipe installs a
+      // sequence with trigger=order_placed — enrollOnTrigger("order_placed")
+      // below picks it up automatically).
+      await checkAndFlagCodRisk(
+        orgId,
+        contact.id,
+        name,
+        phone,
+        shopifyOrderId,
+        totalPriceInPaise,
+        orderItems.map((i: ShopifyLineItem) => ({ name: i.title, quantity: i.quantity || 1 })),
+        shopifyNumericId,
+        savedOrder.id,  // internalOrderId — enables token prepay flow
+      );
       await enrollOnTrigger(orgId, "cod_order_placed", contact.id);
 
       await emitEvent(orgId, "order.cod_pending", {
@@ -348,7 +369,7 @@ async function handleWebhookEvent(topic: string, payload: ShopifyWebhookPayload,
         },
       });
     } else {
-      // Prepaid path: existing behaviour — enroll in order_placed (confirmation + review).
+      // Prepaid path — address_verification sequence fires via order_placed trigger.
       await enrollOnTrigger(orgId, "order_placed", contact.id);
 
       await emitEvent(orgId, "order.placed", {

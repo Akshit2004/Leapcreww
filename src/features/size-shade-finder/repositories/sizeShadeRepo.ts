@@ -19,3 +19,51 @@ export function updateContactAttributes(contactId: string, attributes: Record<st
     data: { attributes },
   });
 }
+
+export interface BrandVoice {
+  brandName: string;
+  /** Free-form tone descriptor distilled from brandProfile / aiPersona. */
+  tone: string;
+  vertical: string;
+}
+
+/**
+ * Distil the org's brand identity into a compact voice descriptor that the
+ * finders feed to Groq, so recommendations sound like the brand's own
+ * stylist/beauty-advisor rather than a generic bot.
+ */
+export async function getOrgBrandVoice(organizationId: string): Promise<BrandVoice> {
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { name: true, businessVertical: true, brandProfile: true, aiPersona: true },
+  });
+
+  const profile = (org?.brandProfile as Record<string, any> | null) ?? {};
+  const toneParts = [
+    profile.toneOfVoice,
+    profile.tone,
+    org?.aiPersona,
+    profile.industry,
+  ].filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+
+  return {
+    brandName: (profile.name as string) || org?.name || "our store",
+    tone: toneParts.join(" · ") || "warm, friendly and genuinely helpful — like a favourite store associate",
+    vertical: org?.businessVertical || "GENERAL",
+  };
+}
+
+/** First dialable WhatsApp number for the org (for wa.me deep links). */
+export async function getOrgDialableNumber(organizationId: string): Promise<string | null> {
+  const pn = await prisma.phoneNumber.findFirst({
+    where: { organizationId },
+    select: { phoneNumber: true },
+    orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+  });
+  if (pn?.phoneNumber) return pn.phoneNumber.replace(/\D/g, "");
+  const widget = await prisma.widgetConfig.findUnique({
+    where: { organizationId },
+    select: { phoneNumber: true },
+  });
+  return widget?.phoneNumber ? widget.phoneNumber.replace(/\D/g, "") : null;
+}

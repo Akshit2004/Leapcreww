@@ -52,6 +52,7 @@ export interface ShiprocketWebhookPayload {
   order_id?: string | number;
   shipment_id?: string | number;
   courier_name?: string;
+  attempt?: number | string; // delivery attempt number (NDR events)
   /**
    * Examples: "SHIPPED" | "OUT FOR DELIVERY" | "DELIVERED" | "NDR" |
    * "RTO INITIATED" | "RTO DELIVERED" | "PICKUP SCHEDULED" | "PICKUP GENERATED"
@@ -205,16 +206,14 @@ export async function handleShiprocketStatusUpdate(
         break;
       }
 
-      // ---- Out for delivery → immediate free-form WhatsApp nudge ----------
+      // ---- Out for delivery → enroll OFD sequence (template) ----------------
       case "OUT FOR DELIVERY": {
-        const ofdMessage =
-          "🚚 Your order is out for delivery today! Expect it shortly.";
-        await sendWhatsAppMessage({ to: phone, text: ofdMessage }, orgId).catch(
-          (err) => console.error("[Shiprocket] OFD WhatsApp send failed:", err)
-        );
+        // Prefer the proper OFD template sequence — it respects the 24h session
+        // boundary and uses an approved Meta template when the session is cold.
+        await enrollOnTrigger(orgId, "order_out_for_delivery", contact.id);
         await writeLog(
           orgId,
-          `Shiprocket: OFD event for ${contact.name} (AWB: ${awb}). Out-for-delivery WhatsApp message sent.`
+          `Shiprocket: OFD event for ${contact.name} (AWB: ${awb}). OFD alert sequence queued.`
         );
         break;
       }
@@ -236,11 +235,17 @@ export async function handleShiprocketStatusUpdate(
 
       // ---- NDR → hand off to the dedicated NDR service -------------------
       case "NDR": {
+        const attempt =
+          typeof payload.attempt === "number"
+            ? payload.attempt
+            : typeof payload.attempt === "string"
+            ? parseInt(payload.attempt, 10) || 1
+            : 1;
         await handleNdrWebhook(orgId, {
           awb,
           orderId,
           courier: courierName || undefined,
-          attempt: 1,
+          attempt,
           reason: "Delivery attempt failed",
           customerPhone: phone,
           customerName: payload.customer_name,
@@ -258,6 +263,14 @@ export async function handleShiprocketStatusUpdate(
             console.error("[Shiprocket] RTO WhatsApp send failed:", err)
         );
         await enrollOnTrigger(orgId, "order_rto", contact.id);
+
+        // Feed the shared RTO fraud network — a confirmed RTO is the strongest
+        // signal of all. Best-effort; never breaks webhook processing.
+        try {
+          const { recordNetworkSignal } = await import("@/features/cod/services/networkSignalService");
+          await recordNetworkSignal(phone, "rto", orgId);
+        } catch { /* non-fatal */ }
+
         await writeLog(
           orgId,
           `Shiprocket: RTO initiated for ${contact.name} (AWB: ${awb}). Customer notified on WhatsApp.`

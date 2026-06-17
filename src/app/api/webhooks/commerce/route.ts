@@ -21,6 +21,7 @@ import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
 import { emitEvent } from "@/features/webhooks/services/webhookDeliveryService";
 import { authenticateApiKey } from "@/features/public-api/services/apiKeyService";
 import { ApiError } from "@/shared/lib/api";
+import { checkAndFlagCodRisk } from "@/features/cod/services/codService";
 
 const CommerceEventSchema = z.object({
   event: z.enum(["order.cod_pending", "order.placed", "cart.abandoned", "inventory.restocked"]),
@@ -133,6 +134,39 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // Cancel any active/paused cart recovery enrollments — customer placed an order
+      await prisma.sequenceEnrollment.updateMany({
+        where: {
+          contactId: contact.id,
+          organizationId: orgId,
+          status: { in: ["active", "paused"] },
+          sequence: { trigger: "cart_abandoned" },
+        },
+        data: { status: "completed", nextRunAt: null },
+      });
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          attributes: {
+            ...((contact.attributes as Record<string, unknown>) || {}),
+            cart_recovered: true,
+            cart_recovery_enrolled: false,
+            cart_recovered_at: new Date().toISOString(),
+          },
+        },
+      });
+
+      await checkAndFlagCodRisk(
+        orgId,
+        contact.id,
+        contact.name,
+        phone,
+        order.id,
+        Math.round(order.total * 100),
+        order.items?.map((i) => ({ name: i.name, quantity: i.quantity })),
+        // shopifyNumericId — not available for non-Shopify sources
+        undefined,
+      );
       await enrollOnTrigger(orgId, "cod_order_placed", contact.id);
 
       await emitEvent(orgId, "order.cod_pending", {
@@ -169,6 +203,28 @@ export async function POST(req: NextRequest) {
           codStatus: null,
           phone,
           organizationId: orgId,
+        },
+      });
+
+      // Cancel any active/paused cart recovery enrollments — customer placed an order
+      await prisma.sequenceEnrollment.updateMany({
+        where: {
+          contactId: contact.id,
+          organizationId: orgId,
+          status: { in: ["active", "paused"] },
+          sequence: { trigger: "cart_abandoned" },
+        },
+        data: { status: "completed", nextRunAt: null },
+      });
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          attributes: {
+            ...((contact.attributes as Record<string, unknown>) || {}),
+            cart_recovered: true,
+            cart_recovery_enrolled: false,
+            cart_recovered_at: new Date().toISOString(),
+          },
         },
       });
 

@@ -18,9 +18,11 @@ import {
   failCampaignsAwaitingTemplate,
 } from "@/features/campaigns/services/strategistActivation";
 import { handleCodReply } from "@/features/cod/services/codService";
+import { handleAddressConfirmReply } from "@/features/cod/services/addressConfirmService";
+import { handleCartRecoveryReply } from "@/features/sequences/services/cartRecoveryAgent";
 import { handleLeadQualifier } from "@/features/campaigns/services/leadQualifierService";
 import { handleNdrReply } from "@/features/ndr/services/ndrService";
-import { handleSizeFinderReply, handleShadeFinderReply } from "@/features/size-shade-finder/services/sizeShadeService";
+import { handleSizeFinderReply, handleShadeFinderReply, handleFinderKeyword } from "@/features/size-shade-finder/services/sizeShadeService";
 import { handleReplenishmentReply } from "@/features/replenishment/services/replenishmentService";
 import * as repo from "../repositories/whatsappWebhookRepo";
 
@@ -398,6 +400,17 @@ export async function processInboundMessage(
     if (qualifierHandled) return;
   }
 
+  // Address confirmation intercept: handles YES/NO replies to pre-shipment
+  // address verification pings. Runs before COD to avoid misrouting.
+  const addrHandled = await handleAddressConfirmReply(cleanText, contact, orgId);
+  if (addrHandled) return;
+
+  // Cart recovery intercept: pause the active drip sequence, run Analyst +
+  // Ghostwriter + Closer pipeline. Runs before COD so a recovery conversation
+  // is not misread as a COD confirmation.
+  const cartRecoveryHandled = await handleCartRecoveryReply(cleanText, contact, orgId);
+  if (cartRecoveryHandled) return;
+
   // COD confirmation intercept: takes priority over all other routing.
   // Returns true if the message was a YES/NO reply to a pending COD order.
   const codHandled = await handleCodReply(cleanText, contact, orgId);
@@ -408,11 +421,17 @@ export async function processInboundMessage(
   const ndrHandled = await handleNdrReply(cleanText, contact, orgId);
   if (ndrHandled) return;
 
-  // Size finder intercept: guides customer through gender → height → weight → size recommendation.
+  // Finder keyword entry: a customer messaging "SHADE" / "SIZE" (e.g. from a
+  // storefront wa.me deep link) starts the relevant finder. Runs before the
+  // reply handlers; it no-ops when a finder flow is already in progress.
+  const finderStarted = await handleFinderKeyword(cleanText, contact, orgId);
+  if (finderStarted) return;
+
+  // Size finder intercept: anchor-based fit flow (category → usual size → fit pref).
   const sizeHandled = await handleSizeFinderReply(cleanText, contact, orgId);
   if (sizeHandled) return;
 
-  // Shade finder intercept: guides customer through skin tone → undertone → shade recommendation.
+  // Shade finder intercept: depth → undertone (jewellery proxy) → finish → shade, with optional refine.
   const shadeHandled = await handleShadeFinderReply(cleanText, contact, orgId);
   if (shadeHandled) return;
 

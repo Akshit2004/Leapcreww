@@ -1,0 +1,10 @@
+{
+  "crons": [
+    { "path": "/api/cron/process-sequences",       "schedule": "* * * * *"    },
+    { "path": "/api/cron/process-broadcasts",      "schedule": "* * * * *"    },
+    { "path": "/api/cron/process-launch-steps",    "schedule": "* * * * *"    },
+    { "path": "/api/cron/process-webhooks",        "schedule": "*/5 * * * *"  },
+    { "path": "/api/cron/cod-token-expire",        "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/fulfillment-hold-release","schedule": "0 * * * *"    }
+  ]
+}

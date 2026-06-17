@@ -77,6 +77,20 @@ model Organization {
   // Groq sampling temperature for the free-form AI autoresponder agent
   aiTemperature Float? @default(0.7)
 
+  // Merchant-configured Shopify discount code used by the T3 cart-recovery
+  // incentive send. Must be a code the merchant already created in Shopify —
+  // when null, the recovery pipeline sends a no-incentive template instead of
+  // promising a discount it cannot honour.
+  cartRecoveryDiscountCode String?
+
+  // Opt-in: pause Shopify fulfillment on high-risk COD orders pending WhatsApp verification.
+  // Requires shopify integration to be connected. False by default — merchants enable explicitly.
+  fulfillmentHoldEnabled Boolean @default(false)
+
+  // Opt-in: audit COD orders for risk even before WhatsApp is connected ("Silent Watcher").
+  // Scores orders, tags them in Shopify, surfaces count in the onboarding dashboard.
+  silentWatcherEnabled Boolean @default(false)
+
   // White-label / agency reseller link (T-09)
   partnerId String?
   partner   Partner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
@@ -364,6 +378,10 @@ model Order {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+
+  shopifyNumericId  String? // raw Shopify numeric order ID (payload.id) for Admin API calls
+  fulfillmentHoldId String? // Shopify fulfillment order ID currently on hold
+  fulfillmentHeldAt DateTime? // when the hold was placed — cron auto-releases after 4h
 }
 
 model OrderItem {
@@ -878,6 +896,24 @@ model NdrEvent {
   @@index([organizationId, status])
   @@index([organizationId, awb])
   @@index([contactId])
+}
+
+/// Shared RTO fraud network — the cross-merchant moat.
+/// Each row is a single anonymized risk signal keyed by sha256(phone). Raw PII
+/// is NEVER stored. `organizationId` records which brand reported the signal so
+/// a brand can read its OWN history for a customer; it is deliberately a plain
+/// String (no relation/cascade) so network signals survive even if the
+/// reporting org is deleted — the anonymized dataset is the network's value.
+model NetworkSignal {
+  id             String   @id @default(uuid())
+  phoneHash      String // sha256(normalized phone) — never raw PII
+  signal         String // "rto" | "token_unpaid" | "cod_cancel" | "ndr_2plus"
+  category       String? // product category, e.g. "fashion" | "electronics"
+  organizationId String // reporting brand (internal only; never exposed cross-merchant)
+  createdAt      DateTime @default(now())
+
+  @@index([phoneHash])
+  @@index([organizationId, phoneHash])
 }
 
 model WalletTopup {

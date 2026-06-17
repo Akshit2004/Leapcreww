@@ -33,6 +33,15 @@ export async function handlePaymentSuccess(razorpayOrderId: string, paymentId?: 
     return { status: "order_not_found" };
   }
 
+  // COD token prepay: order is still "pending" COD — customer just paid the
+  // ₹99 token to confirm. Delegate to tokenPrepayService which handles the
+  // confirmation flow, hold release, and customer message.
+  if (order.codStatus === "pending") {
+    const { confirmTokenPayment } = await import("@/features/cod/services/tokenPrepayService");
+    await confirmTokenPayment(order.organizationId, order.id);
+    return { status: "order_confirmed" };
+  }
+
   const wasCodConversion = order.codStatus === "confirmed";
 
   await repo.updateOrder(order.id, {
