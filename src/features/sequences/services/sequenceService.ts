@@ -11,6 +11,12 @@ import { recordTouch } from "@/features/analytics/services/attribution";
 import { recordUsage } from "@/features/billing/services/billingService";
 import * as repo from "../repositories/sequenceRepo";
 import type { SequenceInput, SequenceTrigger } from "../types";
+import {
+  selectCartRecoveryTemplate,
+  buildTemplateComponents,
+  CART_RECOVERY_TEMPLATES,
+} from "./cartRecoveryTemplateSelector";
+import { resolveCartDiscount } from "./cartDiscountService";
 
 const minutesFromNow = (m: number) => new Date(Date.now() + m * 60 * 1000);
 
@@ -131,48 +137,110 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
       sentOk = r.ok;
       if (r.ok) sentPreview = resolvedMessage;
     } else {
-      // Session is expired: promote to cart_recovery template
-      console.log(`[Sequence Fallback] Contact ${contact.name} out of 24h window. Promoting message step to 'cart_recovery' template.`);
-      
+      // Session is expired: use the AI template selector to pick the right
+      // personalised cart-recovery variant with an image header.
       const { prisma } = await import("@/shared/lib/prisma");
-      const dbTemplate = await prisma.template.findFirst({
-        where: { name: "cart_recovery", organizationId, metaStatus: "approved" },
+
+      // Count prior orders to distinguish new vs repeat buyers
+      const orderCount = await prisma.order.count({
+        where: { contactId: contact.id, paymentStatus: "paid" },
       });
 
-      const templateName = dbTemplate?.name || "cart_recovery";
+      // Resolve product image from the first cart item (Product.images[0])
+      let headerImageUrl: string | null = null;
+      const cartItems = String(attrs.cart_items ?? "");
+      if (cartItems) {
+        const firstProductName = cartItems.split(",")[0]?.replace(/\s*\(x\d+\)/, "").trim();
+        if (firstProductName) {
+          const product = await prisma.product.findFirst({
+            where: { name: { contains: firstProductName, mode: "insensitive" }, organizationId },
+            select: { images: true },
+          });
+          headerImageUrl = product?.images?.[0] ?? null;
+        }
+      }
 
-      const r = await sendWhatsAppMessage(
-        {
-          to: phone,
-          template: {
-            name: templateName,
-            language: { code: "en_US" },
-            components: [
-              {
-                type: "body",
-                parameters: [
-                  { type: "text", text: contact.name },
-                  { type: "text", text: attrs.cart_checkout_url || attrs.shopify_checkout_url || "https://leapcreww.com" },
-                ],
-              },
-            ],
+      let selection;
+      try {
+        selection = await selectCartRecoveryTemplate(contact, step.order, orderCount, headerImageUrl);
+      } catch {
+        // Hard fallback to the legacy cart_recovery template if selector fails
+        selection = null;
+      }
+
+      if (selection) {
+        // T3 incentive: only the cr_t3_discount variant promises a discount.
+        // We must have a real, merchant-backed code before sending it — otherwise
+        // the "here's a little something" copy is misleading. When no code is
+        // configured, fall back to the honest no-incentive last-call template
+        // (reusing the same name + product + plain checkout URL).
+        if (step.order >= 2 && selection.template.name === "cr_t3_discount") {
+          const discount = await resolveCartDiscount(contact, organizationId, selection.bodyParams[2]).catch(() => null);
+          if (discount?.code) {
+            selection = {
+              ...selection,
+              bodyParams: [selection.bodyParams[0], selection.bodyParams[1], discount.url],
+            };
+          } else {
+            selection = {
+              template: CART_RECOVERY_TEMPLATES.cr_winback_cold,
+              bodyParams: selection.bodyParams,
+              headerImageUrl: null,
+            };
+          }
+        }
+
+        const components = buildTemplateComponents(selection);
+        const r = await sendWhatsAppMessage(
+          {
+            to: phone,
+            template: {
+              name: selection.template.name,
+              language: { code: "en_US" },
+              components,
+            },
           },
-        },
-        organizationId
-      );
-
-      sentOk = r.ok;
-      if (r.ok) {
-        sentPreview = `[Template: ${templateName}]`;
+          organizationId,
+        );
+        sentOk = r.ok;
+        if (r.ok) {
+          sentPreview = `[Recovery: ${selection.template.name}]`;
+        } else {
+          await prisma.systemLog.create({
+            data: {
+              type: "campaign",
+              message: `⚠️ Cart recovery template '${selection.template.name}' failed for ${contact.name}. Check Meta template approval status.`,
+              organizationId,
+            },
+          });
+        }
       } else {
-        // Log warning in DB system logs
-        await prisma.systemLog.create({
-          data: {
-            type: "campaign",
-            message: `⚠️ Skipped sequence step for ${contact.name}: Contact is outside the 24h window and no approved 'cart_recovery' template was successfully sent.`,
-            organizationId,
-          },
+        // Legacy fallback
+        const dbTemplate = await prisma.template.findFirst({
+          where: { name: "cart_recovery", organizationId, metaStatus: "approved" },
         });
+        const templateName = dbTemplate?.name || "cart_recovery";
+        const r = await sendWhatsAppMessage(
+          {
+            to: phone,
+            template: {
+              name: templateName,
+              language: { code: "en_US" },
+              components: [
+                {
+                  type: "body",
+                  parameters: [
+                    { type: "text", text: contact.name },
+                    { type: "text", text: String(attrs.cart_checkout_url || attrs.shopify_checkout_url || "") },
+                  ],
+                },
+              ],
+            },
+          },
+          organizationId,
+        );
+        sentOk = r.ok;
+        if (r.ok) sentPreview = `[Template: ${templateName}]`;
       }
     }
   } else if (step.actionType === "send_template" && step.templateName) {
@@ -201,6 +269,27 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
       bodyParameters.push({ type: "text" as const, text: attrs.pending_cod_order_total || "0" });
     } else if (templateName === "ndr_alert") {
       bodyParameters.push({ type: "text" as const, text: contact.name });
+    } else if (templateName === "ndr_alert_attempt2") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+    } else if (templateName === "address_confirmation") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+      bodyParameters.push({ type: "text" as const, text: attrs.pending_cod_order_id || attrs.last_order_id || "" });
+    } else if (templateName === "ofd_alert") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+      // For COD orders: inject the exact amount so the customer knows how much
+      // cash to keep ready. "Keep ₹1,450 ready" eliminates "cash not ready" RTO.
+      const codAmount = attrs.pending_cod_order_total
+        ? `₹${attrs.pending_cod_order_total}`
+        : attrs.cod_status
+        ? ""
+        : "";
+      if (codAmount) bodyParameters.push({ type: "text" as const, text: codAmount });
+    } else if (templateName === "rto_initiated") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+    } else if (templateName === "cod_risk_verify") {
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+      bodyParameters.push({ type: "text" as const, text: attrs.pending_cod_order_id || "" });
+      bodyParameters.push({ type: "text" as const, text: attrs.pending_cod_order_total || "0" });
     } else if (templateName === "size_finder_start") {
       bodyParameters.push({ type: "text" as const, text: contact.name });
     } else if (templateName === "shade_finder_start") {
@@ -208,6 +297,16 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
     } else if (templateName === "beauty_replenishment") {
       bodyParameters.push({ type: "text" as const, text: contact.name });
       bodyParameters.push({ type: "text" as const, text: String(attrs.replenishment_days ?? "30") });
+    } else if (templateName.startsWith("cr_")) {
+      // Cart recovery family — {{1}}=name  {{2}}=product  {{3}}=checkoutUrl
+      const productName =
+        String(attrs.cart_items ?? "")
+          .split(",")[0]
+          ?.replace(/\s*\(x\d+\)/, "")
+          .trim() || "your item";
+      bodyParameters.push({ type: "text" as const, text: contact.name });
+      bodyParameters.push({ type: "text" as const, text: productName });
+      bodyParameters.push({ type: "text" as const, text: String(attrs.cart_checkout_url || attrs.shopify_checkout_url || "") });
     } else {
       // Default fallback parameter mappings
       bodyParameters.push({ type: "text" as const, text: contact.name });
@@ -244,11 +343,20 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
       });
     }
 
+    if (r.ok && templateName === "address_confirmation") {
+      const { prisma: p } = await import("@/shared/lib/prisma");
+      const cAttrs = (contact.attributes as Record<string, any>) || {};
+      await p.contact.update({
+        where: { id: contact.id },
+        data: { attributes: { ...cAttrs, address_confirm_pending: true } },
+      });
+    }
+
     if (r.ok && (templateName === "size_finder_start" || templateName === "shade_finder_start")) {
       const { prisma: p } = await import("@/shared/lib/prisma");
       const cAttrs = (contact.attributes as Record<string, any>) || {};
       const stateKey = templateName === "size_finder_start" ? "size_finder_state" : "shade_finder_state";
-      const stateVal = templateName === "size_finder_start" ? "awaiting_gender" : "awaiting_skin_tone";
+      const stateVal = templateName === "size_finder_start" ? "awaiting_category" : "awaiting_depth";
       await p.contact.update({
         where: { id: contact.id },
         data: { attributes: { ...cAttrs, [stateKey]: stateVal } },

@@ -1,73 +1,33 @@
+/**
+ * sizeShadeService.ts — the Shade Finder and Size Finder conversational agents.
+ *
+ * Both are deliberately *short* (3 tappable questions) and *personable*: the
+ * questions arrive as WhatsApp interactive buttons, every answer gets a warm
+ * human acknowledgement, and the final recommendation is written by Groq in the
+ * brand's own voice (naming the product the customer was looking at, if known).
+ *
+ * Entry points:
+ *   - Brand-triggered: a template send sets `shade_finder_state` / `size_finder_state`
+ *     (see sequenceService) and the customer's reply lands in the handlers below.
+ *   - Customer-triggered: the customer messages "SHADE" / "SIZE" (e.g. from a
+ *     storefront wa.me deep link) → handleFinderKeyword starts the flow and, by
+ *     virtue of them messaging us, we now have their phone number.
+ *
+ * Interactive button replies arrive as the button *id* (see whatsapp webhook
+ * route), so every state matches on ids first, then falls back to typed text so
+ * customers who type "fair" / "medium" / "M" still get through.
+ */
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
+import { getGroqChatCompletionWithFallback } from "@/shared/lib/groq";
 import type { Contact } from "@prisma/client";
-import { getContactAttributes, updateContactAttributes } from "../repositories/sizeShadeRepo";
+import {
+  getContactAttributes,
+  updateContactAttributes,
+  getOrgBrandVoice,
+  type BrandVoice,
+} from "../repositories/sizeShadeRepo";
 
-// ── Size recommendation ──────────────────────────────────────────────────────
-
-function parseHeightCm(raw: string): number | null {
-  const s = raw.trim().toLowerCase();
-  // "5'5"" or "5'5" or "5 5"
-  const ft = s.match(/(\d+)['']?\s*(\d+)?[""']?/);
-  if (ft && parseInt(ft[1]) <= 7) {
-    const feet = parseInt(ft[1]);
-    const inches = ft[2] ? parseInt(ft[2]) : 0;
-    return Math.round((feet * 30.48) + (inches * 2.54));
-  }
-  const cm = s.match(/(\d+\.?\d*)\s*cm?/);
-  if (cm) return Math.round(parseFloat(cm[1]));
-  const plain = s.match(/^(\d{3})$/);
-  if (plain) return parseInt(plain[1]);
-  return null;
-}
-
-function parseWeightKg(raw: string): number | null {
-  const s = raw.trim().toLowerCase();
-  const kg = s.match(/(\d+\.?\d*)\s*kg?/);
-  if (kg) return Math.round(parseFloat(kg[1]));
-  const lbs = s.match(/(\d+\.?\d*)\s*l[bi]/);
-  if (lbs) return Math.round(parseFloat(lbs[1]) * 0.453592);
-  const plain = s.match(/^(\d{2,3})$/);
-  if (plain) return parseInt(plain[1]);
-  return null;
-}
-
-function recommendSize(gender: string, heightCm: number, weightKg: number): string {
-  if (gender === "women") {
-    if (weightKg < 46 || heightCm < 155)            return "XS";
-    if (weightKg < 56 && heightCm < 165)             return "S";
-    if (weightKg < 66 && heightCm < 170)             return "M";
-    if (weightKg < 78 && heightCm < 177)             return "L";
-    return "XL";
-  }
-  if (gender === "men") {
-    if (weightKg < 58 || heightCm < 165)             return "S";
-    if (weightKg < 72 && heightCm < 178)             return "M";
-    if (weightKg < 85 && heightCm < 183)             return "L";
-    if (weightKg < 98 && heightCm < 190)             return "XL";
-    return "XXL";
-  }
-  // kids — by height only
-  if (heightCm < 100) return "3-4Y";
-  if (heightCm < 110) return "5-6Y";
-  if (heightCm < 122) return "7-8Y";
-  if (heightCm < 134) return "9-10Y";
-  return "11-12Y";
-}
-
-// ── Shade recommendation ─────────────────────────────────────────────────────
-
-const SHADE_MAP: Record<string, Record<string, string>> = {
-  "1": { "1": "Porcelain / N05", "2": "Ivory / W05", "3": "Vanilla / NC10" },
-  "2": { "1": "Shell / NC15",    "2": "Nude / NW10", "3": "Sand / NC20"    },
-  "3": { "1": "Natural / NC25",  "2": "Honey / NW25","3": "Beige / NC30"   },
-  "4": { "1": "Warm Olive / N35","2": "Caramel / W35","3":"Golden / NC40"  },
-  "5": { "1": "Mahogany / N45",  "2": "Mocha / W45", "3": "Espresso / NC50"},
-  "6": { "1": "Ebony / N55",     "2": "Bronze / W55","3": "Onyx / NC60"    },
-};
-
-function recommendShade(skinTone: string, undertone: string): string {
-  return SHADE_MAP[skinTone]?.[undertone] ?? "Natural / NC25";
-}
+type ReplyButton = { type: "reply"; reply: { id: string; title: string } };
 
 // ── Attribute helpers ────────────────────────────────────────────────────────
 
@@ -84,80 +44,144 @@ async function send(contact: Contact, orgId: string, text: string) {
   await sendWhatsAppMessage({ to: formatPhoneNumber(contact.phone), text }, orgId);
 }
 
-// ── Size finder state machine ────────────────────────────────────────────────
-
-export async function handleSizeFinderReply(
-  text: string,
+async function sendButtons(
   contact: Contact,
-  orgId: string
-): Promise<boolean> {
-  const attrs = (contact.attributes as Record<string, any>) ?? {};
-  const state: string | undefined = attrs.size_finder_state;
-  if (!state || state === "done") return false;
-
-  const t = text.trim();
-
-  if (state === "awaiting_gender") {
-    const up = t.toUpperCase();
-    let gender: string | null = null;
-    if (["1", "W", "WOMEN", "WOMAN", "FEMALE", "F"].includes(up)) gender = "women";
-    else if (["2", "M", "MEN", "MAN", "MALE"].includes(up)) gender = "men";
-    else if (["3", "K", "KID", "KIDS", "CHILD", "CHILDREN"].includes(up)) gender = "kids";
-
-    if (!gender) {
-      await send(contact, orgId, "Please reply *1* for Women, *2* for Men, or *3* for Kids.");
-      return true;
-    }
-    await setAttrs(contact.id, { size_finder_state: "awaiting_height", size_finder_gender: gender });
-    await send(contact, orgId, `Got it! What's your *height*? (e.g. 165cm or 5'5")`);
-    return true;
-  }
-
-  if (state === "awaiting_height") {
-    const heightCm = parseHeightCm(t);
-    if (!heightCm || heightCm < 60 || heightCm > 250) {
-      await send(contact, orgId, "I couldn't read that. Please try again — e.g. *165cm* or *5'5\"*");
-      return true;
-    }
-    await setAttrs(contact.id, { size_finder_state: "awaiting_weight", size_finder_height: heightCm });
-    await send(contact, orgId, `And your *weight*? (e.g. 60kg or 132lbs)`);
-    return true;
-  }
-
-  if (state === "awaiting_weight") {
-    const weightKg = parseWeightKg(t);
-    if (!weightKg || weightKg < 20 || weightKg > 300) {
-      await send(contact, orgId, "I couldn't read that. Please try — e.g. *60kg* or *132lbs*");
-      return true;
-    }
-    const gender = attrs.size_finder_gender ?? "women";
-    const height = attrs.size_finder_height ?? 165;
-    const size = recommendSize(gender, height, weightKg);
-
-    await setAttrs(contact.id, {
-      size_finder_state: "done",
-      size_finder_result: size,
-      size_finder_gender: null,
-      size_finder_height: null,
-    });
-
-    await send(
-      contact, orgId,
-      `Based on your measurements, we recommend *Size ${size}* for you 🎉\n\nThis is a general guide — sizes may vary by brand. Try on a size up if you prefer a relaxed fit.\n\nNeed help with anything else?`
-    );
-    return true;
-  }
-
-  return false;
+  orgId: string,
+  text: string,
+  buttons: ReplyButton[]
+) {
+  // WhatsApp allows max 3 reply buttons.
+  await sendWhatsAppMessage(
+    { to: formatPhoneNumber(contact.phone), text, buttons: buttons.slice(0, 3) },
+    orgId
+  );
 }
 
-// ── Shade finder state machine ───────────────────────────────────────────────
+const btn = (id: string, title: string): ReplyButton => ({ type: "reply", reply: { id, title } });
 
-const SKIN_LABELS: Record<string, string> = {
-  "1": "Fair", "2": "Light", "3": "Medium",
-  "4": "Olive", "5": "Dark", "6": "Deep",
+/** Normalise an incoming reply (button id OR typed text) for matching. */
+function norm(text: string): string {
+  return text.trim().toLowerCase();
+}
+
+/** True if the normalised reply matches the button id or any of the keywords. */
+function matches(reply: string, id: string, ...keywords: string[]): boolean {
+  if (reply === id) return true;
+  return keywords.some((k) => reply === k || reply.includes(k));
+}
+
+// ── Groq personalisation ──────────────────────────────────────────────────────
+
+const PREFERRED_MODEL = "llama-3.1-70b-versatile";
+const FALLBACK_MODEL = "llama-3.1-8b-instant";
+
+/**
+ * Ask Groq to phrase the final recommendation in the brand's voice. Falls back
+ * to a clean static message if the LLM is unavailable — the customer always
+ * gets a useful answer.
+ */
+async function personalize(opts: {
+  voice: BrandVoice;
+  customerName: string | null;
+  productContext: string | null;
+  summary: string; // plain-English summary of what the customer told us
+  recommendation: string; // the concrete result (shade family / size)
+  fallback: string; // static message used if Groq fails
+}): Promise<string> {
+  const { voice, customerName, productContext, summary, recommendation, fallback } = opts;
+  try {
+    const system =
+      `You are a real human style/beauty advisor for "${voice.brandName}". ` +
+      `Voice: ${voice.tone}. ` +
+      `Write ONE short WhatsApp message (2-4 sentences, max ~60 words) that delivers the recommendation warmly and personally. ` +
+      `Sound like a person texting a friend who asked for help — never robotic, never a form. ` +
+      `Use at most one emoji. No markdown headings, no bullet lists, no asterisks around words. ` +
+      `Do NOT invent specific product names, prices, or SKUs beyond what you are given. ` +
+      `End with a light, genuine nudge to try it / shop it.`;
+
+    const user =
+      (customerName ? `Customer's name: ${customerName}.\n` : "") +
+      (productContext ? `They were looking at: ${productContext}.\n` : "") +
+      `What they told me: ${summary}\n` +
+      `My recommendation for them: ${recommendation}\n\n` +
+      `Write the message now.`;
+
+    const out = await getGroqChatCompletionWithFallback(
+      [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      PREFERRED_MODEL,
+      FALLBACK_MODEL,
+      { temperature: 0.8, maxTokens: 220 }
+    );
+    const cleaned = out.trim().replace(/^["']|["']$/g, "");
+    return cleaned.length > 0 ? cleaned : fallback;
+  } catch (err) {
+    console.warn("[finder] personalize failed, using fallback:", err);
+    return fallback;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  SHADE FINDER
+// ════════════════════════════════════════════════════════════════════════════
+//
+//  Q1 skin depth (fair / medium / deep)
+//  Q2 undertone — asked via the gold-vs-silver jewellery proxy (no "look at
+//     your veins" nonsense): gold → warm, silver → cool, both → neutral
+//  Q3 the look they want (everyday / glam)
+//  → recommendation, then an optional one-question refine (skin type) for a
+//    sharper formula pick.
+
+type Depth = "fair" | "medium" | "deep";
+type Undertone = "warm" | "cool" | "neutral";
+
+const SHADE_FAMILIES: Record<Depth, Record<Undertone, string>> = {
+  fair: {
+    cool: "a cool ivory / porcelain shade (think NC15 family)",
+    warm: "a warm vanilla / nude-beige shade (NW15 family)",
+    neutral: "a natural ivory shade (N15 family)",
+  },
+  medium: {
+    cool: "a rose-beige shade (NC30 family)",
+    warm: "a honey / golden-beige shade (NW30 family)",
+    neutral: "a true natural beige (N30 family)",
+  },
+  deep: {
+    cool: "a cool mocha shade (NC50 family)",
+    warm: "a warm espresso / caramel-deep shade (NW50 family)",
+    neutral: "a rich sable shade (N50 family)",
+  },
 };
-const TONE_LABELS: Record<string, string> = { "1": "Cool", "2": "Warm", "3": "Neutral" };
+
+const DEPTH_LABEL: Record<Depth, string> = { fair: "fair", medium: "medium / wheatish", deep: "deep / dusky" };
+const UNDERTONE_LABEL: Record<Undertone, string> = { warm: "warm", cool: "cool", neutral: "neutral" };
+
+function shadeFinishNote(finish: "everyday" | "glam"): string {
+  return finish === "glam"
+    ? "go one shade richer with a long-wear matte for that done-up look"
+    : "a lightweight natural-finish formula will feel like your skin but better";
+}
+
+async function startShade(contact: Contact, orgId: string, product: string | null) {
+  await setAttrs(contact.id, {
+    shade_finder_state: "awaiting_depth",
+    shade_finder_product: product,
+    // clear any stale size flow
+  });
+  const name = contact.name && contact.name !== contact.phone ? `, ${contact.name.split(" ")[0]}` : "";
+  await sendButtons(
+    contact,
+    orgId,
+    `Yay, let's find your perfect shade${name}! ✨ I'll only ask 3 quick things.\n\nFirst — how would you describe your skin tone?`,
+    [
+      btn("sd_depth_fair", "Fair / Light"),
+      btn("sd_depth_medium", "Medium / Wheatish"),
+      btn("sd_depth_deep", "Deep / Dusky"),
+    ]
+  );
+}
 
 export async function handleShadeFinderReply(
   text: string,
@@ -168,49 +192,442 @@ export async function handleShadeFinderReply(
   const state: string | undefined = attrs.shade_finder_state;
   if (!state || state === "done") return false;
 
-  const t = text.trim();
+  const r = norm(text);
 
-  if (state === "awaiting_skin_tone") {
-    const n = t.replace(/[^1-6]/g, "");
-    if (!n || !SKIN_LABELS[n]) {
-      await send(contact, orgId, "Please reply a number 1–6:\n*1* Fair  *2* Light  *3* Medium\n*4* Olive  *5* Dark  *6* Deep");
+  // Q1 → skin depth
+  if (state === "awaiting_depth") {
+    let depth: Depth | null = null;
+    if (matches(r, "sd_depth_fair", "fair", "light", "1")) depth = "fair";
+    else if (matches(r, "sd_depth_medium", "medium", "wheat", "wheatish", "2")) depth = "medium";
+    else if (matches(r, "sd_depth_deep", "deep", "dusky", "dark", "3")) depth = "deep";
+
+    if (!depth) {
+      await sendButtons(contact, orgId, "No worries — just tap the one closest to you 💛", [
+        btn("sd_depth_fair", "Fair / Light"),
+        btn("sd_depth_medium", "Medium / Wheatish"),
+        btn("sd_depth_deep", "Deep / Dusky"),
+      ]);
       return true;
     }
-    await setAttrs(contact.id, { shade_finder_state: "awaiting_undertone", shade_finder_skin: n });
-    await send(
-      contact, orgId,
-      `Great — ${SKIN_LABELS[n]} skin noted 👍\n\nWhat's your *undertone*?\n*1* — Cool (pinkish veins)\n*2* — Warm (greenish veins)\n*3* — Neutral (mix)`
+
+    await setAttrs(contact.id, { shade_finder_state: "awaiting_undertone", shade_finder_depth: depth });
+    await sendButtons(
+      contact,
+      orgId,
+      `Lovely. Here's a fun one — which jewellery makes your skin glow more?\n\n(This is the easiest way to read your undertone 😉)`,
+      [
+        btn("sd_ut_gold", "Gold"),
+        btn("sd_ut_silver", "Silver"),
+        btn("sd_ut_both", "Both look good"),
+      ]
     );
     return true;
   }
 
+  // Q2 → undertone via jewellery proxy
   if (state === "awaiting_undertone") {
-    const up = t.toUpperCase();
-    let undertone: string | null = null;
-    if (["1", "COOL", "PINK", "BLUE", "ROSY"].includes(up)) undertone = "1";
-    else if (["2", "WARM", "YELLOW", "GOLDEN", "GREEN"].includes(up)) undertone = "2";
-    else if (["3", "NEUTRAL", "MIX"].includes(up)) undertone = "3";
+    let undertone: Undertone | null = null;
+    if (matches(r, "sd_ut_gold", "gold", "warm", "1")) undertone = "warm";
+    else if (matches(r, "sd_ut_silver", "silver", "cool", "2")) undertone = "cool";
+    else if (matches(r, "sd_ut_both", "both", "neutral", "either", "3")) undertone = "neutral";
 
     if (!undertone) {
-      await send(contact, orgId, "Please reply *1* for Cool, *2* for Warm, or *3* for Neutral.");
+      await sendButtons(contact, orgId, "Just tap whichever suits you best ✨", [
+        btn("sd_ut_gold", "Gold"),
+        btn("sd_ut_silver", "Silver"),
+        btn("sd_ut_both", "Both look good"),
+      ]);
       return true;
     }
 
-    const skinTone = attrs.shade_finder_skin ?? "3";
-    const shade = recommendShade(skinTone, undertone);
+    await setAttrs(contact.id, { shade_finder_state: "awaiting_finish", shade_finder_undertone: undertone });
+    await sendButtons(
+      contact,
+      orgId,
+      `Got it — ${UNDERTONE_LABEL[undertone]} undertone. Last one: what's the vibe you're going for?`,
+      [
+        btn("sd_fin_everyday", "Everyday / Natural"),
+        btn("sd_fin_glam", "Full Glam"),
+      ]
+    );
+    return true;
+  }
+
+  // Q3 → finish → recommend
+  if (state === "awaiting_finish") {
+    let finish: "everyday" | "glam" | null = null;
+    if (matches(r, "sd_fin_everyday", "everyday", "natural", "subtle", "1")) finish = "everyday";
+    else if (matches(r, "sd_fin_glam", "glam", "full", "bold", "2")) finish = "glam";
+
+    if (!finish) {
+      await sendButtons(contact, orgId, "Pick the look you reach for most 💄", [
+        btn("sd_fin_everyday", "Everyday / Natural"),
+        btn("sd_fin_glam", "Full Glam"),
+      ]);
+      return true;
+    }
+
+    const depth = (attrs.shade_finder_depth as Depth) ?? "medium";
+    const undertone = (attrs.shade_finder_undertone as Undertone) ?? "neutral";
+    const family = SHADE_FAMILIES[depth][undertone];
+    const finishNote = shadeFinishNote(finish);
+
+    await setAttrs(contact.id, {
+      shade_finder_state: "offer_refine",
+      shade_finder_finish: finish,
+      shade_finder_result: family,
+    });
+
+    const voice = await getOrgBrandVoice(orgId);
+    const product = (attrs.shade_finder_product as string) ?? null;
+    const fallback =
+      `Based on your ${DEPTH_LABEL[depth]} skin with ${UNDERTONE_LABEL[undertone]} undertones, your match is ${family}. ` +
+      `For your ${finish === "glam" ? "glam" : "everyday"} look, ${finishNote}. You're going to love how it sits on you 💛`;
+
+    const msg = await personalize({
+      voice,
+      customerName: contact.name && contact.name !== contact.phone ? contact.name : null,
+      productContext: product,
+      summary: `${DEPTH_LABEL[depth]} skin, ${UNDERTONE_LABEL[undertone]} undertone, prefers a ${finish} look`,
+      recommendation: `${family}; tip: ${finishNote}`,
+      fallback,
+    });
+
+    await send(contact, orgId, msg);
+    await sendButtons(
+      contact,
+      orgId,
+      `Want me to fine-tune the exact formula for your skin type?`,
+      [
+        btn("sd_refine_yes", "Yes, tailor it"),
+        btn("sd_refine_no", "I'm all set"),
+      ]
+    );
+    return true;
+  }
+
+  // Optional refine — offer skin-type question
+  if (state === "offer_refine") {
+    if (matches(r, "sd_refine_no", "no", "set", "good", "all set", "done")) {
+      await setAttrs(contact.id, { shade_finder_state: "done", shade_finder_product: null });
+      await send(contact, orgId, "Perfect — happy shopping! Message me anytime if you want a second opinion 💛");
+      return true;
+    }
+    if (matches(r, "sd_refine_yes", "yes", "tailor", "sure", "ok", "okay")) {
+      await setAttrs(contact.id, { shade_finder_state: "awaiting_skintype" });
+      await sendButtons(contact, orgId, "Love it — how does your skin usually behave?", [
+        btn("sd_skin_oily", "Oily / Shiny"),
+        btn("sd_skin_dry", "Dry / Tight"),
+        btn("sd_skin_combo", "Combination"),
+      ]);
+      return true;
+    }
+    // unclear → re-offer
+    await sendButtons(contact, orgId, "Shall I tailor the formula to your skin type?", [
+      btn("sd_refine_yes", "Yes, tailor it"),
+      btn("sd_refine_no", "I'm all set"),
+    ]);
+    return true;
+  }
+
+  // Refine → skin type → final formula note
+  if (state === "awaiting_skintype") {
+    let skinType: "oily" | "dry" | "combo" | null = null;
+    if (matches(r, "sd_skin_oily", "oily", "shiny", "1")) skinType = "oily";
+    else if (matches(r, "sd_skin_dry", "dry", "tight", "2")) skinType = "dry";
+    else if (matches(r, "sd_skin_combo", "combination", "combo", "both", "3")) skinType = "combo";
+
+    if (!skinType) {
+      await sendButtons(contact, orgId, "Just tap the closest one 💛", [
+        btn("sd_skin_oily", "Oily / Shiny"),
+        btn("sd_skin_dry", "Dry / Tight"),
+        btn("sd_skin_combo", "Combination"),
+      ]);
+      return true;
+    }
+
+    const family = (attrs.shade_finder_result as string) ?? "your matched shade";
+    const formula =
+      skinType === "oily"
+        ? "go for a matte / oil-control formula so it stays put all day"
+        : skinType === "dry"
+          ? "pick a hydrating / dewy formula so it never looks patchy"
+          : "a natural satin finish balances your T-zone beautifully";
 
     await setAttrs(contact.id, {
       shade_finder_state: "done",
-      shade_finder_result: shade,
-      shade_finder_skin: null,
+      shade_finder_skintype: skinType,
+      shade_finder_product: null,
     });
 
-    await send(
-      contact, orgId,
-      `Based on your ${SKIN_LABELS[skinTone]} skin with ${TONE_LABELS[undertone].toLowerCase()} undertones, your ideal shades are:\n\n💄 *Foundation:* ${shade}\n✨ *Concealer:* 1-2 shades lighter\n💋 *Lip:* Nudes & mauves work beautifully on you\n\nVisit our store to explore — need help finding specific products?`
-    );
+    const voice = await getOrgBrandVoice(orgId);
+    const product = (attrs.shade_finder_product as string) ?? null;
+    const fallback = `Perfect — with ${skinType === "combo" ? "combination" : skinType} skin, ${formula}. Paired with ${family}, that's your dream combo. Go treat yourself 💛`;
+
+    const msg = await personalize({
+      voice,
+      customerName: contact.name && contact.name !== contact.phone ? contact.name : null,
+      productContext: product,
+      summary: `${skinType} skin; already matched to ${family}`,
+      recommendation: `formula tip: ${formula}; shade: ${family}`,
+      fallback,
+    });
+
+    await send(contact, orgId, msg);
     return true;
   }
 
   return false;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  SIZE FINDER
+// ════════════════════════════════════════════════════════════════════════════
+//
+//  No height/weight interrogation. We anchor on a size the customer already
+//  knows fits them ("what do you usually wear?") — the True-Fit approach — then
+//  adjust by garment type and how they like things to fit.
+//
+//  Q1 garment category (top / bottom / outer-or-ethnic)
+//  Q2 the size that usually fits (typed: S/M/L… or "Zara M", "32 waist")
+//  Q3 fit preference (snug / true-to-size / relaxed)
+
+const SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+
+/** Parse an anchor reply into a letter size or a numeric (waist) size. */
+function parseAnchorSize(raw: string): { letter?: string; numeric?: number } | null {
+  const s = raw.trim().toUpperCase();
+  // letter sizes, also handles "ZARA M", "USUALLY L"
+  const letter = s.match(/\b(XXXL|XXL|XL|XS|XXS|S|M|L)\b/);
+  if (letter) return { letter: letter[1] };
+  // numeric waist / EU size, e.g. "32", "30 waist", "size 38"
+  const num = s.match(/\b(\d{2})\b/);
+  if (num) {
+    const n = parseInt(num[1], 10);
+    if (n >= 24 && n <= 48) return { numeric: n };
+  }
+  return null;
+}
+
+function adjustLetter(letter: string, fit: "snug" | "true" | "relaxed", outer: boolean): string {
+  let idx = SIZE_ORDER.indexOf(letter);
+  if (idx < 0) return letter;
+  if (fit === "snug") idx -= 1;
+  else if (fit === "relaxed") idx += 1;
+  if (outer && fit !== "snug") idx += 1; // outerwear/ethnic layers a touch roomier
+  idx = Math.max(0, Math.min(SIZE_ORDER.length - 1, idx));
+  return SIZE_ORDER[idx];
+}
+
+function adjustNumeric(n: number, fit: "snug" | "true" | "relaxed"): number {
+  if (fit === "snug") return n - 1;
+  if (fit === "relaxed") return n + 2;
+  return n;
+}
+
+async function startSize(contact: Contact, orgId: string, product: string | null) {
+  await setAttrs(contact.id, {
+    size_finder_state: "awaiting_category",
+    size_finder_product: product,
+  });
+  const name = contact.name && contact.name !== contact.phone ? `, ${contact.name.split(" ")[0]}` : "";
+  await sendButtons(
+    contact,
+    orgId,
+    `Let's nail your size${name}! 👗 No tape measure, promise — just 3 taps.\n\nWhat are you shopping for?`,
+    [
+      btn("sz_cat_top", "Top / Shirt / Dress"),
+      btn("sz_cat_bottom", "Jeans / Trousers"),
+      btn("sz_cat_outer", "Jacket / Ethnic"),
+    ]
+  );
+}
+
+export async function handleSizeFinderReply(
+  text: string,
+  contact: Contact,
+  orgId: string
+): Promise<boolean> {
+  const attrs = (contact.attributes as Record<string, any>) ?? {};
+  const state: string | undefined = attrs.size_finder_state;
+  if (!state || state === "done") return false;
+
+  const r = norm(text);
+
+  // Q1 → category
+  if (state === "awaiting_category") {
+    let category: "top" | "bottom" | "outer" | null = null;
+    if (matches(r, "sz_cat_top", "top", "shirt", "dress", "tee", "kurti", "1")) category = "top";
+    else if (matches(r, "sz_cat_bottom", "jeans", "trouser", "trousers", "bottom", "pant", "pants", "skirt", "2")) category = "bottom";
+    else if (matches(r, "sz_cat_outer", "jacket", "ethnic", "outer", "coat", "blazer", "3")) category = "outer";
+
+    if (!category) {
+      await sendButtons(contact, orgId, "Just tap what you're after 👕", [
+        btn("sz_cat_top", "Top / Shirt / Dress"),
+        btn("sz_cat_bottom", "Jeans / Trousers"),
+        btn("sz_cat_outer", "Jacket / Ethnic"),
+      ]);
+      return true;
+    }
+
+    await setAttrs(contact.id, { size_finder_state: "awaiting_anchor", size_finder_category: category });
+    await send(
+      contact,
+      orgId,
+      `Great choice! Now the secret to a perfect fit 👇\n\nWhat size do you *usually* wear and love? You can tell me a size (S, M, L…) or even a brand that fits you well — like "Zara M" or "32 waist". Whatever you've got!`
+    );
+    return true;
+  }
+
+  // Q2 → anchor size (free text — the True-Fit anchor)
+  if (state === "awaiting_anchor") {
+    const parsed = parseAnchorSize(text);
+    if (!parsed) {
+      await send(
+        contact,
+        orgId,
+        `No stress! Just type the size you reach for most — like *M*, *L*, or a number like *32*. If you're not sure, tell me a brand + size that fit you nicely 😊`
+      );
+      return true;
+    }
+    await setAttrs(contact.id, {
+      size_finder_state: "awaiting_fit",
+      size_finder_anchor_letter: parsed.letter ?? null,
+      size_finder_anchor_numeric: parsed.numeric ?? null,
+    });
+    await sendButtons(contact, orgId, `Perfect. And how do you like things to fit?`, [
+      btn("sz_fit_snug", "Snug / Fitted"),
+      btn("sz_fit_true", "True to size"),
+      btn("sz_fit_relaxed", "Relaxed / Roomy"),
+    ]);
+    return true;
+  }
+
+  // Q3 → fit preference → recommend
+  if (state === "awaiting_fit") {
+    let fit: "snug" | "true" | "relaxed" | null = null;
+    if (matches(r, "sz_fit_snug", "snug", "fitted", "tight", "1")) fit = "snug";
+    else if (matches(r, "sz_fit_true", "true", "regular", "standard", "2")) fit = "true";
+    else if (matches(r, "sz_fit_relaxed", "relaxed", "roomy", "loose", "oversized", "3")) fit = "relaxed";
+
+    if (!fit) {
+      await sendButtons(contact, orgId, "How do you like your fit?", [
+        btn("sz_fit_snug", "Snug / Fitted"),
+        btn("sz_fit_true", "True to size"),
+        btn("sz_fit_relaxed", "Relaxed / Roomy"),
+      ]);
+      return true;
+    }
+
+    const category = (attrs.size_finder_category as "top" | "bottom" | "outer") ?? "top";
+    const anchorLetter = attrs.size_finder_anchor_letter as string | null;
+    const anchorNumeric = attrs.size_finder_anchor_numeric as number | null;
+    const outer = category === "outer";
+
+    let result: string;
+    let summary: string;
+    if (anchorNumeric != null) {
+      const n = adjustNumeric(anchorNumeric, fit);
+      result = `size ${n} (waist)`;
+      summary = `usually wears ${anchorNumeric}, wants a ${fit} fit on ${category}`;
+    } else {
+      const letter = adjustLetter(anchorLetter ?? "M", fit, outer);
+      result = `size ${letter}`;
+      summary = `usually wears ${anchorLetter ?? "M"}, wants a ${fit} fit on a ${category} item`;
+    }
+
+    const fitWord = fit === "snug" ? "fitted" : fit === "relaxed" ? "relaxed" : "true-to-size";
+
+    await setAttrs(contact.id, {
+      size_finder_state: "done",
+      size_finder_fit: fit,
+      size_finder_result: result,
+      size_finder_product: null,
+      size_finder_anchor_letter: null,
+      size_finder_anchor_numeric: null,
+    });
+
+    const voice = await getOrgBrandVoice(orgId);
+    const product = (attrs.size_finder_product as string) ?? null;
+    const fallback = `Based on what fits you well and your love for a ${fitWord} fit, go with *${result}* with us. If you're between sizes on ${outer ? "outerwear" : "this one"}, size up for comfort. Happy shopping! 🛍️`;
+
+    const msg = await personalize({
+      voice,
+      customerName: contact.name && contact.name !== contact.phone ? contact.name : null,
+      productContext: product,
+      summary,
+      recommendation: `${result}; they like a ${fitWord} fit`,
+      fallback,
+    });
+
+    await send(contact, orgId, msg);
+    return true;
+  }
+
+  return false;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  KEYWORD ENTRY  ("SHADE" / "SIZE" from a storefront deep link or chat)
+// ════════════════════════════════════════════════════════════════════════════
+
+const SHADE_KEYWORD = /^\s*(shade\b|find\s*(my)?\s*shade|shade\s*finder|colou?r\s*match)/i;
+const SIZE_KEYWORD = /^\s*(size\b|find\s*(my)?\s*size|size\s*finder|fit\s*finder)/i;
+
+/** Pull product context out of a deep-link payload like "SHADE: Velvet Lipstick". */
+function extractProduct(text: string): string | null {
+  const after = text.replace(/^[^:—\-]*[:—-]\s*/, "").trim();
+  // if the split produced the same string (no separator) there's no product
+  if (after && after.toLowerCase() !== text.trim().toLowerCase() && after.length <= 80) {
+    return after;
+  }
+  return null;
+}
+
+/**
+ * Customer-initiated entry. If the message starts a finder ("SHADE"/"SIZE") and
+ * the customer is NOT already mid-flow, kick off the relevant finder. Returns
+ * true when it consumed the message.
+ *
+ * Wire this into the inbound chain BEFORE the reply handlers above.
+ */
+export async function handleFinderKeyword(
+  text: string,
+  contact: Contact,
+  orgId: string
+): Promise<boolean> {
+  const attrs = (contact.attributes as Record<string, any>) ?? {};
+  // Don't hijack an in-progress flow — let the reply handlers own it.
+  const shadeActive = attrs.shade_finder_state && attrs.shade_finder_state !== "done";
+  const sizeActive = attrs.size_finder_state && attrs.size_finder_state !== "done";
+  if (shadeActive || sizeActive) return false;
+
+  if (SHADE_KEYWORD.test(text)) {
+    await startShade(contact, orgId, extractProduct(text));
+    return true;
+  }
+  if (SIZE_KEYWORD.test(text)) {
+    await startSize(contact, orgId, extractProduct(text));
+    return true;
+  }
+  return false;
+}
+
+// ── Storefront deep-link generator ────────────────────────────────────────────
+
+/**
+ * Build a click-to-WhatsApp deep link that pre-fills the finder keyword (and an
+ * optional product name). When the customer taps it on the storefront and hits
+ * send, the inbound webhook captures their phone number and handleFinderKeyword
+ * starts the flow.
+ */
+export function buildFinderDeepLink(
+  dialableNumber: string,
+  kind: "shade" | "size",
+  product?: string | null
+): string {
+  const keyword = kind === "shade" ? "SHADE" : "SIZE";
+  const payload = product ? `${keyword}: ${product}` : keyword;
+  const num = dialableNumber.replace(/\D/g, "");
+  return `https://wa.me/${num}?text=${encodeURIComponent(payload)}`;
 }

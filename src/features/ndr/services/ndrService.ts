@@ -14,6 +14,7 @@ import type { Prisma } from "@prisma/client";
 import { sendWhatsAppMessage, formatPhoneNumber } from "@/shared/lib/whatsapp";
 import { ApiError } from "@/shared/lib/api";
 import { enrollOnTrigger } from "@/features/sequences/services/sequenceService";
+import { analyseNdrReply } from "./ndrAnalystService";
 import * as repo from "../repositories/ndrRepo";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ async function stampContactAttrs(
   });
 }
 
-// ─── Keyword token sets ──────────────────────────────────────────────────────
+// ─── Fast-path keyword sets (checked before Groq to save latency) ────────────
 
 const CONFIRM_TOKENS = new Set(["CONFIRM", "YES", "HA", "1", "AVAILABLE"]);
 const RESCHEDULE_TOKENS = new Set(["RESCHEDULE", "CHANGE", "2", "DATE"]);
@@ -143,10 +144,58 @@ export async function handleNdrWebhook(
   await stampContactAttrs(contact.id, {
     ndr_pending: true,
     ndr_awb: awb,
+    ndr_attempt: attempt,
     pending_ndr_reason: reason || null,
   });
 
-  // 5. Enroll into any active "ndr_pending" sequences.
+  // 5a. Repeat attempt (2+): skip the drip sequence and escalate directly to a
+  //     human agent. At this stage the standard script has already failed once;
+  //     a human is far more likely to close the loop than another template.
+  if (attempt >= 2) {
+    const { prisma } = await import("@/shared/lib/prisma");
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: {
+        assignedAgent: "Human",
+        unreadCount: { increment: 1 },
+        tags: { set: Array.from(new Set([...(contact.tags || []), "NDR-High-Risk", `NDR-Attempt-${attempt}`])) },
+      },
+    });
+
+    // Send the urgent repeat-attempt template directly instead of queuing a sequence.
+    const dbTemplate = await prisma.template.findFirst({
+      where: { name: "ndr_alert_attempt2", organizationId: orgId, metaStatus: "approved" },
+    });
+    if (dbTemplate) {
+      await sendWhatsAppMessage(
+        {
+          to: phone,
+          template: {
+            name: "ndr_alert_attempt2",
+            language: { code: "en_US" },
+            components: [{ type: "body", parameters: [{ type: "text", text: contact.name }] }],
+          },
+        },
+        orgId,
+      ).catch(() => {});
+    }
+
+    await writeSystemLog(
+      orgId,
+      `NDR attempt #${attempt} for ${contact.name} (AWB: ${awb}) — escalated to human agent.`
+    );
+
+    // Feed the shared RTO fraud network — a 2nd+ failed delivery attempt is a
+    // high-confidence RTO predictor.
+    try {
+      const { recordNetworkSignal } = await import("@/features/cod/services/networkSignalService");
+      await recordNetworkSignal(phone, "ndr_2plus", orgId);
+    } catch { /* non-fatal */ }
+
+    return { ndrEventId: ndrEvent.id, contactId: contact.id };
+  }
+
+  // 5b. First attempt — enroll in the standard drip sequence.
   await enrollOnTrigger(orgId, "ndr_pending", contact.id);
 
   // 6. Audit log.
@@ -220,10 +269,30 @@ export async function handleNdrReply(
     return true;
   }
 
-  // ── Keyword matching (only when ndr_pending is true) ─────────────────────
+  // ── Intent resolution (only when ndr_pending is true) ───────────────────
   if (!attrs.ndr_pending) return false;
 
+  // Fast-path: single-token messages use the keyword sets (no API latency).
+  // Multi-word or ambiguous messages fall through to the Groq analyst.
+  let intent: "confirm" | "reschedule" | "address" | "cancel" | "unknown";
+
   if (CONFIRM_TOKENS.has(token)) {
+    intent = "confirm";
+  } else if (RESCHEDULE_TOKENS.has(token)) {
+    intent = "reschedule";
+  } else if (ADDRESS_TOKENS.has(token)) {
+    intent = "address";
+  } else if (CANCEL_TOKENS.has(token)) {
+    intent = "cancel";
+  } else {
+    // Natural-language / Hinglish / multi-word — classify with Groq.
+    const analysis = await analyseNdrReply(text).catch(
+      () => ({ intent: "unknown" as const, summary: text.slice(0, 40) })
+    );
+    intent = analysis.intent;
+  }
+
+  if (intent === "confirm") {
     await resolveNdrReply(contact.id, orgId, "confirmed", attrs);
     const reply = `✅ Perfect! We've notified the courier you're available. Expect redelivery in 24–48 hours.`;
     await sendWhatsAppMessage({ to: phone, text: reply }, orgId);
@@ -231,35 +300,29 @@ export async function handleNdrReply(
     return true;
   }
 
-  if (RESCHEDULE_TOKENS.has(token)) {
-    // Two-step: mark reschedule requested, then capture the next message as date.
+  if (intent === "reschedule") {
     const ndrEvent = await repo.findPendingNdrForContact(contact.id, orgId);
     if (ndrEvent) {
       await repo.updateNdrEvent(ndrEvent.id, orgId, { status: "rescheduled" });
     }
-    await stampContactAttrs(contact.id, {
-      ndr_reschedule_requested: true,
-    });
+    await stampContactAttrs(contact.id, { ndr_reschedule_requested: true });
     const reply = `📅 Please reply with your preferred date and time (e.g. *Tomorrow 2PM*).`;
     await sendWhatsAppMessage({ to: phone, text: reply }, orgId);
     return true;
   }
 
-  if (ADDRESS_TOKENS.has(token)) {
-    // Two-step: mark address update requested, then capture next message as address.
+  if (intent === "address") {
     const ndrEvent = await repo.findPendingNdrForContact(contact.id, orgId);
     if (ndrEvent) {
       await repo.updateNdrEvent(ndrEvent.id, orgId, { status: "address_updated" });
     }
-    await stampContactAttrs(contact.id, {
-      ndr_address_update_requested: true,
-    });
+    await stampContactAttrs(contact.id, { ndr_address_update_requested: true });
     const reply = `🏠 Please reply with your updated delivery address and we'll pass it to the courier.`;
     await sendWhatsAppMessage({ to: phone, text: reply }, orgId);
     return true;
   }
 
-  if (CANCEL_TOKENS.has(token)) {
+  if (intent === "cancel") {
     await resolveNdrReply(contact.id, orgId, "cancelled", attrs);
     const reply = `Understood. Your order will be returned. We're sorry it didn't work out — reach out if you need help.`;
     await sendWhatsAppMessage({ to: phone, text: reply }, orgId);
@@ -267,7 +330,7 @@ export async function handleNdrReply(
     return true;
   }
 
-  // No keyword matched; the message is not an NDR reply.
+  // "unknown" intent — let the message fall through to the normal autoresponder.
   return false;
 }
 
