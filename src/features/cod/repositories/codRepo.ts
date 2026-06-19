@@ -81,3 +81,40 @@ export function completeSequenceEnrollment(enrollmentId: string) {
     data: { status: "completed", nextRunAt: null },
   });
 }
+
+/**
+ * Stamp a Shopify fulfillment hold onto the order row.
+ * `fulfillmentHeldAt` is set to now so the cron can auto-release stale holds.
+ */
+export function setOrderFulfillmentHold(
+  orderId: string,
+  organizationId: string,
+  fulfillmentHoldId: string
+) {
+  return prisma.order.updateMany({
+    where: { orderId, organizationId },
+    data: { fulfillmentHoldId, fulfillmentHeldAt: new Date() },
+  });
+}
+
+/**
+ * Clear the fulfillment hold fields once the hold is released (confirmed or
+ * auto-released by the cron).
+ */
+export function clearOrderFulfillmentHold(orderId: string, organizationId: string) {
+  return prisma.order.updateMany({
+    where: { orderId, organizationId },
+    data: { fulfillmentHoldId: null, fulfillmentHeldAt: null },
+  });
+}
+
+/**
+ * Return the first order row for (orderId, org) with its Shopify identifiers.
+ * Used by the fulfillment hold logic to fetch hold IDs before releasing them.
+ */
+export function findOrderByOrderId(orderId: string, organizationId: string) {
+  return prisma.order.findFirst({
+    where: { orderId, organizationId },
+    select: { id: true, orderId: true, shopifyNumericId: true, fulfillmentHoldId: true },
+  });
+}

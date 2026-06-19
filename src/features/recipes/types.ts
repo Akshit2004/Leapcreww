@@ -16,7 +16,11 @@ export type RecipeId =
   | "post_delivery_review"
   | "size_finder"
   | "shade_finder"
-  | "beauty_replenishment";
+  | "beauty_replenishment"
+  | "address_verification"
+  | "ofd_reminder"
+  | "rto_winback"
+  | "cod_risk_verification";
 
 /** A Meta template the recipe needs; created + submitted during install. */
 export interface RecipeTemplateDef {

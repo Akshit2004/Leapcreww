@@ -18,6 +18,14 @@ import {
   Sparkles,
   RefreshCw,
   ShoppingBag,
+  Truck,
+  AlertTriangle,
+  Lock,
+  Shield,
+  Network,
+  BadgeCheck,
+  Loader2,
+  PackageX,
 } from "lucide-react";
 import { useApp } from "@/shared/context/AppContext";
 
@@ -222,16 +230,54 @@ export const AnalyticsTab: React.FC = () => {
   const params = useParams();
   const orgId = params.orgId as string;
 
-  const [activeSection, setActiveSection] = useState<"campaigns" | "agents" | "roi" | "commerce">("campaigns");
+  const [activeSection, setActiveSection] = useState<"campaigns" | "agents" | "roi" | "commerce" | "recovery" | "rto">("campaigns");
   const [agentMetrics, setAgentMetrics] = useState<Array<{ agent: string; avgLatencyMinutes: number; replies: number; conversations: number; resolutionRate: number; attributedSales: number; attributedRevenuePaise: number }>>([]);
   const [roiLedger, setRoiLedger] = useState<Array<{ id: string; name: string; templateName: string; sent: number; delivered: number; costPaise: number; attributedRevenuePaise: number; conversions: number; roi: number; status: string; date: string }>>([]);
   const [roiSummary, setRoiSummary] = useState<{ totalCostPaise: number; totalRevenuePaise: number; totalConversions: number; overallRoi: number }>({ totalCostPaise: 0, totalRevenuePaise: 0, totalConversions: 0, overallRoi: 0 });
   const [roiView, setRoiView] = useState<"campaigns" | "sequences">("campaigns");
   const [seqLedger, setSeqLedger] = useState<Array<{ id: string; name: string; trigger: string; sends: number; costPaise: number; attributedRevenuePaise: number; conversions: number; roi: number; status: string }>>([]);
   const [seqSummary, setSeqSummary] = useState<{ totalCostPaise: number; totalRevenuePaise: number; totalConversions: number; overallRoi: number }>({ totalCostPaise: 0, totalRevenuePaise: 0, totalConversions: 0, overallRoi: 0 });
+  const [rtoData, setRtoData] = useState<{
+    ndr: { total: number; rescued: number; pending: number; cancelled: number; rescueRate: number; avgAttempt: number };
+    cod: { total: number; confirmed: number; cancelled: number; converted: number; confirmRate: number; conversionRate: number; rtoLossPaise: number; highRiskFlagged: number };
+    tokenPrepay?: { sent: number; paid: number; expired: number; payRate: number };
+    fulfillmentHold?: { activeHolds: number; autoReleased: number; totalHeld: number };
+    successFee?: { codRescues: number; prepaidConversions: number; ndrRescues: number; estimatedFeePaise: number };
+    network?: { totalSignals: number; uniquePhones: number };
+    missingTemplates?: string[];
+  } | null>(null);
+  const [seedingTemplates, setSeedingTemplates] = useState(false);
+  const [seedResult, setSeedResult] = useState<{ created: string[]; existing: string[] } | null>(null);
+  const [recovery, setRecovery] = useState<{
+    summary: { inRecovery: number; recovered: number; lost: number; recoveryRate: number; repliesHandled: number; recoveredRevenuePaise: number };
+    intentBreakdown: Record<string, number>;
+    recentReplies: Array<{ contactId: string; name: string; label: string; objection: string | null; score: number; action: string; analysedAt: string }>;
+  } | null>(null);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [narration, setNarration] = useState("");
   const [loadingNarration, setLoadingNarration] = useState(false);
+
+  const seedRtoTemplates = useCallback(async () => {
+    if (!orgId) return;
+    setSeedingTemplates(true);
+    try {
+      const res = await fetch(`/api/org/${orgId}/templates/seed-rto`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setSeedResult(data);
+        // Re-fetch RTO analytics to clear the missing-templates warning
+        const rtoRes = await fetch(`/api/org/${orgId}/analytics/rto`);
+        if (rtoRes.ok) {
+          const rtoJson = await rtoRes.json();
+          if (rtoJson.ndr) setRtoData(rtoJson);
+        }
+      }
+    } catch (err) {
+      console.error("Seed RTO templates error:", err);
+    } finally {
+      setSeedingTemplates(false);
+    }
+  }, [orgId]);
 
   const fetchNarration = useCallback(async () => {
     if (!orgId) return;
@@ -258,10 +304,12 @@ export const AnalyticsTab: React.FC = () => {
     const fetchPerformanceStats = async () => {
       setLoadingMetrics(true);
       try {
-        const [resAgents, resRoi, resSeq] = await Promise.all([
+        const [resAgents, resRoi, resSeq, resRecovery, resRto] = await Promise.all([
           fetch(`/api/org/${orgId}/analytics/agent-metrics`),
           fetch(`/api/org/${orgId}/analytics/roi-ledger`),
           fetch(`/api/org/${orgId}/analytics/sequence-roi`),
+          fetch(`/api/org/${orgId}/analytics/cart-recovery`),
+          fetch(`/api/org/${orgId}/analytics/rto`),
         ]);
         if (resAgents.ok) {
           const data = await resAgents.json();
@@ -276,6 +324,14 @@ export const AnalyticsTab: React.FC = () => {
           const data = await resSeq.json();
           if (data.ledger) setSeqLedger(data.ledger);
           if (data.summary) setSeqSummary(data.summary);
+        }
+        if (resRecovery.ok) {
+          const data = await resRecovery.json();
+          if (data.summary) setRecovery(data);
+        }
+        if (resRto.ok) {
+          const data = await resRto.json();
+          if (data.ndr) setRtoData(data);
         }
       } catch (err) {
         console.error("Failed to load operational analytics", err);
@@ -567,8 +623,8 @@ export const AnalyticsTab: React.FC = () => {
 
         {/* ─── Sub-Navigation Pills ─── */}
         <div className="flex items-center gap-1 bg-stone-200/60 rounded-xl p-1 w-fit flex-wrap select-none">
-          {(["campaigns", "agents", "roi", "commerce"] as const).map((sec) => {
-            const labels = { campaigns: "Campaigns", agents: "Agents", roi: "ROI", commerce: "Commerce" };
+          {(["campaigns", "agents", "roi", "commerce", "recovery", "rto"] as const).map((sec) => {
+            const labels = { campaigns: "Campaigns", agents: "Agents", roi: "ROI", commerce: "Commerce", recovery: "Recovery", rto: "RTO / NDR" };
             return (
               <button
                 key={sec}
@@ -1323,6 +1379,440 @@ export const AnalyticsTab: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+          );
+        })()}
+
+        {/* ─── SECTION: AI RECOVERY PIPELINE ─── */}
+        {activeSection === "recovery" && (() => {
+          const s = recovery?.summary;
+          const intent = recovery?.intentBreakdown || { hot: 0, objection: 0, not_now: 0, dead: 0 };
+          const replies = recovery?.recentReplies || [];
+
+          const intentMeta: Record<string, { label: string; bar: string; chip: string }> = {
+            hot:       { label: "Hot",        bar: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+            objection: { label: "Objection",  bar: "bg-amber-500",   chip: "bg-amber-50 text-amber-700 border-amber-200" },
+            not_now:   { label: "Not Now",    bar: "bg-blue-500",    chip: "bg-blue-50 text-blue-700 border-blue-200" },
+            dead:      { label: "Dead",       bar: "bg-rose-500",    chip: "bg-rose-50 text-rose-700 border-rose-200" },
+          };
+          const intentTotal = Object.values(intent).reduce((a, b) => a + b, 0);
+
+          return (
+            <div className="space-y-6 animate-slide-up">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <StatCard
+                  title="Carts In Recovery"
+                  value={fmt(s?.inRecovery ?? 0)}
+                  subtitle="Active drip + paused replies"
+                  icon={<Users className="w-5 h-5 text-blue-500" />}
+                  iconBg="bg-blue-50"
+                  cardBg="linear-gradient(135deg, #eff6ff 0%, #ffffff 65%)"
+                />
+                <StatCard
+                  title="Recovered"
+                  value={fmt(s?.recovered ?? 0)}
+                  subtitle={`₹${((s?.recoveredRevenuePaise ?? 0) / 100).toFixed(2)} cart value`}
+                  icon={<CheckCheck className="w-5 h-5 text-wa-green" />}
+                  iconBg="bg-wa-green/10"
+                  trend={(s?.recoveryRate ?? 0) > 15 ? 1 : -1}
+                  cardBg="linear-gradient(135deg, #f0fdf9 0%, #ffffff 65%)"
+                />
+                <StatCard
+                  title="Lost"
+                  value={fmt(s?.lost ?? 0)}
+                  subtitle="Completed / cancelled, no buy"
+                  icon={<TrendingDown className="w-5 h-5 text-rose-500" />}
+                  iconBg="bg-rose-50"
+                  cardBg="linear-gradient(135deg, #fff1f2 0%, #ffffff 65%)"
+                />
+                <StatCard
+                  title="Recovery Rate"
+                  value={`${s?.recoveryRate ?? 0}%`}
+                  subtitle="Recovered vs lost"
+                  icon={<TrendingUp className="w-5 h-5 text-emerald-500" />}
+                  iconBg="bg-emerald-50"
+                  trend={(s?.recoveryRate ?? 0) > 15 ? 1 : -1}
+                />
+              </div>
+
+              {/* Analyst intent breakdown */}
+              <div className="bg-white border border-stone-200 shadow-sm rounded-2xl p-6 sm:p-8">
+                <h3 className="text-sm font-black text-stone-950 flex items-center gap-2 mb-1">
+                  <Sparkles className="w-4 h-4 text-wa-green" />
+                  Analyst Intent Breakdown
+                </h3>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mt-1 mb-6">
+                  {fmt(s?.repliesHandled ?? 0)} replies analysed by the recovery agent
+                </p>
+
+                {intentTotal === 0 ? (
+                  <div className="h-32 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
+                    NO REPLIES ANALYSED YET
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {Object.entries(intent).map(([key, count]) => {
+                      const meta = intentMeta[key] || { label: key, bar: "bg-stone-400", chip: "bg-stone-50 text-stone-600 border-stone-200" };
+                      const widthPct = intentTotal > 0 ? Math.round((count / intentTotal) * 100) : 0;
+                      return (
+                        <div key={key} className="flex items-center gap-3">
+                          <span className={`inline-flex items-center justify-center px-2.5 py-1 text-[8px] font-black tracking-widest uppercase rounded-full border w-24 ${meta.chip}`}>
+                            {meta.label}
+                          </span>
+                          <div className="flex-1 h-3 bg-stone-100 rounded-full overflow-hidden">
+                            <div className={`h-full ${meta.bar} transition-all duration-700`} style={{ width: `${widthPct}%` }} />
+                          </div>
+                          <span className="text-xs font-bold text-stone-700 w-12 text-right">{fmt(count)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Recent Ghostwriter-handled replies */}
+              <div className="bg-white border border-stone-200 shadow-sm rounded-2xl p-6 sm:p-8">
+                <h3 className="text-sm font-black text-stone-950 flex items-center gap-2 mb-1">
+                  <MousePointerClick className="w-4 h-4 text-wa-green" />
+                  Recent Recovery Replies
+                </h3>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mt-1 mb-6">Latest customer replies scored by the Analyst</p>
+
+                {replies.length === 0 ? (
+                  <div className="h-32 flex items-center justify-center text-stone-500 text-xs font-bold uppercase tracking-widest">
+                    NO RECOVERY REPLIES YET
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-stone-200">
+                          <th className="text-[10px] font-bold uppercase tracking-wider text-stone-400 pb-3 pr-4">Contact</th>
+                          <th className="text-[10px] font-bold uppercase tracking-wider text-stone-400 pb-3 pr-4">Intent</th>
+                          <th className="text-[10px] font-bold uppercase tracking-wider text-stone-400 pb-3 pr-4">Objection</th>
+                          <th className="text-[10px] font-bold uppercase tracking-wider text-stone-400 pb-3 pr-4 text-center">Score</th>
+                          <th className="text-[10px] font-bold uppercase tracking-wider text-stone-400 pb-3 pr-4">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {replies.map((r) => {
+                          const meta = intentMeta[r.label] || { label: r.label, bar: "bg-stone-400", chip: "bg-stone-50 text-stone-600 border-stone-200" };
+                          return (
+                            <tr key={r.contactId} className="border-b border-stone-100 hover:bg-stone-50 transition-colors text-xs font-medium">
+                              <td className="py-3 pr-4">
+                                <span className="font-bold text-stone-800 uppercase tracking-wider">{r.name}</span>
+                              </td>
+                              <td className="py-3 pr-4">
+                                <span className={`inline-flex items-center px-2 py-0.5 text-[8px] font-black tracking-widest uppercase rounded-full border ${meta.chip}`}>
+                                  {meta.label}
+                                </span>
+                              </td>
+                              <td className="py-3 pr-4 text-stone-600 uppercase tracking-wide text-[10px]">{r.objection || "—"}</td>
+                              <td className="py-3 pr-4 text-center font-bold text-stone-900">{r.score}/10</td>
+                              <td className="py-3 pr-4 text-stone-600 uppercase tracking-wide text-[10px]">{r.action.replace(/_/g, " ")}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ─── SECTION: RTO / NDR ─── */}
+        {activeSection === "rto" && (() => {
+          const ndr = rtoData?.ndr;
+          const cod = rtoData?.cod;
+
+          const ndrStatusMeta: Record<string, { label: string; bar: string; chip: string }> = {
+            rescued:   { label: "Rescued",   bar: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+            pending:   { label: "Pending",   bar: "bg-amber-500",   chip: "bg-amber-50 text-amber-700 border-amber-200" },
+            cancelled: { label: "Cancelled", bar: "bg-rose-500",    chip: "bg-rose-50 text-rose-700 border-rose-200" },
+          };
+
+          return (
+            <div className="space-y-6 animate-slide-up">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-3">NDR Recovery</p>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <StatCard
+                    title="Total NDRs"
+                    value={fmt(ndr?.total ?? 0)}
+                    subtitle="All-time delivery failures"
+                    icon={<Truck className="w-5 h-5 text-amber-500" />}
+                    iconBg="bg-amber-50"
+                    cardBg="linear-gradient(135deg, #fffbeb 0%, #ffffff 65%)"
+                  />
+                  <StatCard
+                    title="Rescued"
+                    value={fmt(ndr?.rescued ?? 0)}
+                    subtitle={`${ndr?.rescueRate ?? 0}% rescue rate`}
+                    icon={<CheckCheck className="w-5 h-5 text-wa-green" />}
+                    iconBg="bg-wa-green/10"
+                    trend={(ndr?.rescueRate ?? 0) > 50 ? 1 : -1}
+                    cardBg="linear-gradient(135deg, #f0fdf9 0%, #ffffff 65%)"
+                  />
+                  <StatCard
+                    title="Pending"
+                    value={fmt(ndr?.pending ?? 0)}
+                    subtitle="Awaiting customer reply"
+                    icon={<Clock className="w-5 h-5 text-blue-500" />}
+                    iconBg="bg-blue-50"
+                  />
+                  <StatCard
+                    title="Avg Attempts"
+                    value={String(ndr?.avgAttempt ?? 0)}
+                    subtitle="Before rescue or cancellation"
+                    icon={<RefreshCw className="w-5 h-5 text-stone-400" />}
+                    iconBg="bg-stone-100"
+                  />
+                </div>
+              </div>
+
+              {(ndr?.total ?? 0) > 0 && (
+                <div className="bg-white border border-stone-200 shadow-sm rounded-2xl p-6 sm:p-8">
+                  <h3 className="text-sm font-black text-stone-950 mb-6">NDR Outcome Breakdown</h3>
+                  <div className="space-y-3">
+                    {[
+                      { key: "rescued",   count: ndr?.rescued   ?? 0 },
+                      { key: "pending",   count: ndr?.pending   ?? 0 },
+                      { key: "cancelled", count: ndr?.cancelled ?? 0 },
+                    ].map(({ key, count }) => {
+                      const meta = ndrStatusMeta[key];
+                      const widthPct = (ndr?.total ?? 0) > 0 ? Math.round((count / (ndr?.total ?? 1)) * 100) : 0;
+                      return (
+                        <div key={key} className="flex items-center gap-3">
+                          <span className={`inline-flex items-center justify-center px-2.5 py-1 text-[8px] font-black tracking-widest uppercase rounded-full border w-24 ${meta.chip}`}>
+                            {meta.label}
+                          </span>
+                          <div className="flex-1 h-3 bg-stone-100 rounded-full overflow-hidden">
+                            <div className={`h-full ${meta.bar} transition-all duration-700`} style={{ width: `${widthPct}%` }} />
+                          </div>
+                          <span className="text-xs font-bold text-stone-700 w-20 text-right">{fmt(count)} ({widthPct}%)</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-3">COD Intelligence</p>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <StatCard
+                    title="COD Orders"
+                    value={fmt(cod?.total ?? 0)}
+                    subtitle="All cash-on-delivery orders"
+                    icon={<ShoppingBag className="w-5 h-5 text-blue-500" />}
+                    iconBg="bg-blue-50"
+                  />
+                  <StatCard
+                    title="Confirmed"
+                    value={fmt(cod?.confirmed ?? 0)}
+                    subtitle={`${cod?.confirmRate ?? 0}% confirm rate`}
+                    icon={<CheckCheck className="w-5 h-5 text-wa-green" />}
+                    iconBg="bg-wa-green/10"
+                    trend={(cod?.confirmRate ?? 0) > 70 ? 1 : -1}
+                    cardBg="linear-gradient(135deg, #f0fdf9 0%, #ffffff 65%)"
+                  />
+                  <StatCard
+                    title="COD → Prepaid"
+                    value={fmt(cod?.converted ?? 0)}
+                    subtitle={`${cod?.conversionRate ?? 0}% of confirmed`}
+                    icon={<TrendingUp className="w-5 h-5 text-emerald-500" />}
+                    iconBg="bg-emerald-50"
+                    trend={(cod?.conversionRate ?? 0) > 10 ? 1 : -1}
+                  />
+                  <StatCard
+                    title="RTO Loss Value"
+                    value={`₹${((cod?.rtoLossPaise ?? 0) / 100).toFixed(0)}`}
+                    subtitle={`${fmt(cod?.cancelled ?? 0)} cancelled COD orders`}
+                    icon={<TrendingDown className="w-5 h-5 text-rose-500" />}
+                    iconBg="bg-rose-50"
+                    cardBg="linear-gradient(135deg, #fff1f2 0%, #ffffff 65%)"
+                  />
+                </div>
+              </div>
+
+              {(cod?.highRiskFlagged ?? 0) > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-center gap-4">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                  <div>
+                    <p className="text-sm font-bold text-amber-800">
+                      {fmt(cod?.highRiskFlagged ?? 0)} high-risk COD contact{(cod?.highRiskFlagged ?? 0) !== 1 ? "s" : ""} flagged
+                    </p>
+                    <p className="text-xs text-amber-600 mt-0.5">First-time buyers with large orders — verification template sent automatically before dispatch.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Token Prepay Engine ─── */}
+              {rtoData?.tokenPrepay && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-3">₹99 Token Prepay Engine</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <StatCard
+                      title="Tokens Sent"
+                      value={fmt(rtoData.tokenPrepay.sent)}
+                      subtitle="High-risk orders challenged"
+                      icon={<Lock className="w-5 h-5 text-blue-500" />}
+                      iconBg="bg-blue-50"
+                    />
+                    <StatCard
+                      title="Tokens Paid"
+                      value={fmt(rtoData.tokenPrepay.paid)}
+                      subtitle={`${rtoData.tokenPrepay.payRate}% pay rate`}
+                      icon={<BadgeCheck className="w-5 h-5 text-wa-green" />}
+                      iconBg="bg-wa-green/10"
+                      trend={rtoData.tokenPrepay.payRate > 50 ? 1 : -1}
+                      cardBg="linear-gradient(135deg, #f0fdf9 0%, #ffffff 65%)"
+                    />
+                    <StatCard
+                      title="Expired (Ghosted)"
+                      value={fmt(rtoData.tokenPrepay.expired)}
+                      subtitle="Likely fake — auto-cancelled"
+                      icon={<PackageX className="w-5 h-5 text-rose-400" />}
+                      iconBg="bg-rose-50"
+                      cardBg="linear-gradient(135deg, #fff1f2 0%, #ffffff 65%)"
+                    />
+                    <StatCard
+                      title="RTO Blocked"
+                      value={`₹${((rtoData.tokenPrepay.expired * 1200)).toLocaleString()}`}
+                      subtitle="Est. loss prevented (avg ₹1200/order)"
+                      icon={<Shield className="w-5 h-5 text-emerald-500" />}
+                      iconBg="bg-emerald-50"
+                      trend={1}
+                      cardBg="linear-gradient(135deg, #f0fdf9 0%, #ffffff 65%)"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Fulfillment Holds ─── */}
+              {rtoData?.fulfillmentHold && rtoData.fulfillmentHold.totalHeld > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-3">Shopify Fulfillment Holds</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <StatCard
+                      title="Total Held"
+                      value={fmt(rtoData.fulfillmentHold.totalHeld)}
+                      subtitle="Orders paused at warehouse"
+                      icon={<Truck className="w-5 h-5 text-amber-500" />}
+                      iconBg="bg-amber-50"
+                    />
+                    <StatCard
+                      title="Active Holds"
+                      value={fmt(rtoData.fulfillmentHold.activeHolds)}
+                      subtitle="Still awaiting verification"
+                      icon={<Clock className="w-5 h-5 text-rose-500" />}
+                      iconBg="bg-rose-50"
+                    />
+                    <StatCard
+                      title="Auto-Released"
+                      value={fmt(rtoData.fulfillmentHold.autoReleased)}
+                      subtitle="Released after 4h timeout"
+                      icon={<RefreshCw className="w-5 h-5 text-stone-400" />}
+                      iconBg="bg-stone-100"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Success Fee Meter ─── */}
+              {rtoData?.successFee && rtoData.successFee.codRescues + rtoData.successFee.ndrRescues + rtoData.successFee.prepaidConversions > 0 && (
+                <div className="bg-white border border-stone-200 shadow-sm rounded-2xl p-6 sm:p-8">
+                  <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-sm font-black text-stone-950">This Month — Platform Success Fees</h3>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Estimated</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div className="bg-stone-50 border border-stone-100 rounded-xl p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-1">COD Rescues</p>
+                      <p className="text-2xl font-black text-stone-900">{fmt(rtoData.successFee.codRescues)}</p>
+                      <p className="text-[11px] text-stone-400 mt-0.5">₹10 / rescue</p>
+                    </div>
+                    <div className="bg-stone-50 border border-stone-100 rounded-xl p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-1">Prepaid Conversions</p>
+                      <p className="text-2xl font-black text-stone-900">{fmt(rtoData.successFee.prepaidConversions)}</p>
+                      <p className="text-[11px] text-stone-400 mt-0.5">₹15 / conversion</p>
+                    </div>
+                    <div className="bg-stone-50 border border-stone-100 rounded-xl p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-1">NDR Rescues</p>
+                      <p className="text-2xl font-black text-stone-900">{fmt(rtoData.successFee.ndrRescues)}</p>
+                      <p className="text-[11px] text-stone-400 mt-0.5">₹10 / rescue</p>
+                    </div>
+                    <div className="bg-gradient-to-br from-stone-900 to-stone-700 rounded-xl p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-300 mb-1">Est. Platform Fee</p>
+                      <p className="text-2xl font-black text-white">₹{((rtoData.successFee.estimatedFeePaise) / 100).toLocaleString()}</p>
+                      <p className="text-[11px] text-stone-400 mt-0.5">This calendar month</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Fraud Network ─── */}
+              {rtoData?.network && (
+                <div className="bg-gradient-to-br from-stone-900 to-stone-800 rounded-2xl p-6 sm:p-8">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                      <Network className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-white">Shared RTO Fraud Network</p>
+                      <p className="text-[11px] text-stone-400">Cross-merchant anonymized risk signals</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-2xl font-black text-white">{fmt(rtoData.network.uniquePhones)}</p>
+                      <p className="text-[11px] text-stone-400 mt-0.5">Unique fraud phones flagged by your brand</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-black text-white">{fmt(rtoData.network.totalSignals)}</p>
+                      <p className="text-[11px] text-stone-400 mt-0.5">Total risk signals contributed to network</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-stone-500 mt-4">Signals are sha256-hashed — raw phone numbers are never stored or shared.</p>
+                </div>
+              )}
+
+              {/* ─── Missing Templates Warning ─── */}
+              {(rtoData?.missingTemplates ?? []).length > 0 && (
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-rose-800">Missing RTO templates</p>
+                      <p className="text-xs text-rose-600 mt-0.5 mb-3">
+                        These templates are required for the COD/NDR pipeline to work. Create them as drafts so you can submit to Meta:
+                      </p>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {(rtoData?.missingTemplates ?? []).map((name) => (
+                          <span key={name} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                      {seedResult && seedResult.created.length > 0 && (
+                        <p className="text-xs text-emerald-700 font-semibold mb-2">
+                          ✓ Created {seedResult.created.length} template draft{seedResult.created.length !== 1 ? "s" : ""}. Go to Templates → submit to Meta.
+                        </p>
+                      )}
+                      <button
+                        onClick={seedRtoTemplates}
+                        disabled={seedingTemplates}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-rose-700 text-white text-xs font-bold rounded hover:bg-rose-800 transition-colors disabled:opacity-60"
+                      >
+                        {seedingTemplates ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                        Create drafts in Template Builder
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}

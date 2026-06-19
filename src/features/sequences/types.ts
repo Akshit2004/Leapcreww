@@ -11,6 +11,7 @@ export type SequenceTrigger =
   | "ndr_pending"
   | "order_shipped"
   | "order_delivered"
+  | "order_out_for_delivery"
   | "order_rto";
 
 export type StepAction = "send_template" | "send_message" | "add_tag" | "branch";

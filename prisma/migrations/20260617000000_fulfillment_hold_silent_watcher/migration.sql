@@ -1,0 +1,6 @@
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "shopifyNumericId" TEXT;
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "fulfillmentHoldId" TEXT;
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "fulfillmentHeldAt" TIMESTAMP(3);
+
+ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "fulfillmentHoldEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "silentWatcherEnabled" BOOLEAN NOT NULL DEFAULT false;
