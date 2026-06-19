@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "video", "video_promo", "mcp-server", "n8n-node", "zapier-app", "sdk", "tests", "playwright.config.ts"]
+  "exclude": ["node_modules", "videos", "mcp-server", "n8n-node", "zapier-app", "sdk", "tests", "playwright.config.ts"]
 }

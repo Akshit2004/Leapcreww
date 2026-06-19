@@ -1,0 +1,22 @@
+{
+  "name": "cart-recovery-video",
+  "version": "1.0.0",
+  "description": "LeapCreww — Cart Recovery Agent promotional video",
+  "scripts": {
+    "dev": "remotion studio",
+    "render": "remotion render CartRecovery out/cart-recovery.mp4",
+    "build": "remotion render CartRecovery out/cart-recovery.mp4 --codec h264"
+  },
+  "dependencies": {
+    "remotion": "^4.0.0",
+    "@remotion/cli": "^4.0.0",
+    "@remotion/transitions": "^4.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+}

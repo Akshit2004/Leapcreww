@@ -148,7 +148,7 @@ Paste URL → pick events → Subscribe → `whsec_` secret shown once → **Sen
 │ P1  │ Queue-based broadcast engine                         │ Current design caps you at small sends           │
 ├─────┼──────────────────────────────────────────────────────┼──────────────────────────────────────────────────┤
 │     │ Zapier/Make/n8n connectors + an MCP server so AI     │ In 2026, "easy to integrate" includes agents as  │
-│ P2  │ agents can use WappFlow as a tool                    │ integrators — this would genuinely differentiate │
+│ P2  │ agents can use LeapCreww as a tool                    │ integrators — this would genuinely differentiate │
 │     │                                                      │  you                                             │
 ├─────┼──────────────────────────────────────────────────────┼──────────────────────────────────────────────────┤
 │ P2  │ Inbox depth (assignment UI, canned replies, notes),  │                                                  │
@@ -159,7 +159,7 @@ Bottom line: the application is impressively complete and disciplined — top-de
 the platform (API + webhooks + docs + reliability) is ~15% built, and that's exactly the part your goal statement
 depends on. The good news: the architecture makes all of the P0 items straightforward to add.
 
-the north star is: a business should go from "found WappFlow" to "WhatsApp working with their system" in 
+the north star is: a business should go from "found LeapCreww" to "WhatsApp working with their system" in 
 minutes, with clicks, not code. Here's how that maps concretely onto what you have, in order of leverage:
 
 The "few clicks" integration architecture
@@ -167,7 +167,7 @@ The "few clicks" integration architecture
 1. Embeddable WhatsApp Button Widget — literally one line
   The classic killer feature (AiSensy/WATI both sell this hard). A business pastes one script tag and gets a floating
   WhatsApp chat button on their site:
-  `<script src="https://wappflow.com/widget.js" data-wf="org_abc123"></script>`
+  `<script src="https://leapcreww.com/widget.js" data-wf="org_abc123"></script>`
   Every click becomes a Contact in your CRM with source tracking, fires the welcome chatbot flow, and feeds
   attribution. You give it a no-code configurator in Settings (color, position, prefilled message, live preview) and a
   "Copy snippet" button. This is the purest "just a button" integration — works on Shopify, WordPress, Wix, anything,
