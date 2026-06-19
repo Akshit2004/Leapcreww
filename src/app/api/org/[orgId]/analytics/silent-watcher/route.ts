@@ -7,6 +7,7 @@
  * them to connect WhatsApp and activate the interception pipeline.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { requireOrg } from "@/shared/lib/api";
 import { prisma } from "@/shared/lib/prisma";
 
 export async function GET(
@@ -15,6 +16,7 @@ export async function GET(
 ) {
   try {
     const { orgId } = await params;
+    await requireOrg(orgId);
 
     const [org, highRiskCount, codOrders] = await Promise.all([
       prisma.organization.findUnique({

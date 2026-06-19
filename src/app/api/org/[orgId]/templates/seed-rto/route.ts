@@ -8,9 +8,8 @@
  * Returns { created: string[], existing: string[] }
  */
 import { NextRequest, NextResponse } from "next/server";
+import { requireOrg } from "@/shared/lib/api";
 import { prisma } from "@/shared/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/features/auth/api/[...nextauth]/route";
 
 const SEED_TEMPLATES = [
   {
@@ -56,12 +55,8 @@ export async function POST(
   { params }: { params: Promise<{ orgId: string }> },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { orgId } = await params;
+    await requireOrg(orgId, "ADMIN");
 
     const existing = await prisma.template.findMany({
       where: { organizationId: orgId, name: { in: SEED_TEMPLATES.map((t) => t.name) } },

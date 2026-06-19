@@ -10,8 +10,7 @@
  * Returns { number, shade, size } or 409 if no WhatsApp number is connected.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/features/auth/api/[...nextauth]/route";
+import { requireOrg } from "@/shared/lib/api";
 import { buildFinderDeepLink } from "@/features/size-shade-finder/services/sizeShadeService";
 import { getOrgDialableNumber } from "@/features/size-shade-finder/repositories/sizeShadeRepo";
 
@@ -20,12 +19,9 @@ export async function GET(
   { params }: { params: Promise<{ orgId: string }> },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { orgId } = await params;
+    await requireOrg(orgId);
+
     const product = req.nextUrl.searchParams.get("product");
 
     const number = await getOrgDialableNumber(orgId);
