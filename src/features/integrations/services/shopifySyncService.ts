@@ -117,5 +117,11 @@ export async function syncShopifyCatalog(orgId: string): Promise<{ synced: numbe
     `Catalog Sync Success: Imported and updated ${syncedCount} products from Shopify.`
   );
 
+  // E. Push synced products to Meta's WhatsApp Commerce Catalog (best-effort,
+  // fire-and-forget — same pattern as catalogService's manual create/update).
+  if (syncedCount > 0) {
+    import("@/shared/lib/meta-catalog").then((m) => m.syncAllProductsToMeta(orgId));
+  }
+
   return { synced: syncedCount };
 }

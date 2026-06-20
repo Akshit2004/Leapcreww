@@ -1,7 +1,7 @@
 "use client";
 
 import toast from "react-hot-toast";
-import { CheckCircle2, AlertTriangle, Info } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Info, Loader2 } from "lucide-react";
 import React from "react";
 
 /**
@@ -13,7 +13,7 @@ import React from "react";
  * (sharp borders, off-white surfaces) instead of the library defaults.
  */
 
-type Variant = "success" | "error" | "info";
+type Variant = "success" | "error" | "info" | "loading";
 
 const VARIANT_STYLES: Record<
   Variant,
@@ -34,11 +34,16 @@ const VARIANT_STYLES: Record<
     bar: "bg-stone-400",
     icon: <Info className="w-4 h-4 text-stone-600 shrink-0" />,
   },
+  loading: {
+    border: "border-stone-300",
+    bar: "bg-stone-400",
+    icon: <Loader2 className="w-4 h-4 text-stone-600 shrink-0 animate-spin" />,
+  },
 };
 
 const DURATION_MS = 5000;
 
-function emit(variant: Variant, title: string, message?: string) {
+function emit(variant: Variant, title: string, message?: string, options?: { id?: string; duration?: number }) {
   const styles = VARIANT_STYLES[variant];
   return toast.custom(
     (t) => (
@@ -72,16 +77,18 @@ function emit(variant: Variant, title: string, message?: string) {
               ✕
             </button>
           </div>
-          <div className="h-0.5 w-full bg-stone-100">
-            <div
-              key={t.id}
-              className={`h-full animate-toast-bar ${styles.bar}`}
-            />
-          </div>
+          {variant !== "loading" && (
+            <div className="h-0.5 w-full bg-stone-100">
+              <div
+                key={t.id}
+                className={`h-full animate-toast-bar ${styles.bar}`}
+              />
+            </div>
+          )}
         </div>
       </div>
     ),
-    { duration: DURATION_MS }
+    { id: options?.id, duration: options?.duration ?? DURATION_MS }
   );
 }
 
@@ -89,5 +96,10 @@ export const notify = {
   success: (title: string, message?: string) => emit("success", title, message),
   error: (title: string, message?: string) => emit("error", title, message),
   info: (title: string, message?: string) => emit("info", title, message),
-  dismiss: () => toast.dismiss(),
+  /** Persistent toast (no auto-dismiss) for in-progress work. Returns the toast id. */
+  loading: (title: string, message?: string) => emit("loading", title, message, { duration: Infinity }),
+  /** Replace an existing toast in place (e.g. a `loading` toast) by id — used for live progress updates. */
+  update: (id: string, variant: Variant, title: string, message?: string) =>
+    emit(variant, title, message, { id, duration: variant === "loading" ? Infinity : DURATION_MS }),
+  dismiss: (id?: string) => toast.dismiss(id),
 };

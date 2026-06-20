@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { notify } from "@/shared/lib/toast";
 import {
   ChevronDown,
   ChevronUp,
@@ -284,6 +285,43 @@ export function IntegrationsTab() {
     }
   }
 
+  async function pollMetaCatalogProgress(toastId: string) {
+    const POLL_INTERVAL_MS = 1200;
+    const MAX_POLLS = 60; // ~72s ceiling so a stuck/dead progress entry can't poll forever
+
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+      const res = await fetch(`/api/org/${orgId}/integrations/shopify/sync/progress`);
+      if (!res.ok) continue;
+      const progress: { current: number; total: number; done: boolean } = await res.json();
+
+      // done + total 0 means the batch sync finished without a metaCatalogId
+      // configured — distinct from "hasn't started counting products yet".
+      if (progress.done && progress.total === 0) {
+        notify.update(
+          toastId,
+          "info",
+          "WhatsApp catalog not configured",
+          "Set a Meta Catalog ID in Settings to push synced products to WhatsApp."
+        );
+        return;
+      }
+
+      if (progress.total === 0) continue; // still counting products, keep polling
+
+      notify.update(
+        toastId,
+        progress.done ? "success" : "loading",
+        progress.done ? "WhatsApp catalog synced" : "Syncing to WhatsApp catalog",
+        `${Math.min(progress.current, progress.total)} of ${progress.total} products`
+      );
+
+      if (progress.done) return;
+    }
+
+    notify.dismiss(toastId);
+  }
+
   async function handleSync() {
     setSyncing(true);
     try {
@@ -296,6 +334,10 @@ export function IntegrationsTab() {
             ? `Synced ${data.synced} product${data.synced === 1 ? "" : "s"} from Shopify.`
             : "Sync ran, but no products were found in your Shopify store."
         );
+        if (data.synced > 0) {
+          const toastId = notify.loading("Syncing to WhatsApp catalog", "Starting...");
+          pollMetaCatalogProgress(toastId);
+        }
       } else {
         setError(data.error ?? "Sync failed.");
       }

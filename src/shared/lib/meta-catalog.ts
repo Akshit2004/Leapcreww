@@ -3,6 +3,22 @@ import { prisma } from "./prisma";
 const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || "v21.0";
 
 /**
+ * In-memory progress tracker for batch Meta Catalog syncs, keyed by org.
+ * Best-effort only — lost on server restart and not shared across
+ * instances, same caveat as the fire-and-forget sync itself.
+ */
+export interface MetaCatalogSyncProgress {
+  current: number;
+  total: number;
+  done: boolean;
+}
+const syncProgress = new Map<string, MetaCatalogSyncProgress>();
+
+export function getMetaCatalogSyncProgress(organizationId: string): MetaCatalogSyncProgress | null {
+  return syncProgress.get(organizationId) ?? null;
+}
+
+/**
  * Syncs a LeapCreww Product to Meta Commerce Catalog via Graph API
  */
 export async function syncProductToMetaCatalog(productId: string) {
@@ -61,6 +77,10 @@ export async function syncProductToMetaCatalog(productId: string) {
  * Batch syncs all active products of an organization to Meta Catalog
  */
 export async function syncAllProductsToMeta(organizationId: string) {
+  // Registered immediately (before any await) so pollers can distinguish
+  // "in progress, count not known yet" (done: false) from "not started" (no
+  // entry) and from "finished with nothing to sync" (done: true, total: 0).
+  syncProgress.set(organizationId, { current: 0, total: 0, done: false });
   try {
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
@@ -69,6 +89,7 @@ export async function syncAllProductsToMeta(organizationId: string) {
 
     if (!org || !org.metaCatalogId) {
       console.warn(`[Meta Catalog Sync] Cannot sync all products: organization ${organizationId} has no metaCatalogId`);
+      syncProgress.set(organizationId, { current: 0, total: 0, done: true });
       return;
     }
 
@@ -77,14 +98,22 @@ export async function syncAllProductsToMeta(organizationId: string) {
     });
 
     console.log(`[Meta Catalog Sync] Batch syncing ${products.length} products for org ${organizationId}...`);
+    syncProgress.set(organizationId, { current: 0, total: products.length, done: false });
 
     for (const product of products) {
       await syncProductToMetaCatalog(product.id);
+      const progress = syncProgress.get(organizationId);
+      if (progress) progress.current++;
     }
-    
+
+    const progress = syncProgress.get(organizationId);
+    if (progress) progress.done = true;
+
     console.log(`[Meta Catalog Sync] Batch sync completed for org ${organizationId}`);
   } catch (err) {
     console.error("[Meta Catalog Sync] Error during batch sync:", err);
+    const progress = syncProgress.get(organizationId);
+    if (progress) progress.done = true;
   }
 }
 

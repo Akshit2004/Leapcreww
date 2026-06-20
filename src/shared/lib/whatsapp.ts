@@ -165,6 +165,19 @@ export async function sendWhatsAppMessage(
   message: WhatsAppMessage,
   orgId: string
 ): Promise<{ ok: boolean; data?: WhatsAppResponseData; error?: string }> {
+  if (process.env.MOCK_WHATSAPP === "true") {
+    const previewContent = message.template
+      ? `Template: ${message.template.name} with params: ${JSON.stringify(message.template.components || [])}`
+      : message.text || JSON.stringify(message);
+    console.log(`\n┌──────────────── MOCK WHATSAPP MESSAGE ────────────────┐\n│ To: ${message.to}\n│ Content: ${previewContent}\n└───────────────────────────────────────────────────────┘\n`);
+    return { 
+      ok: true, 
+      data: { 
+        messages: [{ id: `mock_${crypto.randomBytes(8).toString("hex")}` }] 
+      } 
+    };
+  }
+
   const config = await getWhatsAppConfig(orgId);
 
   if (!config) {
