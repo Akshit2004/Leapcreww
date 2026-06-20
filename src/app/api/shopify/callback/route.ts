@@ -17,9 +17,6 @@ const WEBHOOK_TOPICS = [
   "checkouts/create",
   "inventory_levels/update",
   "app/uninstalled",
-  "customers/data_request",
-  "customers/redact",
-  "shop/redact",
 ];
 
 async function registerWebhooks(
