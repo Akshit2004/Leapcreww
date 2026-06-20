@@ -48,7 +48,7 @@ export function findDueEnrollments(now: Date) {
   return prisma.sequenceEnrollment.findMany({
     where: { status: "active", nextRunAt: { lte: now } },
     include: { sequence: { include: { steps: { orderBy: { order: "asc" } } } }, contact: true },
-    take: 100,
+    take: 50,
   });
 }
 

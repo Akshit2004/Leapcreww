@@ -1,6 +1,8 @@
 import { route, ok, fail } from "@/shared/lib/api";
 import { processDueEnrollments, sweepAbandonedCarts } from "@/features/sequences/services/sequenceService";
 
+export const maxDuration = 60;
+
 function guardCron(req: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return fail("Server misconfigured: CRON_SECRET not set", 500);

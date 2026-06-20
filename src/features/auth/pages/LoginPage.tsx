@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn, getSession } from "next-auth/react";
+import { signIn, getSession, useSession } from "next-auth/react";
 import {
   Bot, ArrowRight, Mail, AlertCircle, Loader, CheckCircle,
   MessageSquare, Copy, Building, User, Lock
@@ -13,7 +13,21 @@ import { QRCodeSVG } from "qrcode.react";
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+  const { data: session, status } = useSession();
+
+  // Already signed in (e.g. cookie survived a server/tab restart) — skip the
+  // login form and go straight to the workspace instead of asking again.
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    interface CustomSessionUser {
+      activeOrgId?: string | null;
+      organizations?: Array<{ id: string }>;
+    }
+    const user = session?.user as unknown as CustomSessionUser | undefined;
+    const orgId = user?.activeOrgId || user?.organizations?.[0]?.id;
+    router.replace(orgId ? `/org/${orgId}` : "/admin");
+  }, [status, session, router]);
+
   // Tab states
   const [activeTab, setActiveTab] = useState<"password" | "whatsapp" | "email">("password");
 

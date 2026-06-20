@@ -11,9 +11,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { autoReleaseExpiredHolds } from "@/features/cod/services/fulfillmentHoldService";
 
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   const authHeader = req.headers.get("authorization");
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secretParam = req.nextUrl.searchParams.get("secret");
+  if (authHeader !== `Bearer ${cronSecret}` && secretParam !== cronSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

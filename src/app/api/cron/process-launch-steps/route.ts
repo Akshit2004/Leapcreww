@@ -1,6 +1,8 @@
 import { route, ok, fail } from "@/shared/lib/api";
 import { processDueLaunchSteps } from "@/features/launches/services/launchService";
 
+export const maxDuration = 60;
+
 function guardCron(req: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return fail("Server misconfigured: CRON_SECRET not set", 500);

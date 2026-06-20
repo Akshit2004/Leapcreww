@@ -26,8 +26,8 @@ import {
   type WhatsAppTemplatePayload,
 } from "../types";
 
-/** Max contacts to send per cron tick per campaign. 50 × 1s delay = 50s worst-case. */
-export const CHUNK_SIZE = 50;
+/** Max contacts to send per cron tick per campaign. 20 × 1s delay = 20s. Keeps us under cron-job.org's 30s limit. */
+export const CHUNK_SIZE = 20;
 
 /** Build a Meta template payload for one contact, resolving variables + media header. */
 export function buildTemplatePayload(
