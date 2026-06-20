@@ -107,14 +107,14 @@ export const MarketplaceTab: React.FC<{ embedded?: boolean }> = ({ embedded = fa
           steps: [
             {
               order: 0,
-              delayMinutes: 0,
+              delayMinutes: 60,
               actionType: "send_message",
               message:
                 "Hey {{contact.name}}! 🛒 You left {{cart.items_list}} in your cart (Total: {{cart.total}}). Complete your order here: {{cart.checkout_url}}",
             },
             {
               order: 1,
-              delayMinutes: 120,
+              delayMinutes: 1440,
               actionType: "send_template",
               templateName: "cart_recovery",
             },

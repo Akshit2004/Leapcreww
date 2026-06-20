@@ -44,6 +44,18 @@ export function findExistingEnrollment(sequenceId: string, contactId: string) {
   });
 }
 
+/** Any active enrollment for this contact in a sequence with the given trigger, across all sequences. */
+export function findExistingEnrollmentByTrigger(organizationId: string, trigger: string, contactId: string) {
+  return prisma.sequenceEnrollment.findFirst({
+    where: {
+      contactId,
+      organizationId,
+      status: "active",
+      sequence: { trigger },
+    },
+  });
+}
+
 export function findDueEnrollments(now: Date) {
   return prisma.sequenceEnrollment.findMany({
     where: { status: "active", nextRunAt: { lte: now } },

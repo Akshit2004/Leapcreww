@@ -51,6 +51,7 @@ const WEBHOOK_TOPICS = [
   { topic: "orders/create", label: "New order placed" },
   { topic: "orders/fulfilled", label: "Order dispatched" },
   { topic: "checkouts/create", label: "Abandoned cart started" },
+  { topic: "checkouts/update", label: "Checkout info updated (email, address, phone)" },
 ];
 
 type IntegrationId = "shopify" | "razorpay" | "shiprocket";

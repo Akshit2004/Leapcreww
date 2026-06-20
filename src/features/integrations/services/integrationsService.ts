@@ -196,7 +196,7 @@ export async function connectShopify(
     webhookWarning =
       "Localhost environment detected. Skipping automatic Shopify webhook registration. Please set up a tunnel (e.g. ngrok) to receive real-time webhook updates.";
   } else {
-    const topics = ["orders/create", "orders/fulfilled", "checkouts/create"];
+    const topics = ["orders/create", "orders/fulfilled", "checkouts/create", "checkouts/update"];
     for (const topic of topics) {
       try {
         const webhookRes = await fetch(`https://${cleanShop}/admin/api/${SHOPIFY_API_VERSION}/webhooks.json`, {

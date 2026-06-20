@@ -56,6 +56,14 @@ export async function enrollOnTrigger(
   contactId: string,
   triggerMeta?: { tag?: string }
 ) {
+  // cart_abandoned carts fire repeated webhooks/cron sweeps for the same cart —
+  // one active drip per contact is enough, even across multiple cart_abandoned
+  // sequences, so check across all of them up front rather than per-sequence.
+  if (trigger === "cart_abandoned") {
+    const existingAny = await repo.findExistingEnrollmentByTrigger(organizationId, trigger, contactId);
+    if (existingAny) return;
+  }
+
   const sequences = await repo.findActiveSequencesByTrigger(organizationId, trigger);
   for (const seq of sequences) {
     if (!seq.steps.length) continue;

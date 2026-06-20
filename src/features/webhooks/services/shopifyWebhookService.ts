@@ -93,17 +93,26 @@ export async function handleShopifyEvent(
     }
 
     const contactAttributes = (contact.attributes as Record<string, unknown>) || {};
+    const alreadyEnrolled = contactAttributes.cart_recovery_enrolled === true;
+
     contactAttributes.shopify_checkout_url = payload.abandoned_checkout_url || "";
     contactAttributes.cart_total = payload.total_price || "0.00";
     contactAttributes.cart_items = lineItems.map((i) => `${i.title} (x${i.quantity || 1})`).join(", ");
-    contactAttributes.cart_abandoned_at = timestampStr;
+    contactAttributes.cart_abandoned_at = contactAttributes.cart_abandoned_at || timestampStr;
     contactAttributes.cart_recovered = false;
+    if (!alreadyEnrolled) contactAttributes.cart_recovery_enrolled = true;
 
     await repo.updateContactAttributes(contact.id, contactAttributes as Prisma.InputJsonValue);
 
+    if (alreadyEnrolled) {
+      // checkouts/update fired again (e.g. address/phone edited) — cart info
+      // refreshed above, but the recovery drip is already running for this cart.
+      return { success: true, message: "Checkout updated; recovery sequence already enrolled." };
+    }
+
     await repo.createShopifySystemLog(
       orgId,
-      `Shopify Webhook: checkouts/create - Cart abandoned by ${name} (₹${payload.total_price || "0.00"}). Saved to database, scheduling drip recovery sequence.`,
+      `Shopify Webhook: ${topic} - Cart abandoned by ${name} (₹${payload.total_price || "0.00"}). Saved to database, scheduling drip recovery sequence.`,
     );
 
     await enrollOnTrigger(orgId, "cart_abandoned", contact.id);
