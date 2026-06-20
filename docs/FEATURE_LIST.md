@@ -497,12 +497,19 @@ Features are ordered **most rich → least** for testing priority.
 | Slot management | View, update, delete individual slots |
 | Booking management | View all bookings; update status |
 | Use case settings | Configure business hours, slot duration, buffer time |
+| Slot booking customers | Dedicated "Bookings → Customers" tab: one row per customer aggregating all their slot bookings (totals, upcoming, no-shows, last visit, next appointment, fees collected) |
+| Customer drill-down | Expand a customer to view their full booking history with status badges |
+| Customer actions | Manage booking status (completed / no-show / cancel), message on WhatsApp (jumps to Inbox), export the directory to CSV |
 
 **Test checklist:**
 - [ ] Configure use-case settings (working hours, duration) → slots generated
 - [ ] Book a slot → booking appears in console
 - [ ] Update booking status → confirmed/cancelled
 - [ ] Delete a slot → no longer bookable
+- [ ] Open Bookings → Customers → customers aggregated one row each
+- [ ] Expand a customer → full booking history shown
+- [ ] Message on WhatsApp → opens that contact in Inbox
+- [ ] Export CSV → downloads customer directory
 
 **Routes:** `GET/PUT /api/usecase/settings` · `GET/POST /api/usecase/slots` · `POST /api/usecase/slots/generate` · `GET/PUT/DELETE /api/usecase/slots/[id]` · `GET/POST /api/usecase/bookings` · `GET/PUT /api/usecase/bookings/[id]`
 
@@ -533,19 +540,24 @@ Features are ordered **most rich → least** for testing priority.
 
 | Feature | Details |
 |---|---|
-| Widget config | Configure widget color, greeting, trigger delay per org |
-| Public key | Each org gets a public key for widget authentication |
-| Widget snippet | Embeddable `<script>` tag for any website |
-| Click tracking | Track widget interactions via `/api/widget/[publicKey]/click` |
+| Widget config | Configure phone number, color, greeting bubble, position (bottom-left/right), prefilled visitor message per org |
+| Public key | Each org gets a public key (`wfw_…`); the only identifier customer sites ever see |
+| Widget snippet | One-line embeddable `<script src=".../widget.js" data-wf="wfw_…" async>` tag for any website |
+| Phone-number gating | Widget only renders when **enabled AND** a WhatsApp number is set; the public config reports `enabled: false` until then |
+| Clean prefilled message | Customer sees only the configured message — no internal `[ref:…]` tag. Inbound parser still strips/reads `[ref:…]` for backward compatibility |
+| Click tracking | Fire-and-forget click beacon via `/api/widget/[publicKey]/click` (works independent of the prefilled text) |
+| Loader diagnostics | `widget.js` logs a clear console warning when the button stays hidden (disabled, missing number, bad `data-wf` key, or unreachable host) |
+| CORS | Public config/click endpoints send `Access-Control-Allow-Origin: *` so the script works on any third-party domain |
 | Config endpoint | Public endpoint returns widget config by public key |
-| Widget UI card | Settings card in dashboard to manage widget |
+| Live preview | Settings card shows a live preview of the button + greeting bubble as you configure it |
 
 **Test checklist:**
-- [ ] Open Settings → Widget card → configure color and greeting
-- [ ] Copy embed snippet → paste into test HTML page → widget renders
-- [ ] Click widget → click tracked via `/api/widget/[publicKey]/click`
-- [ ] `GET /api/widget/[publicKey]/config` → returns correct config
-- [ ] Update widget config → changes reflect on embedded widget
+- [ ] Open Settings → Website Chat Button → set WhatsApp number (with country code), color, greeting → Save
+- [ ] Copy embed snippet → paste into test HTML page → widget renders (button appears)
+- [ ] With no phone number set → button stays hidden and console shows the "add a number" warning
+- [ ] Click widget → opens `wa.me` with the clean prefilled message (no `[ref:…]`) → click tracked via `/api/widget/[publicKey]/click`
+- [ ] `GET /api/widget/[publicKey]/config` → returns correct config with CORS header
+- [ ] Update widget config → changes reflect on embedded widget (hard-refresh to bust cached `widget.js`)
 
 **Routes:** `GET/PUT /api/org/[orgId]/widget` · `GET /api/widget/[publicKey]/config` · `POST /api/widget/[publicKey]/click`
 

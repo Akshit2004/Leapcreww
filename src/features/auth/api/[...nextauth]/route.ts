@@ -3,6 +3,12 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../../../shared/lib/prisma";
 
+const useSecureCookies = process.env.NODE_ENV === "production";
+const sessionCookieName = useSecureCookies
+  ? "__Secure-next-auth.session-token"
+  : "next-auth.session-token";
+const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60; // 7 days
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -157,7 +163,19 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60 // 30 days
+    maxAge: SESSION_MAX_AGE_SECONDS
+  },
+  cookies: {
+    sessionToken: {
+      name: sessionCookieName,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+        maxAge: SESSION_MAX_AGE_SECONDS
+      }
+    }
   },
   callbacks: {
     async jwt({ token, user, trigger, session }) {

@@ -26,13 +26,57 @@ import { BusinessTypeOnboarding } from "@/features/dashboard/components/Business
 import { AICopilotSidebar } from "@/features/ai/components/AICopilotSidebar";
 import { AiWorkspace } from "@/features/ai/components/AiWorkspace";
 import { CommandPalette } from "@/shared/components/CommandPalette";
-import { DashboardSkeleton } from "@/shared/components/ui/Skeleton";
+import {
+  DashboardSkeleton,
+  OverviewSkeleton,
+  AnalyticsSkeleton,
+  InboxSkeleton,
+  CustomersSkeleton,
+  AdsSkeleton,
+  CampaignsSkeleton,
+  TemplatesSkeleton,
+  FlowsSkeleton,
+  ChatbotSkeleton,
+  RecipesSkeleton,
+  UseCasesSkeleton,
+  BookingCustomersSkeleton,
+  IntegrationsSkeleton,
+  NdrSkeleton,
+  LaunchesSkeleton,
+  MarketplaceSkeleton,
+  SettingsSkeleton,
+  AiWorkspaceSkeleton,
+} from "@/shared/components/ui/Skeleton";
 import { WalletWarningBanner } from "@/shared/components/ui/WalletWarningBanner";
 import { QuickActionFAB } from "@/shared/components/ui/QuickActionFAB";
 import { isValidTab, NAV_ITEMS } from "@/shared/config/navigation";
 import { Loader, AlertCircle } from "lucide-react";
 
 const MAX_RETRIES = 4;
+
+// Per-tab skeleton lookup — each tab gets a loader that mirrors its real
+// layout so there's no shape jump when content swaps in. Unmapped tabs
+// fall back to the generic DashboardSkeleton.
+const TAB_SKELETONS: Record<string, React.ComponentType> = {
+  overview: OverviewSkeleton,
+  analytics: AnalyticsSkeleton,
+  inbox: InboxSkeleton,
+  customers: CustomersSkeleton,
+  ads: AdsSkeleton,
+  campaigns: CampaignsSkeleton,
+  templates: TemplatesSkeleton,
+  flows: FlowsSkeleton,
+  chatbot: ChatbotSkeleton,
+  recipes: RecipesSkeleton,
+  usecases: UseCasesSkeleton,
+  bookingcustomers: BookingCustomersSkeleton,
+  integrations: IntegrationsSkeleton,
+  ndr: NdrSkeleton,
+  launches: LaunchesSkeleton,
+  marketplace: MarketplaceSkeleton,
+  settings: SettingsSkeleton,
+  "ai-workspace": AiWorkspaceSkeleton,
+};
 
 function TenantDashboardInner() {
   const params = useParams();
@@ -263,7 +307,12 @@ function TenantDashboardInner() {
 
         <WalletWarningBanner onNavigate={handleTabChange} />
 
-        {loading ? <DashboardSkeleton /> : renderActiveTab()}
+        {loading
+          ? (() => {
+              const ActiveSkeleton = TAB_SKELETONS[activeTab] ?? DashboardSkeleton;
+              return <ActiveSkeleton />;
+            })()
+          : renderActiveTab()}
         <QuickActionFAB activeTab={activeTab} />
       </main>
 

@@ -12,7 +12,7 @@ import { authOptions } from "@/features/auth/api/[...nextauth]/route";
 export type Role = "OWNER" | "ADMIN" | "AGENT";
 
 // Higher number = more privilege.
-const ROLE_RANK: Record<Role, number> = {
+export const ROLE_RANK: Record<Role, number> = {
   AGENT: 1,
   ADMIN: 2,
   OWNER: 3,

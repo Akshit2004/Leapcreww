@@ -6,7 +6,8 @@
  * in feature `repositories/`. Routes should read like a table of contents.
  */
 import { NextResponse } from "next/server";
-import { getAppSession, hasOrgRole, isPlatformAdmin, type AppSession, type Role } from "./authz";
+import { getAppSession, isPlatformAdmin, ROLE_RANK, type AppSession, type Role } from "./authz";
+import { prisma } from "./prisma";
 
 /** Standard success envelope. */
 export function ok<T>(data: T, init?: ResponseInit): NextResponse {
@@ -55,10 +56,21 @@ export async function requireSession(): Promise<AppSession> {
   return session;
 }
 
-/** Require membership in `orgId` with at least `minRole`, returning the session. */
+/**
+ * Require membership in `orgId` with at least `minRole`, returning the session.
+ *
+ * Checks the live Membership row rather than the JWT's `organizations` claim:
+ * the claim is baked in at login and only refreshed via an explicit client
+ * `update()` call, so trusting it would let a removed/demoted member keep
+ * access for up to the session's `maxAge` after their membership changes.
+ */
 export async function requireOrg(orgId: string, minRole: Role = "AGENT"): Promise<AppSession> {
   const session = await requireSession();
-  if (!hasOrgRole(session, orgId, minRole)) {
+  const membership = await prisma.membership.findUnique({
+    where: { userId_organizationId: { userId: session.user.id, organizationId: orgId } },
+    select: { role: true }
+  });
+  if (!membership || ROLE_RANK[membership.role as Role] < ROLE_RANK[minRole]) {
     throw new ApiError("Forbidden: insufficient access to this workspace", 403);
   }
   return session;
