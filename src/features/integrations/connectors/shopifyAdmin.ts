@@ -147,6 +147,27 @@ export async function releaseFulfillmentHold(
   }
 }
 
+export interface ShopifyWebhookSubscription {
+  id: number;
+  topic: string;
+  address: string;
+}
+
+/** List webhook subscriptions currently registered with Shopify for this app's access token. */
+export async function listShopifyWebhooks(
+  creds: ShopifyCredentials,
+): Promise<ShopifyWebhookSubscription[]> {
+  const res = await fetch(adminUrl(creds.shopDomain, "webhooks.json"), {
+    headers: shopifyHeaders(creds.accessToken),
+  });
+  if (!res.ok) {
+    console.warn(`[shopifyAdmin] listShopifyWebhooks failed: ${res.status}`);
+    return [];
+  }
+  const data = (await res.json()) as { webhooks?: ShopifyWebhookSubscription[] };
+  return data.webhooks ?? [];
+}
+
 /**
  * Update the shipping address on a Shopify order.
  * address is the free-text string the customer replied with — stored as address1.

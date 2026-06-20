@@ -13,6 +13,7 @@ import { ApiError } from "@/shared/lib/api";
 import { encryptSecret, decryptSecretSafe } from "@/shared/lib/crypto";
 import * as integrationsRepo from "@/features/integrations/repositories/integrationsRepo";
 import { authenticateShiprocket } from "@/features/integrations/connectors/shiprocket";
+import { getShopifyCredentials, listShopifyWebhooks } from "@/features/integrations/connectors/shopifyAdmin";
 import type {
   ConnectShopifyInput,
   ConnectRazorpayInput,
@@ -67,6 +68,14 @@ function decryptCredentials(id: string, stored: string): Record<string, unknown>
     console.warn(`[integrations] Failed to parse credentials for "${id}".`);
     return null;
   }
+}
+
+/** Topics currently registered with Shopify for this org's store (live, not cached). */
+export async function getShopifyWebhookTopics(orgId: string): Promise<string[]> {
+  const creds = await getShopifyCredentials(orgId);
+  if (!creds) return [];
+  const webhooks = await listShopifyWebhooks(creds);
+  return webhooks.map((w) => w.topic);
 }
 
 // ─── Disconnect ──────────────────────────────────────────────────────────

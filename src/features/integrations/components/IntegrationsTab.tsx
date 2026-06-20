@@ -11,6 +11,7 @@ import {
   Link2Off,
   AlertTriangle,
   CheckCircle2,
+  XCircle,
   Copy,
   ExternalLink,
   Loader2,
@@ -192,6 +193,32 @@ export function IntegrationsTab() {
   }, [orgId, searchParams, fetchIntegration, router]);
 
   const isConnected = integration?.status === "connected";
+
+  const [subscribedTopics, setSubscribedTopics] = useState<string[] | null>(null);
+  const [loadingWebhooks, setLoadingWebhooks] = useState(false);
+
+  useEffect(() => {
+    if (selected !== "shopify" || !isConnected) {
+      setSubscribedTopics(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingWebhooks(true);
+    fetch(`/api/org/${orgId}/integrations/shopify/webhooks`)
+      .then((res) => (res.ok ? res.json() : { topics: [] }))
+      .then((data) => {
+        if (!cancelled) setSubscribedTopics(data.topics ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setSubscribedTopics([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingWebhooks(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, isConnected, orgId]);
 
   const webhookReceiver =
     typeof window !== "undefined"
@@ -826,22 +853,35 @@ export function IntegrationsTab() {
             {/* ── Section: Active Webhooks ── */}
             {isConnected && integration?.webhookUrl && selected === "shopify" && (
               <section className="kc-float p-6 space-y-3">
-                <h4 className="kc-label text-stone-400">
-                  Active Webhook Subscriptions
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="kc-label text-stone-400">
+                    Active Webhook Subscriptions
+                  </h4>
+                  {loadingWebhooks && <Loader2 className="w-3.5 h-3.5 animate-spin text-stone-400" />}
+                </div>
                 <div className="grid sm:grid-cols-3 gap-3">
-                  {WEBHOOK_TOPICS.map((item) => (
-                    <div
-                      key={item.topic}
-                      className="ds-card-flat p-3 flex items-start gap-2.5"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-[#96bf48] shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-[10px] font-bold text-stone-900">{item.label}</p>
-                        <p className="text-[8px] font-mono text-stone-400 mt-0.5">{item.topic}</p>
+                  {WEBHOOK_TOPICS.map((item) => {
+                    const isSubscribed = !!subscribedTopics?.includes(item.topic);
+                    return (
+                      <div
+                        key={item.topic}
+                        className="ds-card-flat p-3 flex items-start gap-2.5"
+                      >
+                        {isSubscribed ? (
+                          <CheckCircle2 className="w-4 h-4 text-[#96bf48] shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-stone-300 shrink-0 mt-0.5" />
+                        )}
+                        <div>
+                          <p className="text-[10px] font-bold text-stone-900">{item.label}</p>
+                          <p className="text-[8px] font-mono text-stone-400 mt-0.5">{item.topic}</p>
+                          {!loadingWebhooks && subscribedTopics !== null && !isSubscribed && (
+                            <p className="text-[8px] font-bold text-amber-600 mt-0.5">Not registered — reconnect Shopify</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             )}
