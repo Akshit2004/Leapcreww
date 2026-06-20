@@ -44,6 +44,8 @@ async function registerWebhooks(
       if (r.ok || r.status === 422) {
         registered.push(topic);
       } else {
+        const errorMsg = await r.text().catch(() => "unknown error");
+        console.error(`❌ Webhook registration failed for topic '${topic}': HTTP ${r.status} - ${errorMsg}`);
         failed.push(topic);
       }
     } catch {
