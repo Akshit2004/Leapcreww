@@ -7,6 +7,7 @@
  * ApiError so the route can translate failures into clean HTTP responses.
  */
 import { ApiError } from "@/shared/lib/api";
+import { decryptSecretSafe } from "@/shared/lib/crypto";
 import * as integrationsRepo from "../repositories/integrationsRepo";
 import * as shopifyProductRepo from "../repositories/shopifyProductRepo";
 
@@ -42,7 +43,7 @@ export async function syncShopifyCatalog(orgId: string): Promise<{ synced: numbe
   let shopDomain: string;
   let accessToken: string;
   try {
-    ({ shopDomain, accessToken } = JSON.parse(integration.apiKey));
+    ({ shopDomain, accessToken } = JSON.parse(decryptSecretSafe(integration.apiKey)));
   } catch {
     throw new ApiError("Invalid Shopify credentials in database.", 400);
   }
@@ -51,7 +52,9 @@ export async function syncShopifyCatalog(orgId: string): Promise<{ synced: numbe
   }
 
   // B. Fetch products from the Shopify Admin API.
-  const shopifyProductsUrl = `https://${shopDomain}/admin/api/2024-04/products.json?limit=50`;
+  // status accepts only active|archived|draft (no "any" literal) — list all
+  // three explicitly so draft/unpublished demo products aren't excluded.
+  const shopifyProductsUrl = `https://${shopDomain}/admin/api/2024-04/products.json?limit=50&status=active,archived,draft`;
   const response = await fetch(shopifyProductsUrl, {
     headers: {
       "X-Shopify-Access-Token": accessToken,

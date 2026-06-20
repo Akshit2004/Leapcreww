@@ -290,7 +290,12 @@ export function IntegrationsTab() {
       const res = await fetch(`/api/org/${orgId}/integrations/shopify/sync`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
-        // sync success
+        setError("");
+        setSuccessBanner(
+          data.synced > 0
+            ? `Synced ${data.synced} product${data.synced === 1 ? "" : "s"} from Shopify.`
+            : "Sync ran, but no products were found in your Shopify store."
+        );
       } else {
         setError(data.error ?? "Sync failed.");
       }

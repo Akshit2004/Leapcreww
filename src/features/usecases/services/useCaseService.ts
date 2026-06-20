@@ -225,6 +225,16 @@ export async function updateSettings(input: UseCaseSettingsInput) {
     data.activeUseCase = input.activeUseCase;
     // Keep the legacy flag aligned so existing marketplace UI/automation works.
     data.marketplaceBotEnabled = input.activeUseCase === "MARKETPLACE";
+    // Keep businessVertical (sidebar nav filter) aligned with the active agent,
+    // so switching agents doesn't leave a stale vertical's tabs showing/hidden.
+    if (input.businessVertical === undefined) {
+      data.businessVertical =
+        input.activeUseCase === "MARKETPLACE"
+          ? "ECOMMERCE"
+          : input.activeUseCase === "APPOINTMENT"
+            ? "APPOINTMENT"
+            : "GENERAL";
+    }
   }
 
   if (input.appointmentPreset !== undefined) {
