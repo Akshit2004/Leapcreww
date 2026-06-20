@@ -135,7 +135,9 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
   // Track what actually went out so we can log it to chat history + record an
   // attribution touch (D-04). Sequence sends were previously invisible in the
   // Message table, breaking both live-chat history and revenue attribution.
-  let sentOk = false;
+  // Defaults to true: non-messaging step types (e.g. add_tag/branch) have
+  // nothing to fail, so only an attempted-and-failed send flips this false.
+  let sentOk = true;
   let sentPreview = "";
 
   if (step.actionType === "send_message") {
@@ -403,12 +405,15 @@ async function executeStep(step: SequenceStep, contact: Contact, organizationId:
       sequenceId: step.sequenceId,
     });
   }
+
+  return sentOk;
 }
 
 /** Cron worker: run all enrollments whose nextRunAt has arrived, one step each. */
 export async function processDueEnrollments() {
   const due = await repo.findDueEnrollments(new Date());
   let advanced = 0;
+  let failed = 0;
 
   for (const enrollment of due) {
     const steps = enrollment.sequence.steps;
@@ -418,10 +423,26 @@ export async function processDueEnrollments() {
       continue;
     }
 
+    let stepOk: boolean;
     try {
-      await executeStep(step, enrollment.contact, enrollment.organizationId);
+      stepOk = await executeStep(step, enrollment.contact, enrollment.organizationId);
     } catch (err) {
       console.error(`[Sequence] step failed for enrollment ${enrollment.id}:`, err);
+      stepOk = false;
+    }
+
+    if (!stepOk) {
+      const { prisma } = await import("@/shared/lib/prisma");
+      await prisma.systemLog.create({
+        data: {
+          type: "campaign",
+          message: `⚠️ Sequence "${enrollment.sequence.name}" step ${enrollment.currentStep + 1} failed to send to ${enrollment.contact.name} — message delivery failed (check WhatsApp connection or template approval status).`,
+          organizationId: enrollment.organizationId,
+        },
+      });
+      await repo.updateEnrollment(enrollment.id, { status: "failed", nextRunAt: null });
+      failed++;
+      continue;
     }
 
     const nextIndex = enrollment.currentStep + 1;
@@ -437,7 +458,7 @@ export async function processDueEnrollments() {
     advanced++;
   }
 
-  return { advanced, scanned: due.length };
+  return { advanced, failed, scanned: due.length };
 }
 
 /**
