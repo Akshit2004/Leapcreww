@@ -19,7 +19,7 @@ export async function issueKey(input: CreateApiKeyInput) {
     name: input.name,
     hashedKey: hash(secret),
     prefix,
-    scopes: input.scopes ?? ["messages:send", "contacts:read", "contacts:write", "templates:read"],
+    scopes: input.scopes ?? ["messages:send", "contacts:read", "contacts:write", "templates:read", "leads:write"],
     organizationId: input.organizationId,
     isSandbox: input.isSandbox ?? false,
   });

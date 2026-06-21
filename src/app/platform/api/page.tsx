@@ -18,6 +18,7 @@ const endpoints = [
   { method: "POST", path: "/api/v1/messages",  desc: "Send a message or template" },
   { method: "POST", path: "/api/v1/contacts",  desc: "Upsert a contact by phone number" },
   { method: "GET",  path: "/api/v1/contacts",  desc: "Paginated contact list with filters" },
+  { method: "POST", path: "/api/v1/leads",     desc: "Capture a lead and deliver its result over WhatsApp" },
   { method: "GET",  path: "/api/v1/templates", desc: "List Meta-approved templates" },
   { method: "GET",  path: "/api/v1/events",    desc: "Poll event stream (cursor-based)" },
   { method: "GET",  path: "/api/v1/openapi",   desc: "OpenAPI 3.1 spec JSON" },
@@ -28,6 +29,7 @@ const scopes = [
   { scope: "contacts:read",    desc: "Read contact list and profiles" },
   { scope: "contacts:write",   desc: "Create and update contacts" },
   { scope: "templates:read",   desc: "List and inspect message templates" },
+  { scope: "leads:write",      desc: "Capture leads and trigger result delivery" },
 ];
 
 const methodColor: Record<string, string> = {

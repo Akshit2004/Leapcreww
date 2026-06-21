@@ -411,6 +411,7 @@ Features are ordered **most rich → least** for testing priority.
 | Send message | `POST /api/v1/messages` — send to any contact by phone |
 | List contacts | `GET /api/v1/contacts` |
 | Create contact | `POST /api/v1/contacts` |
+| Capture lead | `POST /api/v1/leads` — upsert contact, store result, WhatsApp the `lead_capture_result` template (scope `leads:write`) |
 | List templates | `GET /api/v1/templates` |
 | Track events | `POST /api/v1/events` |
 | Organization info | `GET /api/v1/me` |
@@ -432,6 +433,7 @@ Features are ordered **most rich → least** for testing priority.
 |---|---|
 | WhatsApp Cloud API | Inbound messages, delivery receipts, read receipts, referrals |
 | Flow form responses | `nfm_reply` events → FlowResponse + contact attribute update |
+| Lead result delivery | quick-reply tap with payload `lead_result:<id>` → sends the stored result text, marks `resultDelivered` |
 | Razorpay | Payment events → wallet credit |
 | Shopify | Order/customer/cart events |
 | Shiprocket | Delivery status events |
@@ -444,7 +446,7 @@ Features are ordered **most rich → least** for testing priority.
 - [ ] Create outbound webhook subscription → send test payload → HMAC verifies
 - [ ] Revoke API key → subsequent requests return 401
 
-**Routes:** `GET/POST /api/org/[orgId]/api-keys` · `GET/POST /api/org/[orgId]/webhooks` · `GET/PUT/DELETE /api/org/[orgId]/webhooks/[subscriptionId]` · `POST /api/org/[orgId]/webhooks/[subscriptionId]/test` · `POST /api/v1/messages` · `GET/POST /api/v1/contacts` · `GET /api/v1/templates` · `POST /api/v1/events` · `GET /api/v1/me` · `GET /api/v1/openapi`
+**Routes:** `GET/POST /api/org/[orgId]/api-keys` · `GET/POST /api/org/[orgId]/webhooks` · `GET/PUT/DELETE /api/org/[orgId]/webhooks/[subscriptionId]` · `POST /api/org/[orgId]/webhooks/[subscriptionId]/test` · `GET /api/org/[orgId]/lead-submissions` · `POST /api/org/[orgId]/lead-submissions/test` · `POST /api/v1/messages` · `GET/POST /api/v1/contacts` · `POST /api/v1/leads` · `GET /api/v1/templates` · `POST /api/v1/events` · `GET /api/v1/me` · `GET /api/v1/openapi`
 
 ---
 
@@ -722,6 +724,7 @@ Features are ordered **most rich → least** for testing priority.
 | `Integration` | Third-party platform connection |
 | `UsageEvent` | Billing: metered message send event |
 | `ApiKey` | Public API key (hashed) |
+| `LeadSubmission` | Captured lead + pre-compiled result for WhatsApp delivery |
 | `WebhookSubscription` | Outbound webhook endpoint config |
 | `AttributionTouch` | Marketing touch for last-touch attribution |
 | `SystemLog` | Audit trail of user operations |

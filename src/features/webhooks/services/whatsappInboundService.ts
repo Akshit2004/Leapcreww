@@ -24,6 +24,7 @@ import { handleLeadQualifier } from "@/features/campaigns/services/leadQualifier
 import { handleNdrReply } from "@/features/ndr/services/ndrService";
 import { handleSizeFinderReply, handleShadeFinderReply, handleFinderKeyword } from "@/features/size-shade-finder/services/sizeShadeService";
 import { handleReplenishmentReply } from "@/features/replenishment/services/replenishmentService";
+import { deliverLeadResult, LEAD_RESULT_PREFIX } from "@/features/lead-capture/services/leadCaptureService";
 import * as repo from "../repositories/whatsappWebhookRepo";
 
 type WhatsAppStatus = NonNullable<WhatsAppWebhookPayload["entry"][number]["changes"][number]["value"]["statuses"]>[number];
@@ -278,6 +279,16 @@ export async function processInboundMessage(
     await handleNfmReply(contact.id, orgId, {
       responseJson: interactiveData.nfm_reply.response_json,
     });
+  }
+
+  // Lead capture result delivery: a tap on the lead_capture_result template's
+  // quick-reply button arrives as the payload "lead_result:<submissionId>".
+  // Deliver the pre-compiled result text and mark it delivered, then stop — this
+  // is a terminal interaction, not a chatbot/AI turn.
+  if (cleanText.startsWith(LEAD_RESULT_PREFIX)) {
+    const submissionId = cleanText.slice(LEAD_RESULT_PREFIX.length);
+    await deliverLeadResult(orgId, submissionId, contact.phone);
+    return;
   }
 
   // Handle Native WhatsApp Order

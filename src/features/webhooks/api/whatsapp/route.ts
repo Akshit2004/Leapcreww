@@ -64,7 +64,11 @@ export async function POST(req: NextRequest) {
         if (value.messages) {
           for (const msg of value.messages) {
             const waFrom = msg.from;
-            const text = msg.text?.body || msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || msg.button?.text || (msg.order ? "WhatsApp Native Order" : (msg.interactive?.type === "nfm_reply" ? "WhatsApp Flow Response" : ""));
+            // Template quick-reply taps arrive as `button.payload` (the dynamic
+            // value set at send time, e.g. lead_result:<id>); fall back to the
+            // button label. For quick-reply templates with no custom payload Meta
+            // sets payload === text, so preferring payload is regression-safe.
+            const text = msg.text?.body || msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || msg.button?.payload || msg.button?.text || (msg.order ? "WhatsApp Native Order" : (msg.interactive?.type === "nfm_reply" ? "WhatsApp Flow Response" : ""));
             const profileName = value.contacts?.[0]?.profile?.name || `Customer ${waFrom.slice(-4)}`;
 
             console.log(`WhatsApp message from ${waFrom} (${profileName}): ${text}`);

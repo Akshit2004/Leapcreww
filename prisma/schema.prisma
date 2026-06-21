@@ -125,6 +125,7 @@ model Organization {
   stockAlerts          StockAlert[]
   launches             Launch[]
   ndrEvents            NdrEvent[]
+  leadSubmissions      LeadSubmission[]
   webhookDeliveries    WebhookDelivery[]
   idempotencyKeys      IdempotencyKey[]
   events               Event[]
@@ -185,6 +186,7 @@ model Contact {
   internalNotes       InternalNote[]
   stockAlerts         StockAlert[]
   ndrEvents           NdrEvent[]
+  leadSubmissions     LeadSubmission[]
   sourceAdId          String? // Tracks the Meta Ad ID that originated this contact
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -927,4 +929,28 @@ model WalletTopup {
   updatedAt       DateTime     @updatedAt
 
   @@index([organizationId])
+}
+
+// Lead capture (e.g. storefront quiz → WhatsApp result delivery).
+// A merchant's integration POSTs a captured lead with a pre-compiled `result`
+// to /v1/leads. We upsert the Contact and WhatsApp them the approved
+// `lead_capture_result` template, whose quick-reply button carries the payload
+// `lead_result:<id>`. Tapping it opens a 24h session; the inbound webhook then
+// delivers the stored `result` text and flips `resultDelivered`. `attributes`
+// holds whatever the integrator sent (age, gender, quiz answers, ...).
+model LeadSubmission {
+  id              String       @id @default(uuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId       String?
+  contact         Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  source          String // "shopify_quiz" | future sources
+  attributes      Json // free-form integrator payload
+  result          String       @db.Text // pre-compiled by the caller
+  resultDelivered Boolean      @default(false)
+  deliveredAt     DateTime?
+  createdAt       DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([contactId])
 }

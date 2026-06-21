@@ -21,6 +21,7 @@ import type { BrandProfile } from "@/shared/context/types";
 import { WidgetCard } from "@/features/widget/components/WidgetCard";
 import { WebhooksCard } from "@/features/webhooks/components/WebhooksCard";
 import { DevQuickstartCard } from "@/features/public-api/components/DevQuickstartCard";
+import { LeadCaptureCard } from "@/features/lead-capture/components/LeadCaptureCard";
 import { PhoneNumbersCard } from "./PhoneNumbersCard";
 import { WorkingHoursCard } from "@/features/inbox/components/WorkingHoursCard";
 
@@ -649,6 +650,9 @@ export const SettingsTab: React.FC = () => {
 
       {/* Developer Quickstart */}
       <DevQuickstartCard />
+
+      {/* Lead Capture */}
+      <LeadCaptureCard />
 
       {/* Phone Numbers */}
       <PhoneNumbersCard />
