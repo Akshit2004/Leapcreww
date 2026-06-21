@@ -115,7 +115,10 @@ export async function deliverLeadResult(
   toPhone: string
 ): Promise<boolean> {
   const submission = await repo.findSubmissionById(submissionId, organizationId);
-  if (!submission) return false;
+  if (!submission) {
+    console.warn(`[LeadCapture] No submission ${submissionId} found for org ${organizationId}`);
+    return false;
+  }
   if (submission.resultDelivered) return true;
 
   const result = await sendWhatsAppMessage(
@@ -124,6 +127,8 @@ export async function deliverLeadResult(
   );
   if (result.ok) {
     await repo.markDelivered(submission.id);
+  } else {
+    console.warn(`[LeadCapture] Failed to deliver result for submission ${submission.id}:`, result.error);
   }
   return true;
 }
