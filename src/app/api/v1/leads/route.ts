@@ -1,1 +1,1 @@
-export { POST } from "@/features/lead-capture/api/v1/leads/route";
+export { POST, OPTIONS } from "@/features/lead-capture/api/v1/leads/route";

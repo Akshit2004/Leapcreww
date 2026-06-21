@@ -3,6 +3,7 @@ import { route, ok } from "@/shared/lib/api";
 import { parseBody } from "@/shared/lib/validation";
 import { authenticateApiKey, requireScope } from "@/features/public-api/services/apiKeyService";
 import { withIdempotency } from "@/features/public-api/services/v1Service";
+import { withCors, corsPreflight } from "@/features/public-api/lib/cors";
 import { createLead } from "../../../services/leadCaptureService";
 
 const LeadSchema = z.object({
@@ -18,19 +19,24 @@ const LeadSchema = z.object({
  * WhatsApp (T-08 surface). Requires scope `leads:write`. Honours Idempotency-Key
  * so a retried capture won't double-send the template.
  */
-export const POST = route(async (req) => {
-  const ctx = await authenticateApiKey(req);
-  requireScope(ctx, "leads:write");
+export const POST = withCors(
+  route(async (req) => {
+    const ctx = await authenticateApiKey(req);
+    requireScope(ctx, "leads:write");
 
-  const payload = await parseBody(req, LeadSchema);
+    const payload = await parseBody(req, LeadSchema);
 
-  const idempotencyKey = req.headers.get("idempotency-key");
-  const { response, replayed } = await withIdempotency(ctx.organizationId, idempotencyKey, () =>
-    createLead(ctx.organizationId, payload, ctx.isSandbox)
-  );
+    const idempotencyKey = req.headers.get("idempotency-key");
+    const { response, replayed } = await withIdempotency(ctx.organizationId, idempotencyKey, () =>
+      createLead(ctx.organizationId, payload, ctx.isSandbox)
+    );
 
-  return ok(
-    { ok: true, ...response },
-    { status: 201, headers: replayed ? { "Idempotency-Replayed": "true" } : undefined }
-  );
-});
+    return ok(
+      { ok: true, ...response },
+      { status: 201, headers: replayed ? { "Idempotency-Replayed": "true" } : undefined }
+    );
+  })
+);
+
+/** Preflight for browser callers (the lead capture form posts cross-origin). */
+export const OPTIONS = corsPreflight;
