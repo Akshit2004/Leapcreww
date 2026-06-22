@@ -11,7 +11,28 @@ import type { ApiKeyContext, CreateApiKeyInput } from "../types";
 
 const hash = (key: string) => crypto.createHash("sha256").update(key).digest("hex");
 
+/**
+ * Closed set of grantable scopes. Keys may only ever hold scopes from this list,
+ * so a typo or an unknown/over-broad scope passed in the issue request is
+ * rejected (400) rather than silently persisted onto the key.
+ */
+export const VALID_SCOPES = [
+  "messages:send",
+  "contacts:read",
+  "contacts:write",
+  "templates:read",
+  "leads:write",
+] as const;
+
+const DEFAULT_SCOPES = ["messages:send", "contacts:read", "contacts:write", "templates:read"];
+
 export async function issueKey(input: CreateApiKeyInput) {
+  const scopes = input.scopes ?? DEFAULT_SCOPES;
+  const unknown = scopes.filter((s) => !(VALID_SCOPES as readonly string[]).includes(s));
+  if (unknown.length) {
+    throw new ApiError(`Unknown scope(s): ${unknown.join(", ")}`, 400);
+  }
+
   const prefix_str = input.isSandbox ? "wf_test_" : "wf_live_";
   const secret = `${prefix_str}${crypto.randomBytes(24).toString("hex")}`;
   const prefix = secret.slice(0, 12);
@@ -19,7 +40,7 @@ export async function issueKey(input: CreateApiKeyInput) {
     name: input.name,
     hashedKey: hash(secret),
     prefix,
-    scopes: input.scopes ?? ["messages:send", "contacts:read", "contacts:write", "templates:read", "leads:write"],
+    scopes,
     organizationId: input.organizationId,
     isSandbox: input.isSandbox ?? false,
   });

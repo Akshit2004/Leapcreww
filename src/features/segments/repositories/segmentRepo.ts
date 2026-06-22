@@ -12,8 +12,10 @@ export function createSegment(data: Prisma.SegmentUncheckedCreateInput) {
   return prisma.segment.create({ data });
 }
 
-export function deleteSegment(id: string) {
-  return prisma.segment.delete({ where: { id } });
+export function deleteSegment(id: string, organizationId: string) {
+  // deleteMany lets us add the org filter so the delete only affects rows the
+  // caller's workspace owns; returns { count } (0 when not found/other tenant).
+  return prisma.segment.deleteMany({ where: { id, organizationId } });
 }
 
 export function findSegment(id: string) {

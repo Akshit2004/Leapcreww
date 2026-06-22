@@ -1,11 +1,13 @@
-import { route, ok, requireSession, requireFields, body, ApiError } from "@/shared/lib/api";
+import { route, ok, requireOrg, requireFields, body, ApiError } from "@/shared/lib/api";
 import { launchCampaign } from "../../services/broadcastService";
 import type { LaunchCampaignInput } from "../../types";
 
 export const POST = route(async (req) => {
-  await requireSession();
   const input = await body<LaunchCampaignInput>(req);
   requireFields(input, ["name", "organizationId"]);
+  // organizationId is caller-supplied — verify membership before launching a
+  // broadcast that sends real WhatsApp messages and bills this org's wallet.
+  await requireOrg(input.organizationId, "AGENT");
   
   if (!input.targetTag && !input.segmentId) {
     throw new ApiError("Either targetTag or segmentId must be provided.", 400);

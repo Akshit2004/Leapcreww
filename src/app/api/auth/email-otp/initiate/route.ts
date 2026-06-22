@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { sendEmailOtp } from "@/shared/lib/email";
+import { checkRateLimit } from "@/shared/lib/ratelimit";
 import crypto from "crypto";
 
 export async function POST(req: Request) {
@@ -12,6 +13,16 @@ export async function POST(req: Request) {
     }
 
     const emailLower = email.toLowerCase().trim();
+
+    // Per-email throttle to prevent OTP email bombing (matches WhatsApp send-otp).
+    // No-ops when Upstash isn't configured. Checked before any DB/SMTP work.
+    const rl = await checkRateLimit("otp", `email-otp-send:${emailLower}`);
+    if (rl && !rl.success) {
+      return NextResponse.json(
+        { success: false, error: "Too many OTP requests. Please wait a few minutes before trying again." },
+        { status: 429 }
+      );
+    }
 
     // Generate 6-digit OTP
     const otp = crypto.randomInt(100000, 999999).toString();

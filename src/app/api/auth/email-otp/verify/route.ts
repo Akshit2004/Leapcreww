@@ -1,12 +1,32 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
+import { checkRateLimit } from "@/shared/lib/ratelimit";
+import crypto from "crypto";
+
+/** Constant-time OTP comparison with an equal-length guard. */
+function otpMatches(stored: string | null, provided: string): boolean {
+  if (!stored) return false;
+  const a = Buffer.from(stored);
+  const b = Buffer.from(provided);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 export async function POST(req: Request) {
   try {
     const { attemptId, otp } = await req.json().catch(() => ({ attemptId: "", otp: "" }));
 
-    if (!attemptId || !otp) {
+    if (!attemptId || !otp || typeof attemptId !== "string" || typeof otp !== "string") {
       return NextResponse.json({ success: false, error: "Missing attempt ID or OTP." }, { status: 400 });
+    }
+
+    // Brute-force throttle: EmailOtpAttempt has no attempts counter, so cap
+    // guesses per attempt id via the shared OTP limiter (no-ops without Upstash).
+    const rl = await checkRateLimit("otp", `email-otp-verify:${attemptId}`);
+    if (rl && !rl.success) {
+      return NextResponse.json(
+        { success: false, error: "Too many incorrect attempts. Please request a new code." },
+        { status: 429 }
+      );
     }
 
     const attempt = await prisma.emailOtpAttempt.findUnique({
@@ -29,7 +49,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "OTP has expired." }, { status: 400 });
     }
 
-    if (attempt.otp !== otp) {
+    if (!otpMatches(attempt.otp, otp.trim())) {
       return NextResponse.json({ success: false, error: "Incorrect OTP." }, { status: 400 });
     }
 

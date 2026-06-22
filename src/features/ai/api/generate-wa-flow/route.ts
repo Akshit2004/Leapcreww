@@ -30,8 +30,11 @@ export async function POST(request: NextRequest) {
 
     const { userPrompt } = await request.json();
 
-    if (!userPrompt) {
+    if (!userPrompt || typeof userPrompt !== "string") {
       return NextResponse.json({ error: "Missing conversational prompt" }, { status: 400 });
+    }
+    if (userPrompt.length > 4000) {
+      return NextResponse.json({ error: "Prompt too long (max 4000 characters)" }, { status: 400 });
     }
 
     const systemInstruction = `You are a visual AI Form Builder Architect for LeapCreww, generating WhatsApp Flow JSON for Meta's API.
@@ -118,7 +121,8 @@ Return ONLY the raw JSON string array. Do not include any explanations, markdown
 
     return NextResponse.json({ screens: sanitizedScreens });
   } catch (err: unknown) {
+    // Log server-side; never leak internal error details to the client.
     console.error("AI WA Flow Generator error:", err);
-    return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) || "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

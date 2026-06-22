@@ -88,9 +88,14 @@ export async function verifyRazorpayPayment(
   orgId: string
 ): Promise<boolean> {
   const config = await getRazorpayConfig(orgId);
-  if (!config?.webhookSecret) return false;
+  // Razorpay Checkout handler signatures are HMAC-SHA256(order_id|payment_id)
+  // computed with the API KEY SECRET — NOT the webhook secret. Using the wrong
+  // secret here either rejects all genuine payments or (if the two secrets are
+  // accidentally equal) silently weakens the integrity check. The key secret is
+  // the correct, documented secret for verifying checkout payments.
+  if (!config?.keySecret) return false;
   const expected = crypto
-    .createHmac("sha256", config.webhookSecret)
+    .createHmac("sha256", config.keySecret)
     .update(orderId + "|" + paymentId)
     .digest("hex");
   // Length guard: timingSafeEqual throws RangeError on unequal buffer lengths.

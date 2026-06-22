@@ -3,9 +3,13 @@ import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 const KEY_HEX = process.env.INTEGRATION_TOKEN_KEY || process.env.SHOPIFY_TOKEN_KEY || "";
 
 function getKey(): Buffer {
+  // A 32-byte (256-bit) key encoded as 64 hex chars is required. Refuse to
+  // operate with a missing/short key rather than silently using a predictable
+  // all-zero key, which would offer no confidentiality (CWE-321).
   if (!KEY_HEX || KEY_HEX.length !== 64) {
-    // In dev without a key, return a zero-key (no-op encryption)
-    return Buffer.alloc(32, 0);
+    throw new Error(
+      "Encryption key not configured: set INTEGRATION_TOKEN_KEY (or SHOPIFY_TOKEN_KEY) to a 64-char hex (32-byte) value"
+    );
   }
   return Buffer.from(KEY_HEX, "hex");
 }
@@ -49,8 +53,9 @@ export function decryptSecretSafe(value: string | null | undefined): string {
   }
   try {
     return decryptSecret(value);
-  } catch (err) {
-    console.warn("[crypto] Failed to decrypt secret, returning as-is:", err);
+  } catch {
+    // Do not log the error object or the value — both can leak secret material.
+    console.warn("[crypto] Failed to decrypt secret, returning as-is");
     return value;
   }
 }

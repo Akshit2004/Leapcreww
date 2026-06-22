@@ -1,4 +1,5 @@
 /** segmentService.ts — Segment CRUD + audience resolution (T-04). */
+import { ApiError } from "@/shared/lib/api";
 import * as repo from "../repositories/segmentRepo";
 import type { SegmentInput, SegmentRules } from "../types";
 
@@ -14,8 +15,11 @@ export function createSegment(input: SegmentInput) {
   });
 }
 
-export function deleteSegment(id: string) {
-  return repo.deleteSegment(id);
+export async function deleteSegment(id: string, organizationId: string) {
+  // Scope the delete to the org so a member of one workspace cannot delete
+  // another tenant's segment by passing its id (IDOR — Article III).
+  const result = await repo.deleteSegment(id, organizationId);
+  if (result.count === 0) throw new ApiError("Segment not found", 404);
 }
 
 /** Live count for a draft ruleset (used by the segment builder UI). */

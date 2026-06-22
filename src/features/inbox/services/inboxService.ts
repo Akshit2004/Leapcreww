@@ -27,6 +27,14 @@ const preview = (text: string) => (text.length > 35 ? text.substring(0, 32) + ".
  * then dispatch via Meta. Falls back to a sandbox result if WA isn't configured.
  */
 export async function sendAgentMessage(input: SendMessageInput, agentName: string) {
+  // Assert the target contact belongs to the org being billed before we write
+  // any message/log rows — stops cross-tenant writes on a caller-supplied
+  // contactId even when the caller is a member of input.orgId (Article III).
+  const contact = await repo.findContact(input.contactId);
+  if (!contact || contact.organizationId !== input.orgId) {
+    throw new ApiError("Contact not found", 404);
+  }
+
   const ts = hhmm();
   const dbMsg = await repo.createMessage({
     sender: "agent",
@@ -35,8 +43,7 @@ export async function sendAgentMessage(input: SendMessageInput, agentName: strin
     organizationId: input.orgId,
   });
 
-  const contact = await repo.findContact(input.contactId);
-  if (contact && contact.assignedAgent === "Bot") {
+  if (contact.assignedAgent === "Bot") {
     await repo.updateContact(input.contactId, {
       assignedAgent: agentName,
       lastMessage: preview(input.text),

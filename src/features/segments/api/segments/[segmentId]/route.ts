@@ -5,6 +5,6 @@ export const DELETE = route(async (_req, { params }) => {
   const orgId = params?.orgId as string;
   await requireOrg(orgId, "ADMIN");
   const segmentId = params?.segmentId as string;
-  await deleteSegment(segmentId);
+  await deleteSegment(segmentId, orgId);
   return ok({ success: true });
 });
