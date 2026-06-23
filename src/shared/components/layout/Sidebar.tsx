@@ -193,8 +193,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onOpe
 
             return (
               <div key={group.id} className="mb-1">
-                {/* Group header — only shown when expanded */}
-                {isExpanded && (
+                {/* Group header — only shown when expanded AND group has a label */}
+                {isExpanded && group.label && (
                   <button
                     onClick={() => toggleGroup(group.id)}
                     className="w-full flex items-center justify-between px-2 py-1.5 mb-0.5 group cursor-pointer"
@@ -388,9 +388,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onOpe
                 if (mobileItems.length === 0) return null;
                 return (
                   <div key={group.id}>
-                    <p className="text-[9px] font-black tracking-wider uppercase text-stone-400 px-2 mb-1">
-                      {group.label}
-                    </p>
+                    {group.label && (
+                      <p className="text-[9px] font-black tracking-wider uppercase text-stone-400 px-2 mb-1">
+                        {group.label}
+                      </p>
+                    )}
                     <div className="grid grid-cols-3 gap-1">
                       {mobileItems.map((item) => {
                         const Icon = item.icon;

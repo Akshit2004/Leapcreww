@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../../../shared/lib/prisma";
+import type { Prisma } from "@prisma/client";
+import { AUTOMATION_CATALOG } from "@/features/automations/config/catalog";
 
 const RegisterSchema = z.object({
   email: z.string().trim().email("A valid email address is required").max(254),
@@ -153,41 +155,31 @@ export async function POST(req: Request) {
         });
       }
 
-      // Default visual nodes and templates
-      await Promise.all([
-        tx.chatbotNode.create({
-          data: {
-            id: "n1",
-            type: "message",
-            title: "Welcome Message",
-            content: "Hello! Welcome to our store. How can we help you today?",
-            options: ["Support", "Sales"],
-            organizationId: org.id,
-          }
-        }),
-        tx.template.createMany({
-          data: [
-            {
-              name: "welcome_verification",
-              body: "Welcome! Your verification code is {{1}}.",
-              category: "Authentication",
-              buttons: [],
-              mediaType: "none",
-              metaStatus: "approved",
-              organizationId: org.id,
-            },
-            {
-              name: "special_offer",
-              body: "Hi {{1}}, we have a special offer for you! Reply YES to claim.",
-              category: "Marketing",
-              buttons: ["YES", "NO"],
-              mediaType: "none",
-              metaStatus: "approved",
-              organizationId: org.id,
-            }
-          ]
-        })
-      ]);
+      // Default visual chatbot node
+      await tx.chatbotNode.create({
+        data: {
+          id: "n1",
+          type: "message",
+          title: "Welcome Message",
+          content: "Hello! Welcome to our store. How can we help you today?",
+          options: ["Support", "Sales"],
+          organizationId: org.id,
+        }
+      });
+
+      // Seed all 20 default automations from catalog
+      await tx.automation.createMany({
+        data: AUTOMATION_CATALOG.map((item) => ({
+          name: item.title,
+          organizationId: org.id,
+          triggerType: item.triggerType,
+          triggerConfig: item.triggerConfig as Prisma.InputJsonValue,
+          steps: item.steps as unknown as Prisma.InputJsonValue,
+          templateName: "",
+          templateParams: [] as Prisma.InputJsonValue,
+          isActive: true,
+        })),
+      });
 
       return { user, org };
     });

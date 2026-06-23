@@ -13,7 +13,6 @@ import { TemplatesTab } from "@/features/templates/components/TemplatesTab";
 import { FlowsTab } from "@/features/flows/components/FlowsTab";
 import { ChatbotTab } from "@/features/chatbot/components/ChatbotTab";
 import { UseCasesTab } from "@/features/usecases/components/UseCasesTab";
-import { RecipesSection } from "@/features/recipes/components/RecipesSection";
 import { BookingCustomersTab } from "@/features/usecases/components/BookingCustomersTab";
 import { SettingsTab } from "@/features/settings/components/SettingsTab";
 import { IntegrationsTab } from "@/features/integrations/components/IntegrationsTab";
@@ -25,6 +24,8 @@ import { MarketplaceTab } from "@/features/marketplace/components/MarketplaceTab
 import { BusinessTypeOnboarding } from "@/features/dashboard/components/BusinessTypeOnboarding";
 import { AICopilotSidebar } from "@/features/ai/components/AICopilotSidebar";
 import { AiWorkspace } from "@/features/ai/components/AiWorkspace";
+import { AutomationsTab } from "@/features/automations/components/AutomationsTab";
+import { AgentsTab } from "@/features/agents/components/AgentsTab";
 import { CommandPalette } from "@/shared/components/CommandPalette";
 import {
   DashboardSkeleton,
@@ -37,7 +38,6 @@ import {
   TemplatesSkeleton,
   FlowsSkeleton,
   ChatbotSkeleton,
-  RecipesSkeleton,
   UseCasesSkeleton,
   BookingCustomersSkeleton,
   IntegrationsSkeleton,
@@ -67,7 +67,8 @@ const TAB_SKELETONS: Record<string, React.ComponentType> = {
   templates: TemplatesSkeleton,
   flows: FlowsSkeleton,
   chatbot: ChatbotSkeleton,
-  recipes: RecipesSkeleton,
+  automations: DashboardSkeleton,
+  agents: DashboardSkeleton,
   usecases: UseCasesSkeleton,
   bookingcustomers: BookingCustomersSkeleton,
   integrations: IntegrationsSkeleton,
@@ -192,7 +193,9 @@ function TenantDashboardInner() {
       case "chatbot":
         return <ChatbotTab />;
       case "recipes":
-        return <RecipesSection />;
+        // Merged into Automations — redirect transparently
+        handleTabChange("automations");
+        return <AutomationsTab />;
       case "usecases":
         return <UseCasesTab />;
       case "bookingcustomers":
@@ -207,6 +210,10 @@ function TenantDashboardInner() {
         return <MarketplaceTab />;
       case "settings":
         return <SettingsTab />;
+      case "automations":
+        return <AutomationsTab />;
+      case "agents":
+        return <AgentsTab />;
       case "ai-workspace":
         return <AiWorkspace onNavigate={handleTabChange} />;
       default:

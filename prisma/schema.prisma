@@ -133,6 +133,7 @@ model Organization {
   workingHours         Json? // { enabled, timezone, schedule: { [day]: { open, from, to } }, awayMessage }
   cannedReplies        CannedReply[]
   internalNotes        InternalNote[]
+  automations          Automation[]
 
   // Flow Encryption automation state
   flowsPrivateKey        String? @db.Text
@@ -953,4 +954,56 @@ model LeadSubmission {
 
   @@index([organizationId, createdAt])
   @@index([contactId])
+}
+
+// Automation rules: trigger → one or more steps (with optional delays).
+// triggerType: "keyword" | "welcome" | "tag_added" | "button_reply"
+// triggerConfig examples:
+//   keyword      → { keywords: ["PRICE", "MENU"], matchType: "exact"|"contains"|"starts_with" }
+//   welcome      → {}
+//   tag_added    → { tag: "VIP" }
+//   button_reply → { payloadId: "confirm_order" }
+// steps: AutomationStep[] — [{type, templateName, templateParams, tag, delayMinutes}]
+//   step 0 always fires immediately; steps 1+ are queued via AutomationQueue.
+// templateName / templateParams kept for legacy single-step automations (fallback).
+model Automation {
+  id             String       @id @default(uuid())
+  name           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  triggerType   String // "keyword" | "welcome" | "tag_added" | "button_reply"
+  triggerConfig Json   @default("{}")
+  steps         Json   @default("[]") // AutomationStep[] — primary source of truth
+  templateName  String @default("") // legacy fallback (single-step automations)
+  templateParams Json  @default("[]") // legacy fallback
+
+  isActive  Boolean   @default(true)
+  runCount  Int       @default(0)
+  lastRunAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, isActive])
+  @@index([organizationId, triggerType])
+}
+
+// Queued delayed steps for multi-step automations.
+// Step 0 fires immediately; steps 1+ are written here with a scheduledAt
+// and processed by the /api/org/[orgId]/automations/process-queue cron.
+model AutomationQueue {
+  id             String   @id @default(uuid())
+  automationId   String
+  contactId      String
+  contactPhone   String
+  contactName    String
+  stepIndex      Int
+  stepData       Json // the AutomationStep to execute
+  scheduledAt    DateTime
+  processed      Boolean  @default(false)
+  organizationId String
+
+  @@index([organizationId, processed, scheduledAt])
+  @@index([scheduledAt, processed])
 }
