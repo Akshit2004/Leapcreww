@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { Plus, RefreshCw, Layers, LayoutTemplate, Settings2, Code, Share2, ShieldAlert, Lock, Play, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Layers, LayoutTemplate, Settings2, Code, Share2, Play, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
 import { VisualFlowBuilder } from "./VisualFlowBuilder";
@@ -117,6 +117,27 @@ export const FlowsTab: React.FC = () => {
 
   const handlePublish = async () => {
     if (!selectedFlow) return;
+
+    // Encryption keys are required only at publish time, not during editing.
+    if (!isEncryptionSetup) {
+      setIsSettingUp(true);
+      try {
+        const keyRes = await fetch(`/api/org/${orgId}/flows-encryption`, { method: "POST" });
+        if (!keyRes.ok) {
+          const d = await keyRes.json();
+          toast.error(d.error || "Failed to set up encryption keys. Connect WhatsApp first.");
+          return;
+        }
+        setIsEncryptionSetup(true);
+        toast.success("Encryption keys generated. Publishing now…");
+      } catch {
+        toast.error("Failed to set up encryption keys.");
+        return;
+      } finally {
+        setIsSettingUp(false);
+      }
+    }
+
     setIsSaving(true);
     try {
       const res = await fetch(`/api/org/${orgId}/flows/${selectedFlow.id}/publish`, {
@@ -242,46 +263,10 @@ export const FlowsTab: React.FC = () => {
     }
   };
 
-  const handleSetupEncryption = async () => {
-    setIsSettingUp(true);
-    try {
-      const res = await fetch(`/api/org/${orgId}/flows-encryption`, { method: "POST" });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to setup keys");
-      }
-      setIsEncryptionSetup(true);
-      toast.success("Keys successfully generated and uploaded to Meta!");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to setup encryption keys");
-    } finally {
-      setIsSettingUp(false);
-    }
-  };
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative select-none bg-[#fafaf9]">
-      {/* Encryption Overlay */}
-      {!loading && !isEncryptionSetup && (
-        <div className="absolute inset-0 z-50 backdrop-blur-sm bg-white/70 flex items-center justify-center">
-          <div className="bg-white border border-stone-200 p-8 shadow-sm max-w-md text-center">
-            <ShieldAlert className="w-12 h-12 text-wa-green mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-stone-900 mb-2">Automate Security Setup</h2>
-            <p className="text-sm text-stone-500 mb-6">
-              Meta requires an RSA Public Key to encrypt your form submissions. Click the button below to generate a secure keypair and upload it automatically.
-            </p>
-            <button
-              onClick={handleSetupEncryption}
-              disabled={isSettingUp}
-              className="bg-wa-green hover:bg-wa-green-dark text-white font-bold py-2 px-6 rounded-none w-full flex justify-center items-center gap-2 transition-all cursor-pointer shadow-none active:scale-95 disabled:opacity-50"
-            >
-              {isSettingUp ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-              {isSettingUp ? "Setting up keys..." : "Generate & Upload Keys"}
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Encryption note — shown inline on the publish button, not as a page block */}
 
       {/* Top Header */}
       <header className="h-16 border-b border-stone-200 bg-[#fafaf9] px-6 flex items-center justify-between shrink-0 select-none">

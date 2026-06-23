@@ -24,6 +24,77 @@ import { useParams } from "next/navigation";
 import { useConfirm } from "@/shared/components/ui/ConfirmDialog";
 import { CreateTemplateModal } from "./CreateTemplateModal";
 
+// ── Industry mapping (template name → vertical) ───────────────────────────
+const TEMPLATE_INDUSTRY: Record<string, string> = {
+  // E-commerce
+  wishlist_reminder: "E-commerce", price_drop_alert: "E-commerce",
+  order_cancelled: "E-commerce", refund_processed: "E-commerce",
+  review_request: "E-commerce", loyalty_points_earned: "E-commerce",
+  product_launch: "E-commerce", abandoned_checkout: "E-commerce",
+  exchange_initiated: "E-commerce", delivery_scheduled: "E-commerce",
+  cart_recovery: "E-commerce", order_shipped: "E-commerce",
+  order_confirmation: "E-commerce", special_offer: "E-commerce",
+  delivery_delayed: "E-commerce",
+  // Education
+  assignment_due: "Education", exam_reminder: "Education",
+  result_announced: "Education", fee_reminder: "Education",
+  admission_confirmed: "Education", scholarship_awarded: "Education",
+  parent_teacher_meeting: "Education", attendance_alert: "Education",
+  course_completion: "Education", student_welcome: "Education",
+  // Healthcare
+  prescription_ready: "Healthcare", vaccination_reminder: "Healthcare",
+  health_checkup_reminder: "Healthcare", doctor_appt_confirmed: "Healthcare",
+  doctor_appointment_confirmed: "Healthcare", lab_report_ready: "Healthcare",
+  insurance_claim_update: "Healthcare", surgery_reminder: "Healthcare",
+  appointment_reminder: "Healthcare", appointment_confirmed: "Healthcare",
+  // Restaurant
+  delivery_on_way: "Restaurant", reservation_reminder: "Restaurant",
+  special_menu_today: "Restaurant", food_loyalty_reward: "Restaurant",
+  catering_booking_confirmed: "Restaurant", table_booking_confirmed: "Restaurant",
+  // Finance
+  transaction_alert: "Finance", credit_card_due: "Finance",
+  investment_update: "Finance", savings_milestone: "Finance",
+  fixed_deposit_maturity: "Finance", credit_score_update: "Finance",
+  emi_reminder: "Finance", account_statement_ready: "Finance",
+  // Travel
+  cab_booking_confirmed: "Travel", hotel_checkout_reminder: "Travel",
+  visa_appt_confirmed: "Travel", travel_package_confirmed: "Travel",
+  flight_delay_alert: "Travel", hotel_upgrade: "Travel",
+  check_in_reminder: "Travel", flight_reminder: "Travel",
+  // Automobile
+  service_due_reminder: "Automobile", vehicle_doc_expiry: "Automobile",
+  test_drive_confirmed: "Automobile", roadside_assistance: "Automobile",
+  service_booking_confirmed: "Automobile", vehicle_ready_pickup: "Automobile",
+  insurance_renewal: "Automobile",
+  // HR
+  offer_letter_sent: "HR", onboarding_welcome: "HR",
+  payslip_ready: "HR", leave_approved: "HR",
+  performance_review: "HR", training_reminder: "HR",
+  // Real Estate
+  property_visit_confirmed: "Real Estate", rent_payment_reminder: "Real Estate",
+  rental_agreement_ready: "Real Estate", property_booking_confirmed: "Real Estate",
+  maintenance_request: "Real Estate",
+  // Events
+  event_reminder: "Events", ticket_confirmed: "Events",
+};
+
+const getIndustry = (name: string): string =>
+  TEMPLATE_INDUSTRY[name] ?? "General";
+
+const INDUSTRY_EMOJI: Record<string, string> = {
+  "E-commerce":  "🛒",
+  "Education":   "🎓",
+  "Healthcare":  "🏥",
+  "Restaurant":  "🍽️",
+  "Finance":     "💰",
+  "Travel":      "✈️",
+  "Automobile":  "🚗",
+  "HR":          "👥",
+  "Real Estate": "🏠",
+  "Events":      "🎫",
+  "General":     "⚡",
+};
+
 export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({ onNavigate }) => {
   const { templates, deleteTemplate, addSystemLog, refreshWorkspace } = useApp();
   const confirm = useConfirm();
@@ -32,6 +103,7 @@ export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({
   const orgId = params.orgId as string;
 
   const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [activeIndustry, setActiveIndustry] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -64,14 +136,20 @@ export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({
     }
   };
 
+  // Build the list of industries that actually exist in this org's templates
+  const availableIndustries = Array.from(
+    new Set(templates.map((t) => getIndustry(t.name)))
+  ).sort();
+
   // Filter templates
   const filteredTemplates = templates.filter((t) => {
     const matchesCategory = activeCategory === "all" || t.category === activeCategory;
+    const matchesIndustry = activeIndustry === "all" || getIndustry(t.name) === activeIndustry;
     const matchesSearch =
       t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.body.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.category.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return matchesCategory && matchesIndustry && matchesSearch;
   });
 
   /** Convert snake_case or slug to Title Case — e.g. "diwali_discount20" → "Diwali Discount20" */
@@ -157,8 +235,12 @@ export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({
     });
   };
 
+  const totalCount = templates.length;
+  const approvedCount = templates.filter((t) => t.metaStatus?.toLowerCase() === "approved").length;
+  const pendingCount = templates.filter((t) => t.metaStatus?.toLowerCase() === "pending").length;
+
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar animate-slide-up bg-stone-100">
+    <div className="flex-1 overflow-y-auto custom-scrollbar animate-slide-up bg-[#fafaf9]">
 
       {/* ── Sticky header ─────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-4 sm:px-8">
@@ -187,8 +269,26 @@ export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({
           </div>
         </div>
 
+        {/* Stats strip */}
+        <div className="flex gap-6 pb-3 border-b border-stone-100 mb-2">
+          <div className="flex flex-col">
+            <span className="text-xl font-black text-stone-900 leading-none">{totalCount}</span>
+            <span className="text-[10px] uppercase tracking-wider text-stone-500 mt-0.5">Total</span>
+          </div>
+          <div className="w-px bg-stone-200" />
+          <div className="flex flex-col">
+            <span className="text-xl font-black text-emerald-600 leading-none">{approvedCount}</span>
+            <span className="text-[10px] uppercase tracking-wider text-stone-500 mt-0.5">Approved</span>
+          </div>
+          <div className="w-px bg-stone-200" />
+          <div className="flex flex-col">
+            <span className="text-xl font-black text-amber-600 leading-none">{pendingCount}</span>
+            <span className="text-[10px] uppercase tracking-wider text-stone-500 mt-0.5">Pending</span>
+          </div>
+        </div>
+
         {/* Row 2: category filters + search */}
-        <div className="flex items-center justify-between gap-3 pb-3">
+        <div className="flex items-center justify-between gap-3 pb-2">
           <div className="flex flex-wrap items-center gap-1.5">
             {["all", "Marketing", "Utility", "Authentication"].map((cat) => (
               <button
@@ -223,14 +323,31 @@ export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({
             )}
           </div>
         </div>
+
+        {/* Row 3: industry filter chips */}
+        <div className="flex items-center gap-2 py-3 overflow-x-auto scrollbar-hide -mx-1 px-1">
+          {["all", ...availableIndustries].map((ind) => (
+            <button
+              key={ind}
+              onClick={() => setActiveIndustry(ind)}
+              className={`text-[11px] font-bold px-3 py-1 rounded-full border bg-white whitespace-nowrap transition-all cursor-pointer shrink-0 hover:border-stone-400 ${
+                activeIndustry === ind
+                  ? "bg-stone-900 text-white border-stone-900"
+                  : "text-stone-500 border-stone-200"
+              }`}
+            >
+              {ind === "all" ? "🏢 All Industries" : INDUSTRY_EMOJI[ind] ? `${INDUSTRY_EMOJI[ind]} ${ind}` : ind}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Content grid ─────────────────────────────────────────────────── */}
       <div className="px-4 sm:px-8 py-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTemplates.length === 0 && (
-          <div className="col-span-full p-12 text-center kc-float space-y-4">
-            <FileText className="w-10 h-10 text-stone-300 mx-auto" />
+          <div className="col-span-full py-16 text-center space-y-4">
+            <div className="text-5xl">📋</div>
             {templates.length === 0 ? (
               <>
                 <div>
@@ -239,9 +356,9 @@ export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({
                 </div>
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="ds-btn ds-btn-primary ds-btn-sm"
+                  className="inline-flex items-center gap-2 bg-stone-900 text-white text-xs font-black uppercase tracking-wider px-4 py-2 hover:bg-stone-700 transition-colors cursor-pointer"
                 >
-                  <FileText className="w-3.5 h-3.5" />
+                  <Plus className="w-3.5 h-3.5" />
                   Create First Template
                 </button>
               </>
@@ -256,10 +373,10 @@ export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({
           return (
           <div
             key={t.id}
-            className="bg-white border border-stone-200 flex flex-col overflow-hidden rounded-xl shadow-sm hover:shadow-md transition-shadow"
+            className="bg-white border-2 border-stone-200 flex flex-col overflow-hidden rounded-xl shadow-none hover:border-stone-400 transition-all"
           >
             {/* Colored top accent bar based on category */}
-            <div className="h-1 shrink-0" style={{ background: catStyle.border }} />
+            <div className="h-1.5 shrink-0" style={{ background: catStyle.border }} />
 
             {/* Card header */}
             <div className="px-5 pt-4 pb-3 flex items-start justify-between gap-3 border-b border-stone-100">
@@ -303,7 +420,7 @@ export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({
               </div>
             </div>
 
-            {/* Meta chips: status + category + media */}
+            {/* Meta chips: status + category + industry + media */}
             <div className="px-5 py-2.5 flex flex-wrap items-center gap-1.5 border-b border-stone-100">
               {getStatusChip(t.metaStatus)}
               <span
@@ -312,6 +429,19 @@ export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({
               >
                 {t.category}
               </span>
+              {(() => {
+                const ind = getIndustry(t.name);
+                const emoji = INDUSTRY_EMOJI[ind] ?? "";
+                return (
+                  <span
+                    onClick={() => setActiveIndustry(ind)}
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-stone-500 bg-stone-50 border border-stone-200 px-2 py-0.5 rounded-full cursor-pointer hover:border-stone-400 transition-colors"
+                    title={`Filter by ${ind}`}
+                  >
+                    {emoji} {ind}
+                  </span>
+                );
+              })()}
               {t.isShared && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-stone-500 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-full">
                   <Globe className="w-3 h-3" />
@@ -330,26 +460,27 @@ export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({
               </div>
             </div>
 
-            {/* Footer: buttons or broadcast CTA */}
-            {t.buttons && t.buttons.length > 0 ? (
-              <div className="px-5 pb-4 space-y-2">
-                <div className="text-[9px] uppercase tracking-wider font-bold text-stone-400 flex items-center gap-1">
-                  <MousePointerClick className="w-3 h-3" />
-                  Quick Reply Buttons
+            {/* Footer: buttons preview + broadcast CTA */}
+            <div className="px-5 pb-4 space-y-2">
+              {t.buttons && t.buttons.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-[9px] uppercase tracking-wider font-bold text-stone-400 flex items-center gap-1">
+                    <MousePointerClick className="w-3 h-3" />
+                    Quick Reply Buttons
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {t.buttons.map((btn, bIdx) => (
+                      <span
+                        key={bIdx}
+                        className="text-[11px] font-semibold border border-[#53bdeb] text-[#0a7abf] bg-white px-3 py-1 rounded-full leading-none"
+                      >
+                        {btn}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {t.buttons.map((btn, bIdx) => (
-                    <span
-                      key={bIdx}
-                      className="text-[11px] font-semibold border border-[#53bdeb] text-[#0a7abf] bg-white px-3 py-1 rounded-full leading-none"
-                    >
-                      {btn}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : isApproved ? (
-              <div className="px-5 pb-4">
+              )}
+              {isApproved && t.name !== "lead_capture_result" ? (
                 <button
                   onClick={() => onNavigate?.(`campaigns&launchTemplate=${encodeURIComponent(t.name)}`)}
                   className="w-full flex items-center justify-center gap-2 bg-wa-green hover:bg-wa-green-dark text-white text-[11px] font-black uppercase tracking-wider py-2 rounded-lg transition-colors cursor-pointer"
@@ -357,12 +488,10 @@ export const TemplatesTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({
                   <Megaphone className="w-3.5 h-3.5" />
                   Use in Campaign
                 </button>
-              </div>
-            ) : (
-              <div className="px-5 pb-4">
-                <div className="text-[10px] text-stone-400 italic text-center py-1">No CTA buttons · Awaiting Meta review</div>
-              </div>
-            )}
+              ) : !isApproved ? (
+                <div className="text-[10px] text-stone-400 italic text-center py-1">Awaiting Meta review</div>
+              ) : null}
+            </div>
           </div>
           );
         })}
