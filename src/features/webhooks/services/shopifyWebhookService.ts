@@ -136,6 +136,14 @@ export async function handleShopifyEvent(
     const shopifyOrderId = `SHPFY-${payload.order_number || payload.id}`;
     const shopifyNumericId = payload.id != null ? String(payload.id) : undefined;
 
+    // Shopify may deliver the same webhook more than once by design (not just on
+    // retry-after-failure). Without this guard, a redelivery crashes on the
+    // orderId unique constraint instead of being a no-op.
+    const alreadyProcessed = await repo.findOrderWithContact(orgId, shopifyOrderId);
+    if (alreadyProcessed) {
+      return { success: true, message: "Order already processed (duplicate webhook delivery)." };
+    }
+
     const contact = await repo.upsertShopifyContact(
       orgId,
       email,
