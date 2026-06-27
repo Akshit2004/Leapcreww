@@ -268,6 +268,8 @@ model ChatbotNode {
   title          String
   content        String       @db.Text
   options        String[] // Postgres scalar list
+  positionX      Float?       @default(100) // canvas x-coordinate; nullable for back-compat
+  positionY      Float?       @default(100) // canvas y-coordinate; nullable for back-compat
   delayTime      Int?
   nextId         String?
   routes         Json? // Stores options routing dynamically
