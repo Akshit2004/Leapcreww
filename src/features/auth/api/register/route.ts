@@ -107,7 +107,9 @@ export async function POST(req: Request) {
       
     const uniqueSlug = `${slug}-${Date.now().toString().slice(-4)}`;
 
-    // Execute Transaction
+    // Execute core registration transaction (user, org, membership, attempt update).
+    // Chatbot node seeding and automation seeding run AFTER the transaction so that
+    // a DB schema mismatch or missing column on those tables never blocks registration.
     const result = await prisma.$transaction(async (tx) => {
       // Create User and Organization
       const [user, org] = await Promise.all([
@@ -155,23 +157,33 @@ export async function POST(req: Request) {
         });
       }
 
-      // Default visual chatbot node
-      await tx.chatbotNode.create({
+      return { user, org };
+    });
+
+    // Seed default chatbot node — best-effort, does not block registration.
+    try {
+      await prisma.chatbotNode.create({
         data: {
           id: "n1",
           type: "message",
           title: "Welcome Message",
           content: "Hello! Welcome to our store. How can we help you today?",
           options: ["Support", "Sales"],
-          organizationId: org.id,
+          positionX: 100,
+          positionY: 100,
+          organizationId: result.org.id,
         }
       });
+    } catch (seedErr) {
+      console.error("⚠️ Default chatbot node seed failed (non-fatal):", seedErr);
+    }
 
-      // Seed all 20 default automations from catalog
-      await tx.automation.createMany({
+    // Seed default automations — best-effort, does not block registration.
+    try {
+      await prisma.automation.createMany({
         data: AUTOMATION_CATALOG.map((item) => ({
           name: item.title,
-          organizationId: org.id,
+          organizationId: result.org.id,
           triggerType: item.triggerType,
           triggerConfig: item.triggerConfig as Prisma.InputJsonValue,
           steps: item.steps as unknown as Prisma.InputJsonValue,
@@ -180,9 +192,9 @@ export async function POST(req: Request) {
           isActive: true,
         })),
       });
-
-      return { user, org };
-    });
+    } catch (seedErr) {
+      console.error("⚠️ Default automation seed failed (non-fatal):", seedErr);
+    }
 
     return NextResponse.json(
       { message: "Registration successful. Workspace created.", orgId: result.org.id },
